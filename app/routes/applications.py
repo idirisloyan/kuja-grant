@@ -977,14 +977,25 @@ def api_submit_application(app_id):
         responses = application.get_responses() or {}
         missing = []
         for idx, criterion in enumerate(criteria):
-            # Support both id-based keys (e.g. "approach") and index-based keys (e.g. "criterion_0")
-            cid = str(criterion.get('id', ''))
-            index_key = f'criterion_{idx}'
-            response_text = responses.get(cid, '') if cid else ''
-            if not response_text:
-                response_text = responses.get(index_key, '')
+            # Accept a response under any handle the frontend might have used to
+            # key it: the criterion id ("approach"), the normalized key (now
+            # always present via Grant.get_criteria — usually == id), or the
+            # positional index key ("criterion_0"). Checking all three closes
+            # the id/key/index mismatch that made a by-key-saved response look
+            # "missing" to a by-id-only validator (and vice-versa).
+            candidate_keys = [
+                str(criterion.get('id', '')),
+                str(criterion.get('key', '')),
+                f'criterion_{idx}',
+            ]
+            response_text = ''
+            for k in candidate_keys:
+                if k and str(responses.get(k, '') or '').strip():
+                    response_text = responses.get(k, '')
+                    break
             if not str(response_text).strip():
-                missing.append(criterion.get('label', cid or index_key))
+                label = criterion.get('label') or criterion.get('key') or criterion.get('id') or f'criterion_{idx}'
+                missing.append(label)
         if missing:
             return jsonify({
                 'error': 'Missing required responses',

@@ -320,9 +320,11 @@ export default function ApplyWizardClient() {
   );
 
   const canProceedFromEligibility = useCallback((): boolean => {
+    // SMK-009: require EVERY listed eligibility item to be checked. Filtering
+    // to `r.required` made this vacuously true for grants that don't flag
+    // items required, so handleNext advanced with nothing confirmed.
     const requirements = grant?.eligibility ?? [];
-    const requiredItems = requirements.filter((r) => r.required);
-    return requiredItems.every((r) => eligibility[r.key]?.checked);
+    return requirements.every((r) => eligibility[r.key]?.checked);
   }, [grant, eligibility]);
 
   const handleNext = useCallback(async () => {
@@ -823,6 +825,15 @@ export default function ApplyWizardClient() {
 
   const hasMissingItems = !requiredEligMet || !allCriteriaAnswered || !requiredDocsUploaded;
 
+  // SMK-009: gate the Eligibility step's Next button on EVERY listed
+  // requirement being checked. The old guard filtered to `r.required === true`,
+  // but `required` is optional and most grants leave it unset — so the guard
+  // was vacuously true and Next advanced silently with nothing checked and no
+  // feedback. Requiring all listed items matches the on-screen checkboxes.
+  const eligibilityComplete =
+    eligibilityReqs.length === 0 ||
+    eligibilityReqs.every((r) => eligibility[r.key]?.checked);
+
   return (
     <div className="max-w-[960px]">
       <PageShell>
@@ -998,12 +1009,20 @@ export default function ApplyWizardClient() {
           <ArrowLeft className="h-4 w-4" /> {t('common.previous')}
         </button>
         {step < 3 ? (
-          <button
-            onClick={handleNext}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))]"
-          >
-            {t('common.next')} <ArrowRight className="h-4 w-4" />
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleNext}
+              disabled={step === 0 && !eligibilityComplete}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 py-2 text-sm font-medium text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('common.next')} <ArrowRight className="h-4 w-4" />
+            </button>
+            {step === 0 && !eligibilityComplete && (
+              <span className="text-xs text-amber-600">
+                {t('apply.eligibility_incomplete_hint')}
+              </span>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {/* Phase 297 — quiet "things they look for" hint. Self-gates. */}

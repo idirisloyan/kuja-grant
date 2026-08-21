@@ -26,7 +26,7 @@
 // Old SW shells reference chunks that no longer exist; the activate
 // step purges any cache that doesn't match this prefix so the next
 // page open re-fetches the current bundle.
-const CACHE_VERSION = 'kuja-v15-0';
+const CACHE_VERSION = 'kuja-v16-0';   // bump: purges the stale *-api bucket that poisoned /auth/me (identity+role staleness across a session change)
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const API_CACHE = `${CACHE_VERSION}-api`;
@@ -39,7 +39,12 @@ const SHELL_URLS = ['/'];
 // Edit with care — caching auth-scoped responses is fine because the
 // cache is per-origin and we never persist auth tokens server-side.
 const API_CACHE_ALLOW = [
-  /^\/api\/auth\/me$/,                            // session check
+  // NOTE: /api/auth/me is deliberately NOT cached. It is the source of the
+  // current user's identity AND role, and the cache is keyed by URL only (not
+  // by session cookie), so after a session change stale-while-revalidate
+  // served the PREVIOUS user synchronously — the header, and every role-gated
+  // control, then rendered for the wrong user until the browser cache was
+  // cleared. Session identity must always be fetched live.
   /^\/api\/dashboard\b/,                          // role-aware dashboard
   /^\/api\/grants(?:\/\d+)?(?:\?|$)/,              // grants list + detail
   /^\/api\/applications(?:\/\d+)?(?:\?|$)/,        // applications list + detail

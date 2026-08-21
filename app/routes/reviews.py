@@ -1005,7 +1005,20 @@ def api_update_review(review_id):
             application = db.session.get(Application, review.application_id)
             if application and application.grant:
                 criteria = application.grant.get_criteria() or []
-                weight_map = {str(c.get('id', '')): c.get('weight', 1) for c in criteria}
+                # Scores are keyed by the criterion 'key' (e.g. 'impact') or an
+                # index key ('criterion_0'); the weight_map used to key ONLY by
+                # str(c['id']). Criteria created without an 'id' (the common
+                # case — the wizard assigns 'key', not 'id') therefore all fell
+                # back to weight 1, so the weighted average was correct only
+                # when every criterion carried equal weight. Key the map by id,
+                # key, AND index so a score under any of those resolves to the
+                # right weight.
+                weight_map = {}
+                for _idx, c in enumerate(criteria):
+                    w = c.get('weight', 1)
+                    for _k in (str(c.get('id', '')), c.get('key'), f'criterion_{_idx}'):
+                        if _k:
+                            weight_map[_k] = w
                 total_weight = 0
                 weighted_sum = 0
                 for cid, score_val in scores.items():

@@ -7,6 +7,24 @@ import { create } from 'zustand';
 import { api } from '@/lib/api';
 import type { User } from '@/lib/types';
 
+// Drop the service-worker's cached API responses at every session boundary.
+// The SW stale-while-revalidate cache is keyed by URL, not by session cookie,
+// so without this a login/logout could momentarily surface the previous user's
+// role-scoped data (dashboard, reports, grants…) for one render. Pairs with
+// removing /api/auth/me from the SW allow-list in public/sw.js.
+async function purgeApiCache(): Promise<void> {
+  if (typeof window === 'undefined' || !('caches' in window)) return;
+  try {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((k) => k.endsWith('-api')).map((k) => caches.delete(k)),
+    );
+    navigator.serviceWorker?.controller?.postMessage({ type: 'kuja-purge-api-cache' });
+  } catch {
+    /* non-fatal — freshness is best-effort */
+  }
+}
+
 // ---------------------------------------------------------------------------
 // State shape
 // ---------------------------------------------------------------------------
@@ -57,6 +75,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         { email, password },
       );
       if (res.success && res.user) {
+        await purgeApiCache();
         set({ user: res.user, stageLabels: res.stage_labels ?? {} });
         return true;
       }
@@ -70,7 +89,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await api.post('/auth/logout');
     } finally {
-      set({ user: null });
+      await purgeApiCache();
+      set({ user: null, stageLabels: {} });
     }
   },
 

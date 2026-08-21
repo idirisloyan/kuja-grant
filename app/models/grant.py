@@ -80,7 +80,22 @@ class Grant(db.Model):
         self.eligibility = _json_dump(value)
 
     def get_criteria(self):
-        return _json_load(self.criteria) or []
+        # Normalize every criterion to carry a stable `key` (non-destructive,
+        # on read). Historically criteria were stored with an `id` (e.g.
+        # 'approach') and NO `key`, but the whole frontend — the apply wizard
+        # (responses[c.key]) and the reviewer scorer (scores[c.key]) — indexes
+        # by `key`. With `key` undefined, EVERY criterion collapsed to the same
+        # slot: the manual per-criterion scorer coupled all scores into one,
+        # and per-criterion responses/scores could not be told apart. Deriving
+        # key := key or id or criterion_<i> gives each criterion a distinct,
+        # stable handle that also matches the id-keyed data already on disk.
+        raw = _json_load(self.criteria) or []
+        out = []
+        for i, c in enumerate(raw):
+            if isinstance(c, dict) and not c.get('key'):
+                c = {**c, 'key': c.get('id') or f'criterion_{i}'}
+            out.append(c)
+        return out
 
     def set_criteria(self, value):
         self.criteria = _json_dump(value)

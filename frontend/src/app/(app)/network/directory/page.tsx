@@ -38,13 +38,21 @@ export default function NetworkDirectoryPage() {
   const { t } = useTranslation();
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+    // SMK-013: the directory API returns 403 for a non-member (e.g. an NGO on
+    // the open Kuja marketplace, which carries no NetworkMembership). The old
+    // `.catch(() => {})` swallowed it silently, leaving `data` null forever —
+    // so the header subtitle stayed on "Loading…" and the body rendered
+    // nothing. Capture the error and render a proper members-only state.
     api.get<Resp>('/api/network/membership/directory').then((r) => {
       if (!cancelled) setData(r);
-    }).catch(() => {/* silent */}).finally(() => {
+    }).catch((e) => {
+      if (!cancelled) setError(e instanceof Error ? e.message : 'unavailable');
+    }).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
@@ -69,7 +77,11 @@ export default function NetworkDirectoryPage() {
         title={t('directory.title')}
         icon={Users}
         subtitle={
-          data ? t('directory.members_count', { n: data.total }) : t('common.loading')
+          loading
+            ? t('common.loading')
+            : data
+              ? t('directory.members_count', { n: data.total })
+              : ''
         }
       />
       <PageMain>
@@ -77,6 +89,12 @@ export default function NetworkDirectoryPage() {
           <div className="text-sm text-muted-foreground py-6 text-center">
             <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> {t('common.loading')}
           </div>
+        )}
+        {!loading && error && (
+          <Card className="p-6 text-center">
+            <Users className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">{t('directory.members_only')}</p>
+          </Card>
         )}
         {data && (
           <Card className="p-4 space-y-3">
