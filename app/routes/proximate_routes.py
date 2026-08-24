@@ -44,7 +44,7 @@ from app.models import (
 )
 from app.utils.network import ob_required
 from app.utils.helpers import get_request_json, aware_utc
-from app.utils.i18n import t, SUPPORTED_LANGUAGES
+from app.utils.i18n import t, SUPPORTED_LANGUAGES, resolve_network_lang
 
 logger = logging.getLogger('kuja')
 
@@ -6404,24 +6404,9 @@ def api_partner_mini_portal(token):
 
 
 def _proximate_portal_lang(network_id=None):
-    """Display language for an anonymous Proximate token-portal or any
-    server-generated user-facing label. These requests have no logged-in
-    user, so `get_lang()` would default to English — wrong for an
-    Arabic-first tenant. Resolve from the tenant network's default_language
-    (Proximate='ar'): prefer the row named by network_id, then the
-    host-resolved g.network, then 'en'.
-    """
-    try:
-        if network_id is not None:
-            net = Network.query.get(network_id)
-            if net and net.default_language in SUPPORTED_LANGUAGES:
-                return net.default_language
-    except Exception:
-        pass
-    net = getattr(g, 'network', None)
-    if net is not None and getattr(net, 'default_language', None) in SUPPORTED_LANGUAGES:
-        return net.default_language
-    return 'en'
+    """Anonymous Proximate token-portal display language. Thin wrapper over
+    the shared resolver so both proximate route modules use one implementation."""
+    return resolve_network_lang(network_id)
 
 
 def _partner_decision_timeline(partner) -> list[dict]:

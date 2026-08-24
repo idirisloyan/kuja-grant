@@ -69,6 +69,7 @@ from app.models import (
 )
 from app.utils.network import ob_required, get_current_network
 from app.utils.helpers import get_request_json
+from app.utils.i18n import t, resolve_network_lang
 
 logger = logging.getLogger('kuja')
 
@@ -1187,22 +1188,33 @@ def _receipt_payload(d: ProximateDisbursement) -> dict:
 @cycle_bp.route('/receipt/<token>', methods=['GET'])
 def api_receipt_get(token):
     """Public. The partner opens this from a WhatsApp link."""
+    # Anonymous portal — no logged-in user, so resolve the display language
+    # from the host tenant (Proximate is Arabic-first). The token hasn't
+    # resolved to a disbursement yet on the error path, so use g.network.
+    lang = resolve_network_lang()
     if not token or len(token) < 16:
-        return jsonify({'success': False, 'error': 'Invalid link'}), 404
+        return jsonify({'success': False,
+                        'error': t('proximate.receipt.invalid_link', lang=lang)}), 404
     d = ProximateDisbursement.query.filter_by(receipt_token=token).first()
     if not d:
-        return jsonify({'success': False, 'error': 'Invalid link'}), 404
+        return jsonify({'success': False,
+                        'error': t('proximate.receipt.invalid_link', lang=lang)}), 404
     return jsonify({'success': True, 'receipt': _receipt_payload(d)})
 
 
 @cycle_bp.route('/receipt/<token>', methods=['POST'])
 def api_receipt_confirm(token):
     """Public. The partner confirms the money arrived."""
+    lang = resolve_network_lang()
     if not token or len(token) < 16:
-        return jsonify({'success': False, 'error': 'Invalid link'}), 404
+        return jsonify({'success': False,
+                        'error': t('proximate.receipt.invalid_link', lang=lang)}), 404
     d = ProximateDisbursement.query.filter_by(receipt_token=token).first()
     if not d:
-        return jsonify({'success': False, 'error': 'Invalid link'}), 404
+        return jsonify({'success': False,
+                        'error': t('proximate.receipt.invalid_link', lang=lang)}), 404
+    # Once we have the disbursement, prefer its own tenant network for language.
+    lang = resolve_network_lang(d.network_id)
     if d.receipt_confirmed_at:
         return jsonify({
             'success': True,
@@ -1219,7 +1231,7 @@ def api_receipt_confirm(token):
     return jsonify({
         'success': True,
         'receipt': _receipt_payload(d),
-        'message': 'Thank you. Your confirmation has been recorded.',
+        'message': t('proximate.receipt.confirmed_thanks', lang=lang),
     })
 
 

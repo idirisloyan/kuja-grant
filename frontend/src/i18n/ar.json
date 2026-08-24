@@ -4497,5 +4497,7 @@
   "proximate.timeline.status_changed": "تم تحديث الحالة",
   "proximate.timeline.screening_flagged": "الفحص الدوري: تم وضع علامة للمراجعة",
   "proximate.timeline.screening_cleared": "الفحص الدوري: تم اجتيازه",
-  "proximate.timeline.intervention": "إجراء {kind} ({status})"
+  "proximate.timeline.intervention": "إجراء {kind} ({status})",
+  "proximate.receipt.invalid_link": "رابط غير صالح",
+  "proximate.receipt.confirmed_thanks": "شكرًا لكم. تم تسجيل تأكيدكم."
 }

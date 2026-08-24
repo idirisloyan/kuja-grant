@@ -4521,5 +4521,7 @@
   "proximate.timeline.status_changed": "Status updated",
   "proximate.timeline.screening_flagged": "Routine screening: flagged for review",
   "proximate.timeline.screening_cleared": "Routine screening: cleared",
-  "proximate.timeline.intervention": "{kind} measure ({status})"
+  "proximate.timeline.intervention": "{kind} measure ({status})",
+  "proximate.receipt.invalid_link": "Invalid link",
+  "proximate.receipt.confirmed_thanks": "Thank you. Your confirmation has been recorded."
 }

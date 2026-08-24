@@ -77,6 +77,31 @@ def get_lang():
     return request.args.get('lang', 'en')
 
 
+def resolve_network_lang(network_id=None):
+    """Display language for anonymous token-portals and any server-generated
+    user-facing label that has no logged-in user to resolve from — where
+    get_lang() would wrongly default to English on an Arabic-first tenant.
+
+    Prefers the tenant Network's default_language (the row named by
+    network_id, then the host-resolved g.network), and falls back to 'en'.
+    Use this instead of get_lang() on partner/receipt/endorser/report
+    portals and anywhere the request may be anonymous.
+    """
+    from flask import g
+    from app.models.network import Network
+    try:
+        if network_id is not None:
+            net = Network.query.get(network_id)
+            if net and net.default_language in SUPPORTED_LANGUAGES:
+                return net.default_language
+    except Exception:
+        pass
+    net = getattr(g, 'network', None)
+    if net is not None and getattr(net, 'default_language', None) in SUPPORTED_LANGUAGES:
+        return net.default_language
+    return 'en'
+
+
 def t(key, lang=None, **params):
     """Translate a key to the given (or current user's) language.
 
