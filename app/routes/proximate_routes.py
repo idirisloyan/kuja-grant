@@ -4817,6 +4817,24 @@ def api_record_disbursement():
             'success': False,
             'error': 'partner_id and amount_usd required',
         }), 400
+    # A disbursement must be a POSITIVE amount of money. The check above only
+    # caught None/''/0, so a negative amount (e.g. "-5") slipped through and was
+    # fully processed — corrupting the round's money reconciliation and dodging
+    # the cosigner ladder (|amount| under the threshold). A clawback is a
+    # separate concept, never a negative "release". Reject non-positive /
+    # non-numeric amounts here, before any state is created.
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        return jsonify({
+            'success': False,
+            'error': 'amount_usd must be a number',
+        }), 400
+    if amount <= 0:
+        return jsonify({
+            'success': False,
+            'error': 'amount_usd must be greater than zero',
+        }), 400
     partner = ProximatePartner.query.filter_by(
         id=partner_id, network_id=net.id,
     ).first()
