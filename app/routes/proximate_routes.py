@@ -8274,34 +8274,59 @@ def api_cron_sanctions_rescreen():
     rescreened = 0
     newly_flagged = 0
     skipped_recent = 0
+    errors = 0
     for p in candidates:
-        if p.sanctions_checked_at and p.sanctions_checked_at >= stale_threshold:
+        # sanctions_checked_at is a naive TIMESTAMP on Postgres; coerce to
+        # aware UTC before comparing against the aware threshold, or the
+        # whole batch dies on 'can't compare offset-naive and offset-aware'
+        # (this cron 500'd every run since Phase 690 shipped — a Sudan fund's
+        # only recurring sanctions re-screen silently dead for weeks).
+        checked = p.sanctions_checked_at
+        if checked is not None and checked.tzinfo is None:
+            checked = checked.replace(tzinfo=timezone.utc)
+        if checked is not None and checked >= stale_threshold:
             skipped_recent += 1
             continue
-        prev_flag = bool(p.sanctions_flag)
-        _run_partner_sanctions_screen(p)
-        rescreened += 1
-        if p.sanctions_flag and not prev_flag:
-            newly_flagged += 1
-            AuditChainEntry.append(
-                action='proximate.partner.sanctions_rescreen_flagged',
-                actor_email='cron-monitoring',
-                subject_kind='proximate_partner',
-                subject_id=p.id,
-                details={
-                    'partner_name': p.name,
-                    'rescreen_day': now.strftime('%Y-%m-%d'),
-                },
+        # Per-partner isolation: one partner's screen (external API hiccup,
+        # bad intake data) must never abort the compliance sweep for everyone
+        # else. Roll back and keep going; surface the count in the response.
+        try:
+            prev_flag = bool(p.sanctions_flag)
+            _run_partner_sanctions_screen(p)
+            rescreened += 1
+            if p.sanctions_flag and not prev_flag:
+                newly_flagged += 1
+                AuditChainEntry.append(
+                    action='proximate.partner.sanctions_rescreen_flagged',
+                    actor_email='cron-monitoring',
+                    subject_kind='proximate_partner',
+                    subject_id=p.id,
+                    details={
+                        'partner_name': p.name,
+                        'rescreen_day': now.strftime('%Y-%m-%d'),
+                    },
+                )
+        except Exception as e:
+            errors += 1
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            logger.error(
+                f'Proximate cron: sanctions rescreen FAILED for partner '
+                f'{p.id} ({p.name!r}): {e}'
             )
     logger.info(
         f'Proximate cron: sanctions rescreened {rescreened} partners, '
-        f'newly flagged {newly_flagged}, skipped recent {skipped_recent}'
+        f'newly flagged {newly_flagged}, skipped recent {skipped_recent}, '
+        f'errors {errors}'
     )
     return jsonify({
         'success': True,
         'rescreened': rescreened,
         'newly_flagged': newly_flagged,
         'skipped_recent': skipped_recent,
+        'errors': errors,
         'day': now.strftime('%Y-%m-%d'),
     })
 
