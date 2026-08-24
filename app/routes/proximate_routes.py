@@ -4905,6 +4905,71 @@ def api_record_disbursement():
                     'warnings': readiness['warnings'],
                 }), 422
 
+    # ---- Amount caps (2026-08-24) --------------------------------------
+    # A disbursement may not push a partner OVER their approved panel award,
+    # nor the round OVER its envelope. Money must stay within what the panel
+    # authorised and what the donor committed — the same 'money needs
+    # authorisation' principle as R-01 and the cycle gate. Without this the
+    # API silently accepted a $16k release on a $12k award / $15k envelope,
+    # visible only afterwards as negative 'unspent' on the closeout pack.
+    _cap_round_id = payload.get('round_id')
+    if _cap_round_id:
+        from app.models import ProximateAward
+        _ACTIVE_DISB = (
+            'pending_cosign', 'pending_report', 'reported', 'verified', 'flagged',
+        )
+        # Award cap — only when an award exists for this partner on this round
+        # (rounds that don't use awards have no cap to apply here).
+        _award = ProximateAward.query.filter_by(
+            round_id=_cap_round_id, partner_id=partner.id,
+            network_id=net.id, decision='awarded',
+        ).first()
+        if _award and _award.approved_amount_usd:
+            _to_partner = sum(
+                float(x.amount_usd or 0)
+                for x in ProximateDisbursement.query.filter_by(
+                    network_id=net.id, round_id=_cap_round_id, partner_id=partner.id,
+                ).all()
+                if x.status in _ACTIVE_DISB and (x.amount_usd or 0) > 0
+            )
+            if _to_partner + amount > float(_award.approved_amount_usd) + 0.01:
+                return jsonify({
+                    'success': False,
+                    'error': (
+                        f'This would disburse ${_to_partner + amount:,.0f} to a partner whose '
+                        f'panel award is ${float(_award.approved_amount_usd):,.0f}. A disbursement '
+                        f'cannot exceed the approved award.'
+                    ),
+                    'code': 'err.exceeds_award',
+                    'awarded': float(_award.approved_amount_usd),
+                    'already_disbursed': _to_partner,
+                }), 422
+        # Envelope cap — total disbursements across the round may not exceed
+        # the committed envelope.
+        _cap_round = ProximateRound.query.filter_by(
+            id=_cap_round_id, network_id=net.id,
+        ).first()
+        if _cap_round and _cap_round.envelope_usd:
+            _round_total = sum(
+                float(x.amount_usd or 0)
+                for x in ProximateDisbursement.query.filter_by(
+                    network_id=net.id, round_id=_cap_round_id,
+                ).all()
+                if x.status in _ACTIVE_DISB and (x.amount_usd or 0) > 0
+            )
+            if _round_total + amount > float(_cap_round.envelope_usd) + 0.01:
+                return jsonify({
+                    'success': False,
+                    'error': (
+                        f'This would take total disbursements to '
+                        f'${_round_total + amount:,.0f}, over the round envelope of '
+                        f'${float(_cap_round.envelope_usd):,.0f}.'
+                    ),
+                    'code': 'err.exceeds_envelope',
+                    'envelope': float(_cap_round.envelope_usd),
+                    'already_disbursed': _round_total,
+                }), 422
+
     from datetime import timedelta
     from app.models.proximate_disbursement import (
         COSIGN_THRESHOLD_USD, cosigners_required_for,
