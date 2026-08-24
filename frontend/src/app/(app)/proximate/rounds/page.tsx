@@ -40,6 +40,15 @@ interface Round {
   signers_required: number;
 }
 
+// Round trigger type -> localized label (i18n key first, then a prettified
+// fallback so a new backend type never leaks a raw snake_case token).
+function roundTypeLabel(tt: string, t: (k: string) => string): string {
+  if (!tt) return '';
+  const k = `proximate.round_type.${tt}`;
+  const v = t(k);
+  return v && v !== k ? v : tt.replace(/_/g, ' ');
+}
+
 export default function ProximateRoundsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
@@ -143,7 +152,7 @@ export default function ProximateRoundsPage() {
                   }`}
                 >
                   {s === 'all'
-                    ? `All (${rounds.length})`
+                    ? `${t('common.all')} (${rounds.length})`
                     : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
                 </button>
               ))}
@@ -153,8 +162,8 @@ export default function ProximateRoundsPage() {
           <Card>
             <EmptyState
               compact
-              title={`No ${labelForProximateStatus(statusFilter, t).toLowerCase()} rounds`}
-              hint="Try a different status filter."
+              title={t('proximate.rounds.empty_title')}
+              hint={t('proximate.rounds.empty_hint')}
             />
           </Card>
         )}
@@ -173,12 +182,12 @@ export default function ProximateRoundsPage() {
                           </Badge>
                           {r.status === 'in_review' && (
                             <span className="text-xs text-muted-foreground">
-                              {r.signed_count}/{r.signers_required} signed
+                              {r.signed_count}/{r.signers_required} {t('proximate.rounds.signed')}
                             </span>
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                          <span>{r.trigger_type}</span>
+                          <span>{roundTypeLabel(r.trigger_type, t)}</span>
                           {r.donor_name && <span>· {r.donor_name}</span>}
                           {r.envelope_usd && (
                             <span>· ${r.envelope_usd.toLocaleString()}</span>

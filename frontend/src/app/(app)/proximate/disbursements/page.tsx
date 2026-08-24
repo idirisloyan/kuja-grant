@@ -206,7 +206,7 @@ export default function ProximateDisbursementsPage() {
                   }`}
                 >
                   {s === 'all'
-                    ? `All (${countedRows.length})`
+                    ? `${t('common.all')} (${countedRows.length})`
                     : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
                 </button>
               ))}

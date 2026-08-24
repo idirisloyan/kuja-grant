@@ -4540,5 +4540,17 @@
   "proximate.status.nominated": "مُرشَّح",
   "proximate.status.endorsements_open": "التأييد مفتوح",
   "proximate.status.dd_failed": "لم تجتَز الفحوصات",
-  "proximate.status.suspended": "موقوف"
+  "proximate.status.suspended": "موقوف",
+  "common.all": "الكل",
+  "proximate.status.in_review": "قيد المراجعة",
+  "proximate.status.active": "نشطة",
+  "proximate.status.closed": "مغلقة",
+  "proximate.status.cancelled": "ملغاة",
+  "proximate.round_type.disaster": "كارثة",
+  "proximate.round_type.donor_commitment": "التزام مانح",
+  "proximate.round_type.programme_cycle": "دورة برنامج",
+  "proximate.round_type.programme": "برنامج",
+  "proximate.round_type.donor": "مانح",
+  "proximate.rounds.empty_title": "لا توجد دورات مطابقة لهذا المرشّح",
+  "proximate.rounds.empty_hint": "جرّب مرشّح حالة مختلفًا."
 }

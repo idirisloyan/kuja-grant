@@ -4564,5 +4564,16 @@
   "proximate.status.nominated": "Nominated",
   "proximate.status.endorsements_open": "Endorsements open",
   "proximate.status.dd_failed": "Checks failed",
-  "proximate.status.suspended": "Suspended"
+  "proximate.status.suspended": "Suspended",
+  "proximate.status.in_review": "In review",
+  "proximate.status.active": "Active",
+  "proximate.status.closed": "Closed",
+  "proximate.status.cancelled": "Cancelled",
+  "proximate.round_type.disaster": "Disaster",
+  "proximate.round_type.donor_commitment": "Donor commitment",
+  "proximate.round_type.programme_cycle": "Programme cycle",
+  "proximate.round_type.programme": "Programme",
+  "proximate.round_type.donor": "Donor",
+  "proximate.rounds.empty_title": "No rounds match this filter",
+  "proximate.rounds.empty_hint": "Try a different status filter."
 }
