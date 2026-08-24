@@ -1059,11 +1059,6 @@ export function ProximateRoundDetailClient() {
                   };
                   const stageCls = stageStyles[p.stage] || stageStyles.planned;
                   const partnerHref = `/proximate/admin?partner=${p.partner_id}`;
-                  const endorseUrl = typeof window !== 'undefined'
-                    ? `${window.location.origin}/proximate/endorse/${p.partner_id}`
-                    : `/proximate/endorse/${p.partner_id}`;
-                  const waText = `Please endorse this Proximate partner for our current round: ${p.partner_name || 'partner'}. Open: ${endorseUrl}`;
-                  const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
                   return (
                     <li
                       key={p.id != null ? `enr-${p.id}` : `syn-${p.partner_id}`}
@@ -1100,7 +1095,14 @@ export function ProximateRoundDetailClient() {
                       >
                         History
                       </Link>
-                      {isOperator ? (
+                      {/* Endorser outreach goes through the OB-minted tokenised
+                          invite (/proximate-endorse-invite?t=<token>), which
+                          works for an external recipient with no session. The
+                          old non-operator "Share endorser link" pointed at
+                          /proximate/endorse/<partnerId> — an auth-required
+                          partner page that bounced anonymous recipients to
+                          login — so it is gone; the invite is the one path. */}
+                      {isOperator && (
                         <button
                           type="button"
                           onClick={() => openInviteEndorser(p.partner_id, p.partner_name || `Partner #${p.partner_id}`)}
@@ -1108,24 +1110,15 @@ export function ProximateRoundDetailClient() {
                         >
                           Invite endorser
                         </button>
-                      ) : (
-                        <a
-                          href={waHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                        >
-                          Share endorser link
-                        </a>
                       )}
                     </li>
                   );
                 })}
               </ul>
               <p className="text-[10px] text-muted-foreground mt-2">
-                Click a partner to open detail. Share the endorser link
-                via WhatsApp — the recipient opens it, endorses, and the
-                round auto-updates.
+                Click a partner to open detail. Use “Invite endorser” to send a
+                tokenised link the recipient can open with no login — they
+                endorse, and the round auto-updates.
               </p>
             </Card>
             );

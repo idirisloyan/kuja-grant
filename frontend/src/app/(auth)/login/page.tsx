@@ -49,7 +49,7 @@ export default function LoginPage() {
   // so disabling the trigger is the only robust option.
   const [hydrated, setHydrated] = useState(false);
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
-  const { t } = useTranslation();
+  const { t, isRTL } = useTranslation();
   const network = useNetworkStore((s) => s.network);
   const isNetworkTenant = network?.slug && network.slug !== 'kuja';
   const tenantName = network?.name || 'Kuja';
@@ -250,9 +250,9 @@ export default function LoginPage() {
     const submittedPassword = passwordInput?.value ?? password;
 
     const errors: { email?: string; password?: string } = {};
-    if (!submittedEmail) errors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) errors.email = 'Enter a valid email';
-    if (!submittedPassword) errors.password = 'Password is required';
+    if (!submittedEmail) errors.email = t('login.email_required');
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(submittedEmail)) errors.email = t('login.email_invalid');
+    if (!submittedPassword) errors.password = t('login.password_required');
 
     if (Object.keys(errors).length > 0) {
       setFieldError(errors);
@@ -277,13 +277,11 @@ export default function LoginPage() {
   void router;
 
   return (
-    // dir="ltr" is pinned here on purpose. The Proximate tenant defaults to
-    // Arabic, so use-translation sets documentElement.dir="rtl" globally — but
-    // this login page is English-only on every tenant, and in an RTL context
-    // trailing punctuation on English lines flips to the front (".Welcome back",
-    // "?Not a member yet"). Forcing LTR on the login subtree renders the English
-    // copy correctly regardless of the tenant's default language.
-    <div dir="ltr" className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
+    // The login screen is now localised, so it honours the tenant's language
+    // direction: RTL for Arabic (Proximate defaults to it), LTR otherwise. The
+    // copy is no longer English-only, so the old dir="ltr" pin — which existed
+    // to stop English punctuation flipping under a global RTL — is gone.
+    <div dir={isRTL ? 'rtl' : 'ltr'} className="relative min-h-screen overflow-hidden flex items-center justify-center px-4 py-10">
       {/* Hero gradient */}
       <div
         aria-hidden
@@ -332,49 +330,44 @@ export default function LoginPage() {
                   login backdrop or the tenant name is unreadable. */}
               <div className="kuja-display text-2xl text-white">{tenantName}</div>
               <div className="text-xs text-orange-200 uppercase tracking-widest">
-                {isSax ? 'Community-led response' : isNetworkTenant ? 'Network fund operations' : 'Grant intelligence'}
+                {isSax ? t('login.eyebrow_sax') : isNetworkTenant ? t('login.eyebrow_network') : t('login.eyebrow_grant')}
               </div>
             </div>
           </div>
           {isSax ? (
             <>
               <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
-                Community-led response,
-                <span className="block text-orange-300">delivered in days.</span>
+                {t('login.hero_sax_title')}
+                <span className="block text-orange-300">{t('login.hero_sax_accent')}</span>
               </h1>
               <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
-                {tenantName} runs the SCLR cycle on Kuja: permission-first intake, light community
-                vetting, and micro-grants to already-active groups — with a visible
-                selection-to-disbursement clock. Decisions are recorded; spending is never policed.
+                {t('login.hero_sax_body', { tenant: tenantName })}
               </p>
             </>
           ) : isNetworkTenant ? (
             <>
               <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
-                Locally-led
-                <span className="block text-orange-300">humanitarian response</span>
-                at network speed.
+                {t('login.hero_network_title')}
+                <span className="block text-orange-300">{t('login.hero_network_accent')}</span>
               </h1>
               <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
-                {tenantName} runs on Kuja: capacity-assessed members, fund + window governance,
-                multi-signature emergency declarations, and end-to-end audit-anchored reporting.
+                {t('login.hero_network_body', { tenant: tenantName })}
               </p>
             </>
           ) : (
             <>
               <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
-                Grants done with the
-                <span className="block text-orange-300">Global South</span>
-                in mind.
+                {t('login.hero_kuja_title')}
+                <span className="block text-orange-300">{t('login.hero_kuja_accent')}</span>
               </h1>
               <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
-                Kuja unifies donor grant design, NGO readiness coaching, reviewer intelligence, and ongoing compliance — with AI that grounds every recommendation in your own documents.
+                {t('login.hero_kuja_body')}
               </p>
             </>
           )}
           <div className="pt-2 flex items-center gap-2 text-xs text-orange-100/70">
             <Sparkles className="h-3.5 w-3.5" />
-            AI co-pilot embedded in every surface
+            {t('login.ai_copilot')}
           </div>
         </div>
 
@@ -389,7 +382,7 @@ export default function LoginPage() {
                 tenants exist (see demoMode gate). */}
             <div className="mb-4">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-                Sign in to
+                {t('login.sign_in_to')}
               </div>
               {demoMode ? (
                 <TenantSwitcher />
@@ -402,9 +395,9 @@ export default function LoginPage() {
               )}
             </div>
             <div className="mb-6">
-              <h2 className="kuja-display text-2xl text-foreground">Sign in</h2>
+              <h2 className="kuja-display text-2xl text-foreground">{t('auth.sign_in')}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Welcome back to {tenantName}.
+                {t('login.welcome_back_to', { tenant: tenantName })}
               </p>
             </div>
 
@@ -423,7 +416,7 @@ export default function LoginPage() {
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs font-medium">Email</Label>
+                <Label htmlFor="email" className="text-xs font-medium">{t('auth.email_label')}</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
                   <input
@@ -442,7 +435,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs font-medium">Password</Label>
+                <Label htmlFor="password" className="text-xs font-medium">{t('auth.password_label')}</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
                   <input
@@ -467,15 +460,15 @@ export default function LoginPage() {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('auth.signing_in')}
                   </>
                 ) : !hydrated ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t('login.loading')}
                   </>
                 ) : (
                   <>
-                    Sign in <ArrowRight className="ml-2 h-4 w-4" />
+                    {t('auth.sign_in')} <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
@@ -487,7 +480,7 @@ export default function LoginPage() {
             {demoMode && (
             <div className="mt-6 pt-6 border-t border-border">
               <p className="kuja-eyebrow text-[10px] mb-3">
-                {isNetworkTenant ? `Sign in as a ${tenantName} role` : 'Try a demo account'}
+                {isNetworkTenant ? t('login.sign_in_as_role', { tenant: tenantName }) : t('login.try_demo')}
               </p>
               <div
                 className={
@@ -521,7 +514,7 @@ export default function LoginPage() {
                 })}
               </div>
               <p className="mt-3 text-[11px] text-muted-foreground text-center">
-                Password: <code className="font-mono bg-muted px-1.5 py-0.5 rounded">pass123</code> for all demos
+                {t('login.demo_password', { pw: 'pass123' })}
               </p>
             </div>
             )}
@@ -533,17 +526,17 @@ export default function LoginPage() {
             {!isNetworkTenant && (
               <div className="mt-5 pt-5 border-t border-border text-center">
                 <p className="text-xs text-muted-foreground mb-2">
-                  New to {tenantName}?
+                  {t('login.new_to', { tenant: tenantName })}
                 </p>
                 <a
                   href="/network/join/"
                   className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
                   style={{ color: tenantBrand }}
                 >
-                  Apply to join {tenantName} <ArrowRight className="h-3.5 w-3.5" />
+                  {t('login.apply_to_join', { tenant: tenantName })} <ArrowRight className="h-3.5 w-3.5" />
                 </a>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  New organisations are reviewed before joining.
+                  {t('login.join_reviewed')}
                 </p>
               </div>
             )}
