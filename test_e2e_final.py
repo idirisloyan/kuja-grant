@@ -97,6 +97,54 @@ def login_ok(email):
     return s
 
 
+# --- SMK-004b: self-clean test-artifact grants at process exit ---
+# This suite runs against PROD on every push and used to leave its
+# [E2E-TEST]/[SMOKE-TEST] grants behind (published ones couldn't be deleted,
+# and a test that errored before its inline delete stranded its grant), so they
+# accumulated to thousands. This atexit sweep removes any that remain, using
+# the SAME API + owning-donor sessions the suite created them with — no
+# direct-DB access and no PROD_DATABASE_URL secret required (the grant DELETE
+# endpoint now removes test-artifact grants at any status and cascades their
+# test applications). atexit fires on normal exit AND on sys.exit(), so it runs
+# even when the gate fails. Best-effort: never raises, never fails the run.
+import atexit
+
+
+def _cleanup_e2e_grants():
+    total = 0
+    for email in (DONOR2, DONOR1):
+        try:
+            s, r = login(email)
+            if r.status_code != 200:
+                continue
+            for _ in range(25):  # repeat in case the list paginates
+                gr = s.get(f"{BASE}/api/grants?per_page=200", timeout=15)
+                data = gr.json()
+                grants = data if isinstance(data, list) else data.get("grants", [])
+                stale = [
+                    g for g in grants
+                    if (g.get("title") or "").startswith(("[E2E-TEST]", "[SMOKE-TEST]"))
+                    and g.get("id") is not None
+                ]
+                if not stale:
+                    break
+                progressed = False
+                for g in stale:
+                    d = s.delete(f"{BASE}/api/grants/{g['id']}?cascade=true", timeout=15)
+                    if d.status_code in (200, 204):
+                        total += 1
+                        progressed = True
+                if not progressed:
+                    break  # avoid an infinite loop if none can be deleted
+        except Exception:
+            pass
+    if total:
+        print(f"  [cleanup] removed {total} test-artifact grant(s) via API")
+
+
+atexit.register(_cleanup_e2e_grants)
+
+
 # =========================================================================
 def reset_lockouts_via_admin():
     """Clear IP + per-email lockouts so the suite starts (and resumes) clean.

@@ -607,14 +607,24 @@ def api_delete_grant(grant_id):
     if current_user.role == 'donor' and grant.donor_org_id != current_user.org_id:
         return jsonify({'error': 'You can only delete your own grants', 'success': False}), 403
 
-    if grant.status != 'draft':
+    # SMK-004b — a grant whose title is a recognised test artifact
+    # ([E2E-TEST]/[SMOKE-TEST]/legacy) is disposable by construction. The
+    # owning donor (or an admin) may delete it at ANY status, and it always
+    # cascades over its (test) applications. This is what lets the E2E suite
+    # clean up the grants it PUBLISHES through the same API it created them
+    # with — removing the need for a direct-DB PROD_DATABASE_URL secret in CI.
+    # Real grants keep the strict only-draft protection below.
+    from app.utils.test_artifact_titles import is_test_artifact_title
+    is_test = is_test_artifact_title(grant.title)
+
+    if grant.status != 'draft' and not is_test:
         return jsonify({
             'error': f'Cannot delete a grant with status "{grant.status}". '
                      f'Only drafts may be deleted.',
             'success': False,
         }), 400
 
-    cascade = request.args.get('cascade', '').lower() in ('true', '1', 'yes')
+    cascade = is_test or request.args.get('cascade', '').lower() in ('true', '1', 'yes')
     apps = Application.query.filter_by(grant_id=grant.id).all()
 
     cascaded_app_ids = []
@@ -628,10 +638,12 @@ def api_delete_grant(grant_id):
                 'success': False,
             }), 409
 
-        # With cascade=true, only draft applications are removed. Any
-        # submitted/awarded application still blocks (data integrity).
+        # With cascade=true, only draft applications are removed — any
+        # submitted/awarded application still blocks (data integrity). A test
+        # artifact grant is exempt: it cascades over its applications at any
+        # status, since they are themselves test records.
         non_draft = [a for a in apps if a.status != 'draft']
-        if non_draft:
+        if non_draft and not is_test:
             return jsonify({
                 'error': f'Cannot cascade-delete: {len(non_draft)} application(s) are not '
                          f'in draft status (statuses: '
@@ -662,6 +674,17 @@ def api_delete_grant(grant_id):
         for a in apps:
             cascaded_app_ids.append(a.id)
             db.session.delete(a)
+
+    # SMK-004b — other tables FK grants.id with ON DELETE NO ACTION
+    # (compliance_snapshots, grant_questions, monitoring_visits); a published
+    # test grant that accrued any of these would otherwise block the delete on
+    # a FK violation. Sweep them for test artifacts only, so real grants keep
+    # their existing integrity behaviour untouched.
+    if is_test:
+        from app.models import ComplianceSnapshot, GrantQuestion, MonitoringVisit
+        for model in (ComplianceSnapshot, GrantQuestion, MonitoringVisit):
+            for row in model.query.filter_by(grant_id=grant.id).all():
+                db.session.delete(row)
 
     title = grant.title
     db.session.delete(grant)

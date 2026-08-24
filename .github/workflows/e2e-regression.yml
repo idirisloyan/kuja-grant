@@ -63,18 +63,23 @@ jobs:
         env:
           KUJA_URL: ${{ env.KUJA_URL }}
 
-      # This E2E gate writes to PROD on every push and used to leave its
-      # [E2E-TEST]/[SMOKE-TEST] grants behind — they accumulated to ~4,000 and
-      # cluttered the marketplace/dashboards. Self-clean here (always, even on
-      # test failure). Requires a PROD_DATABASE_URL secret (the Postgres PUBLIC
-      # proxy URL); skips with a warning if not set.
-      - name: Prune test-artifact grants (self-clean)
+      # SMK-004b — test-artifact grants are now cleaned up by the suite itself:
+      # test_e2e_final.py has an atexit sweep that deletes every remaining
+      # [E2E-TEST]/[SMOKE-TEST] grant via the API (the grant DELETE endpoint
+      # removes test artifacts at any status + cascades their test apps). That
+      # runs inside "Run E2E regression tests" above — no secret, no direct DB.
+      #
+      # This step is now an OPTIONAL belt-and-suspenders sweep for anything the
+      # API path can't reach (e.g. artifacts left by other, non-repo runners).
+      # It only runs if a PROD_DATABASE_URL secret happens to be set; if not, it
+      # is a no-op — the API self-clean above already handled this run.
+      - name: Prune test-artifact grants (optional DB sweep)
         if: always()
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::warning::PROD_DATABASE_URL not set — skipping auto-prune; [E2E-TEST] grants will accumulate in prod. Add the secret to enable self-cleanup."
+            echo "::notice::PROD_DATABASE_URL not set — skipping the optional DB sweep. The suite's API self-clean already removed this run's [E2E-TEST] grants."
             exit 0
           fi
           pip install psycopg2-binary
