@@ -22,6 +22,7 @@ on:
       - "static/nextjs/**"
       - "app/**"
       - "browser_test.py"
+      - "browser_data_accuracy_test.py"
       - ".github/workflows/browser-smoke.yml"
   pull_request:
     branches: [main]
@@ -31,6 +32,7 @@ on:
       - "static/nextjs/**"
       - "app/**"
       - "browser_test.py"
+      - "browser_data_accuracy_test.py"
       - ".github/workflows/browser-smoke.yml"
   workflow_dispatch:
 
@@ -65,6 +67,18 @@ jobs:
           ANTHROPIC_API_KEY: "ci-fake-key"
         run: |
           python browser_test.py --local
+
+      # Data-accuracy checks: assert values/state/counts are CORRECT, not just
+      # that pages render. Against the in-process SQLite seed most will SKIP
+      # (no scored apps / single tenant), but the machinery runs and any real
+      # data violation still fails. The daily data-accuracy-monitor.yml runs
+      # the same suite against prod where the data is rich.
+      - name: Run data-accuracy checks (in-process; skips on sparse seed)
+        env:
+          FLASK_ENV: testing
+          ANTHROPIC_API_KEY: "ci-fake-key"
+        run: |
+          python browser_data_accuracy_test.py --local
 
       - name: Upload screenshots on failure
         if: failure()

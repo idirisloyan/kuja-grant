@@ -1,0 +1,46 @@
+name: Data-accuracy monitor (prod)
+
+# Drives the REAL browser as a real user against production and asserts the
+# DATA is correct — computed values match their formula, on-screen state
+# matches the record, counts have no phantoms, and another tenant's data is
+# absent. This is the class of bug the team kept finding that render/200-level
+# tests (browser_test.py, the API suites) can't see: a page renders perfectly
+# and shows the WRONG number.
+#
+# Read-only: it logs in with the shared demo accounts (pass123) and only reads.
+# No secrets, no writes, no fixtures. Runs daily as an early-warning monitor
+# and on demand.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Base URL to check"
+        required: false
+        default: "https://fund.kuja.org"
+
+jobs:
+  data-accuracy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps + Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "playwright>=1.40,<2.0"
+          python -m playwright install --with-deps chromium
+
+      - name: Run data-accuracy checks against prod
+        run: |
+          python browser_data_accuracy_test.py --base "${{ github.event.inputs.target_url || 'https://fund.kuja.org' }}"
