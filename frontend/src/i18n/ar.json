@@ -4485,5 +4485,17 @@
   "proximate.disbursements.days_left": "مستحق خلال {n} يومًا",
   "proximate.partners.show_test": "إظهار شركاء الاختبار ({n})",
   "proximate.partners.hide_test": "إخفاء شركاء الاختبار ({n})",
-  "proximate.partners.test_toggle_hint": "شركاء ثابتون يُستخدمون للاختبار. مخفيون افتراضيًا ليبقى السجل الحي واضحًا — ولا يُحذفون أبدًا."
+  "proximate.partners.test_toggle_hint": "شركاء ثابتون يُستخدمون للاختبار. مخفيون افتراضيًا ليبقى السجل الحي واضحًا — ولا يُحذفون أبدًا.",
+  "proximate.timeline.nominated": "تم ترشيحكم للصندوق",
+  "proximate.timeline.self_nominated": "تم استلام الترشيح الذاتي",
+  "proximate.timeline.endorsements_opened": "بدأت مرحلة التأييد",
+  "proximate.timeline.dd_pending": "بدأت العناية الواجبة",
+  "proximate.timeline.dd_clear": "تم اجتياز العناية الواجبة",
+  "proximate.timeline.bank_verified": "تم التحقق من بيانات الدفع",
+  "proximate.timeline.suspended": "موقوف بانتظار المراجعة",
+  "proximate.timeline.reinstated": "تمت إعادة التفعيل",
+  "proximate.timeline.status_changed": "تم تحديث الحالة",
+  "proximate.timeline.screening_flagged": "الفحص الدوري: تم وضع علامة للمراجعة",
+  "proximate.timeline.screening_cleared": "الفحص الدوري: تم اجتيازه",
+  "proximate.timeline.intervention": "إجراء {kind} ({status})"
 }

@@ -4509,5 +4509,17 @@
   "proximate.disbursements.days_left": "Due in {n} days",
   "proximate.partners.show_test": "Show test partners ({n})",
   "proximate.partners.hide_test": "Hide test partners ({n})",
-  "proximate.partners.test_toggle_hint": "Fixture partners used for testing. Hidden by default so the live register stays readable — they are never deleted."
+  "proximate.partners.test_toggle_hint": "Fixture partners used for testing. Hidden by default so the live register stays readable — they are never deleted.",
+  "proximate.timeline.nominated": "Nominated to the fund",
+  "proximate.timeline.self_nominated": "Self-nomination received",
+  "proximate.timeline.endorsements_opened": "Endorsement stage opened",
+  "proximate.timeline.dd_pending": "Due diligence started",
+  "proximate.timeline.dd_clear": "Due diligence cleared",
+  "proximate.timeline.bank_verified": "Payment details verified",
+  "proximate.timeline.suspended": "Suspended pending review",
+  "proximate.timeline.reinstated": "Reinstated",
+  "proximate.timeline.status_changed": "Status updated",
+  "proximate.timeline.screening_flagged": "Routine screening: flagged for review",
+  "proximate.timeline.screening_cleared": "Routine screening: cleared",
+  "proximate.timeline.intervention": "{kind} measure ({status})"
 }

@@ -44,6 +44,7 @@ from app.models import (
 )
 from app.utils.network import ob_required
 from app.utils.helpers import get_request_json, aware_utc
+from app.utils.i18n import t, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger('kuja')
 
@@ -6402,6 +6403,27 @@ def api_partner_mini_portal(token):
     })
 
 
+def _proximate_portal_lang(network_id=None):
+    """Display language for an anonymous Proximate token-portal or any
+    server-generated user-facing label. These requests have no logged-in
+    user, so `get_lang()` would default to English — wrong for an
+    Arabic-first tenant. Resolve from the tenant network's default_language
+    (Proximate='ar'): prefer the row named by network_id, then the
+    host-resolved g.network, then 'en'.
+    """
+    try:
+        if network_id is not None:
+            net = Network.query.get(network_id)
+            if net and net.default_language in SUPPORTED_LANGUAGES:
+                return net.default_language
+    except Exception:
+        pass
+    net = getattr(g, 'network', None)
+    if net is not None and getattr(net, 'default_language', None) in SUPPORTED_LANGUAGES:
+        return net.default_language
+    return 'en'
+
+
 def _partner_decision_timeline(partner) -> list[dict]:
     """Phase 716d — the partner-facing 'decisions affecting me' feed.
 
@@ -6416,20 +6438,26 @@ def _partner_decision_timeline(partner) -> list[dict]:
 
     Sorted newest-first. Fairness posture: right-to-know without
     right-to-appeal — the payload ends with how to request a review.
+
+    Labels are translated server-side to the partner's tenant language
+    (Proximate is Arabic-first, and this feed is an anonymous token portal
+    with no logged-in user to resolve language from). The frontend renders
+    `label` raw, so it must arrive already localized.
     """
+    lang = _proximate_portal_lang(partner.network_id)
     events = []
 
-    # 1. Whitelisted audit actions → plain-language labels
-    action_labels = {
-        'proximate.partner.nominated': 'Nominated to the fund',
-        'proximate.partner.self_nominated': 'Self-nomination received',
-        'proximate.partner.endorsements_opened': 'Endorsement stage opened',
-        'proximate.partner.dd_pending': 'Due diligence started',
-        'proximate.partner.dd_clear': 'Due diligence cleared',
-        'proximate.partner.bank_verified': 'Payment details verified',
-        'proximate.partner.suspended': 'Suspended pending review',
-        'proximate.partner.reinstated': 'Reinstated',
-        'proximate.partner.status_changed': 'Status updated',
+    # 1. Whitelisted audit actions → i18n keys → localized labels
+    action_keys = {
+        'proximate.partner.nominated': 'proximate.timeline.nominated',
+        'proximate.partner.self_nominated': 'proximate.timeline.self_nominated',
+        'proximate.partner.endorsements_opened': 'proximate.timeline.endorsements_opened',
+        'proximate.partner.dd_pending': 'proximate.timeline.dd_pending',
+        'proximate.partner.dd_clear': 'proximate.timeline.dd_clear',
+        'proximate.partner.bank_verified': 'proximate.timeline.bank_verified',
+        'proximate.partner.suspended': 'proximate.timeline.suspended',
+        'proximate.partner.reinstated': 'proximate.timeline.reinstated',
+        'proximate.partner.status_changed': 'proximate.timeline.status_changed',
     }
     audit_rows = (
         AuditChainEntry.query
@@ -6439,12 +6467,12 @@ def _partner_decision_timeline(partner) -> list[dict]:
         .all()
     )
     for row in audit_rows:
-        label = action_labels.get(row.action)
-        if not label:
+        key = action_keys.get(row.action)
+        if not key:
             continue
         events.append({
             'kind': 'status',
-            'label': label,
+            'label': t(key, lang=lang),
             'at': row.created_at.isoformat() if row.created_at else None,
         })
 
@@ -6452,10 +6480,10 @@ def _partner_decision_timeline(partner) -> list[dict]:
     if partner.sanctions_checked_at:
         events.append({
             'kind': 'screening',
-            'label': (
-                'Routine screening: flagged for review'
-                if partner.sanctions_flag
-                else 'Routine screening: cleared'
+            'label': t(
+                'proximate.timeline.screening_flagged' if partner.sanctions_flag
+                else 'proximate.timeline.screening_cleared',
+                lang=lang,
             ),
             'at': partner.sanctions_checked_at.isoformat(),
         })
@@ -6467,7 +6495,8 @@ def _partner_decision_timeline(partner) -> list[dict]:
     ).order_by(InterventionMeasure.opened_at.desc()).limit(20).all():
         events.append({
             'kind': 'intervention',
-            'label': f'{m.kind.title()} measure ({m.status})',
+            'label': t('proximate.timeline.intervention', lang=lang,
+                       kind=m.kind.title(), status=m.status),
             'reason': m.reason,
             'response_due_at': (
                 m.response_due_at.isoformat() if m.response_due_at else None
