@@ -26,6 +26,10 @@ import re
 
 # Prefix every test-suite-created title should carry going forward.
 E2E_TITLE_PREFIX = "[E2E-TEST]"
+# The manual smoke/probe suites tag their disposable grants with this prefix.
+# Both are recognised so cleanup tooling (and the grant DELETE relaxation)
+# treats them identically.
+SMOKE_TITLE_PREFIX = "[SMOKE-TEST]"
 
 
 # Titles that test_e2e_final.py created before the prefix convention
@@ -94,7 +98,7 @@ def is_test_artifact_title(title: str | None) -> bool:
         return True
     if not title.strip():
         return True
-    if title.startswith(E2E_TITLE_PREFIX):
+    if title.startswith(E2E_TITLE_PREFIX) or title.startswith(SMOKE_TITLE_PREFIX):
         return True
     if title in LEGACY_TEST_GRANT_TITLES:
         return True
