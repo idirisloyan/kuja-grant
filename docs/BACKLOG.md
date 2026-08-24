@@ -26,6 +26,29 @@ Updated 2026-07-05.
 
 ## Platform — open items (all tenants)
 
+### Optional: activate the E2E DB-sweep secret (belt-and-suspenders only)
+- **last_touched:** 2026-08-24
+- SMK-004b (the E2E gate leaving `[E2E-TEST]`/`[SMOKE-TEST]` grants on prod —
+  they once accumulated to thousands) is **resolved without any secret**
+  (`ce3b9dbdf` / `7ae88e8e0`): the grant `DELETE` endpoint now removes
+  test-artifact-titled grants at ANY status for the owning donor and cascades
+  their apps + the NO-ACTION grant FKs (`compliance_snapshots`,
+  `grant_questions`, `monitoring_visits`), and `test_e2e_final.py` runs an
+  `atexit` sweep that deletes leftovers via that API. No `PROD_DATABASE_URL`
+  is needed for the repo's own suite. Verified live (published `[E2E-TEST]`
+  grant → 200; real published grant still 400).
+- [ ] **OPTIONAL / human action** — `.github/workflows/e2e-regression.yml`
+      keeps a downgraded "Prune test-artifact grants (optional DB sweep)" step
+      that only runs when a `PROD_DATABASE_URL` GitHub secret is set (no-op
+      notice otherwise). Its ONLY remaining value is catching test-artifact
+      grants left by OTHER, non-repo runners (soak/load scripts not in this
+      repo). To activate, a repo admin sets the secret to the Postgres PUBLIC
+      proxy URL (Settings → Secrets and variables → Actions, or
+      `gh secret set PROD_DATABASE_URL --repo idirisloyan/kuja-grant`).
+      **It is a production DB credential — a human adds it; do NOT have an
+      agent store it. Skip entirely if no non-repo runners write to prod**
+      (the API self-clean already covers this repo's E2E gate).
+
 ### Regression gate is not trustworthy locally
 - **last_touched:** 2026-07-05
 - Local `smoke_test.py` reports ~137/167 PASS on Windows dev; failures
