@@ -1047,6 +1047,7 @@ export function ProximateRoundDetailClient() {
                 {participants.map((p) => {
                   const stageStyles: Record<string, string> = {
                     planned: 'bg-muted text-muted-foreground border-border',
+                    awarded: 'bg-indigo-100 text-indigo-800 border-indigo-300',
                     endorsement_open: 'bg-amber-100 text-amber-800 border-amber-300',
                     endorsed: 'bg-blue-100 text-blue-800 border-blue-300',
                     bank_verified: 'bg-sky-100 text-sky-800 border-sky-300',
@@ -1065,7 +1066,7 @@ export function ProximateRoundDetailClient() {
                   const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
                   return (
                     <li
-                      key={p.id}
+                      key={p.id != null ? `enr-${p.id}` : `syn-${p.partner_id}`}
                       className="flex items-center gap-2 py-1.5 border-b border-border/60 last:border-b-0 flex-wrap"
                     >
                       <Link

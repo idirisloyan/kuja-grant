@@ -2844,37 +2844,88 @@ def api_round_participants(round_id):
                   ProximatePartner.id == ProximateRoundParticipant.partner_id)
             .order_by(ProximatePartner.name.asc())
             .all())
+    # R-05 follow-up: a partner can be awarded / contracted / disbursed in a
+    # round WITHOUT ever being explicitly enrolled on the participant roster
+    # (awards and participants are separate records). Those partners were
+    # invisible here even though the Awards and Disbursement tabs showed them,
+    # so the roster looked empty despite money having moved. Fold them in as
+    # read-only "synthetic" roster rows (id=None, synthetic=True) with a stage
+    # derived from how far they've progressed, so the roster reflects every
+    # partner actually associated with the round.
+    from app.models import ProximateAward, ProximateDisbursement
+    enrolled_ids = {r.partner_id for r in rows}
+
+    # Furthest stage per partner, from award → disbursement lifecycle.
+    synth_stage: dict[int, str] = {}
+    for a in ProximateAward.query.filter_by(
+        round_id=round_row.id, network_id=net.id, decision='awarded',
+    ).all():
+        if a.partner_id:
+            synth_stage[a.partner_id] = 'awarded'
+    _disb_stage = {
+        'pending_cosign': 'awarded', 'pending_report': 'disbursed',
+        'reported': 'reported', 'verified': 'verified', 'flagged': 'reported',
+    }
+    for d in ProximateDisbursement.query.filter_by(
+        round_id=round_row.id, network_id=net.id,
+    ).all():
+        if d.partner_id:
+            synth_stage[d.partner_id] = _disb_stage.get(d.status, 'disbursed')
+
+    synth_ids = [pid for pid in synth_stage if pid not in enrolled_ids]
+
+    all_pids = [r.partner_id for r in rows] + synth_ids
     partners_by_id = {
         p.id: p for p in ProximatePartner.query.filter(
-            ProximatePartner.id.in_([r.partner_id for r in rows] or [0])
+            ProximatePartner.id.in_(all_pids or [0])
         ).all()
     }
+
+    participants = [
+        {
+            'id': r.id,
+            'partner_id': r.partner_id,
+            'partner_name': (
+                partners_by_id[r.partner_id].name
+                if r.partner_id in partners_by_id else None
+            ),
+            'partner_locality': (
+                partners_by_id[r.partner_id].locality
+                if r.partner_id in partners_by_id else None
+            ),
+            'partner_status': (
+                partners_by_id[r.partner_id].status
+                if r.partner_id in partners_by_id else None
+            ),
+            'stage': r.stage,
+            'notes': r.notes,
+            'added_at': r.added_at.isoformat() if r.added_at else None,
+            'synthetic': False,
+        }
+        for r in rows
+    ]
+    for pid in synth_ids:
+        p = partners_by_id.get(pid)
+        if not p:
+            continue
+        participants.append({
+            'id': None,
+            'partner_id': pid,
+            'partner_name': p.name,
+            'partner_locality': p.locality,
+            'partner_status': p.status,
+            'stage': synth_stage[pid],
+            'notes': None,
+            'added_at': None,
+            'synthetic': True,
+        })
+    participants.sort(key=lambda x: (x['partner_name'] or '').lower())
+
     return jsonify({
         'success': True,
         'round_id': round_row.id,
         'round_title': round_row.title,
-        'participants': [
-            {
-                'id': r.id,
-                'partner_id': r.partner_id,
-                'partner_name': (
-                    partners_by_id[r.partner_id].name
-                    if r.partner_id in partners_by_id else None
-                ),
-                'partner_locality': (
-                    partners_by_id[r.partner_id].locality
-                    if r.partner_id in partners_by_id else None
-                ),
-                'partner_status': (
-                    partners_by_id[r.partner_id].status
-                    if r.partner_id in partners_by_id else None
-                ),
-                'stage': r.stage,
-                'notes': r.notes,
-                'added_at': r.added_at.isoformat() if r.added_at else None,
-            }
-            for r in rows
-        ],
+        'participants': participants,
     })
 
 
@@ -6391,6 +6442,102 @@ def _ensure_endorser_public_token(endorser) -> str:
         endorser.public_token = secrets.token_urlsafe(32)
         db.session.commit()
     return endorser.public_token
+
+
+# =====================================================================
+# R-04 — partner-facing contract signing (no-login tokenised portal).
+# The token in the URL is the only credential, mirroring the disbursement
+# report + endorser portals. This is what makes the partner signature an
+# INDEPENDENT act rather than an Oversight-Body self-attestation.
+# =====================================================================
+
+def _contract_sign_payload(c, partner) -> dict:
+    """What the partner needs to recognise and sign their own agreement.
+    Deliberately small — no internal ids beyond the contract, no other
+    partners, no round finances."""
+    return {
+        'contract_id': c.id,
+        'status': c.status,
+        'partner_name': partner.name if partner else None,
+        'partner_name_ar': getattr(partner, 'name_ar', None) if partner else None,
+        'official_name_ar': c.official_name_ar,
+        'official_name_en': c.official_name_en,
+        'signatory_name': c.signatory_name,
+        'signatory_title': c.signatory_title,
+        'approved_amount_usd': c.approved_amount_usd,
+        'local_currency': c.local_currency,
+        'local_amount': c.local_amount,
+        'duration_days': c.duration_days,
+        'reporting_deadline': (
+            c.reporting_deadline.isoformat() if c.reporting_deadline else None
+        ),
+        'already_signed': c.partner_signed_at is not None,
+        'partner_signed_at': (
+            c.partner_signed_at.isoformat() if c.partner_signed_at else None
+        ),
+        'partner_signed_name': c.partner_signed_name,
+    }
+
+
+@proximate_bp.route('/contract-sign/<token>', methods=['GET'])
+def api_contract_sign_lookup(token):
+    """Public: resolve a signing token to the agreement being presented for
+    the partner's signature. No auth — the token IS the credential."""
+    from app.models import ProximateContract, ProximatePartner
+    c = ProximateContract.query.filter_by(partner_sign_token=token).first()
+    if not c:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    partner = db.session.get(ProximatePartner, c.partner_id)
+    return jsonify({'success': True, 'contract': _contract_sign_payload(c, partner)})
+
+
+@proximate_bp.route('/contract-sign/<token>', methods=['POST'])
+def api_contract_sign_submit(token):
+    """Public: the partner records THEIR OWN signature. Body:
+       { full_name: str (typed name = signature evidence), agree: bool }.
+    Idempotent — re-signing returns success without a second stamp. This is
+    the only path that can move a contract to 'partner_signed'; the OB PATCH
+    route refuses to set that status by hand (see api_contract_update)."""
+    from app.models import ProximateContract, ProximatePartner
+    c = ProximateContract.query.filter_by(partner_sign_token=token).first()
+    if not c:
+        return jsonify({'success': False, 'error': 'invalid token'}), 404
+    partner = db.session.get(ProximatePartner, c.partner_id)
+
+    if c.partner_signed_at is not None:
+        return jsonify({
+            'success': True, 'already_signed': True,
+            'contract': _contract_sign_payload(c, partner),
+        })
+    if c.status in ('completed', 'void'):
+        return jsonify({
+            'success': False, 'error': f'This agreement is {c.status}.',
+        }), 409
+
+    payload = request.get_json(silent=True) or {}
+    full_name = (payload.get('full_name') or '').strip()
+    agree = bool(payload.get('agree'))
+    if not full_name or not agree:
+        return jsonify({
+            'success': False,
+            'error': 'A typed full name and agreement to the terms are required to sign.',
+        }), 400
+
+    c.partner_signed_name = full_name[:200]
+    c.partner_signed_at = datetime.now(timezone.utc)
+    c.partner_sign_source = 'partner_portal'
+    if c.status in ('not_started', 'drafting', 'sent'):
+        c.status = 'partner_signed'
+    db.session.commit()
+
+    try:
+        from app.routes.proximate_cycle_routes import _audit
+        _audit('proximate.contract.partner_signed', 'contract', c.id,
+               name=full_name, source='partner_portal')
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'contract': _contract_sign_payload(c, partner)})
 
 
 def _resolve_endorsing_party(token):

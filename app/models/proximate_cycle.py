@@ -366,6 +366,21 @@ class ProximateContract(db.Model):
         db.Integer, db.ForeignKey("documents.id"), nullable=True,
     )
 
+    # R-04 — partner-facing signature. The OB used to flip status to
+    # 'partner_signed' by hand, so the same operator could attest both sides
+    # of the agreement. Instead the partner signs through a no-login tokenised
+    # link (the same pattern as the report + endorser portals): partner_signed
+    # is now only reachable by the partner's own action on this token, and the
+    # name they type is captured as evidence of an independent identity.
+    partner_sign_token = db.Column(
+        db.String(64), nullable=True, unique=True, index=True,
+    )
+    partner_signed_name = db.Column(db.String(200), nullable=True)
+    # Provenance of the partner signature: 'partner_portal' (signed via the
+    # tokenised link), 'pandadoc' (external e-sign), or 'ob_offline' (recorded
+    # by the OB with out-of-band evidence — kept for legacy/edge cases).
+    partner_sign_source = db.Column(db.String(30), nullable=True)
+
     created_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=True,
     )
@@ -377,6 +392,12 @@ class ProximateContract(db.Model):
     @property
     def is_complete(self) -> bool:
         return self.status == "completed" or bool(self.completed_at)
+
+    @staticmethod
+    def make_sign_token() -> str:
+        """A bearer credential for the partner's no-login signing link."""
+        import secrets
+        return secrets.token_urlsafe(32)
 
     def to_dict(self) -> dict:
         return {
@@ -414,6 +435,18 @@ class ProximateContract(db.Model):
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "has_signed_doc": bool(self.signed_doc_id),
             "is_complete": self.is_complete,
+            # R-04 — partner signing. The token is a bearer credential the OB
+            # shares with the partner; exposing it here (to the authenticated
+            # OB who owns the contract) mirrors how the disbursement report
+            # token is surfaced. The relative link keeps working behind the
+            # Railway proxy (see the report portal for the same pattern).
+            "partner_sign_token": self.partner_sign_token,
+            "partner_sign_url": (
+                f"/proximate-contract-sign?t={self.partner_sign_token}"
+                if self.partner_sign_token else None
+            ),
+            "partner_signed_name": self.partner_signed_name,
+            "partner_sign_source": self.partner_sign_source,
         }
 
 

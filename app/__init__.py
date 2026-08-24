@@ -193,6 +193,15 @@ def create_app(config_name=None):
                         conn.execute(text("ALTER TABLE applications ADD COLUMN ai_rubric_result_json TEXT"))
                     if "budget_lines_json" not in cols:
                         conn.execute(text("ALTER TABLE applications ADD COLUMN budget_lines_json TEXT"))
+                # R-04 (2026-08-24) — partner-facing contract signing columns.
+                if "proximate_contracts" in tables:
+                    cols = {c["name"] for c in inspector.get_columns("proximate_contracts")}
+                    if "partner_sign_token" not in cols:
+                        conn.execute(text("ALTER TABLE proximate_contracts ADD COLUMN partner_sign_token VARCHAR(64)"))
+                    if "partner_signed_name" not in cols:
+                        conn.execute(text("ALTER TABLE proximate_contracts ADD COLUMN partner_signed_name VARCHAR(200)"))
+                    if "partner_sign_source" not in cols:
+                        conn.execute(text("ALTER TABLE proximate_contracts ADD COLUMN partner_sign_source VARCHAR(30)"))
                 conn.commit()
         except Exception as e:
             app.logger.warning(f"Phase 33/34/40 column back-fill skipped: {e}")

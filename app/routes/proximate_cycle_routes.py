@@ -972,6 +972,34 @@ def api_contract_update(contract_id):
                 'success': False,
                 'error': f'status must be one of: {", ".join(CONTRACT_STATUSES)}',
             }), 400
+        # R-04: separation of the two signatures. The OB cannot record the
+        # PARTNER's signature by hand — that let one operator attest both
+        # sides. 'partner_signed' is only reached by the partner acting on
+        # their own signing link (POST /contract-sign/<token>, which stamps
+        # partner_sign_source='partner_portal').
+        if status == 'partner_signed' and c.partner_sign_source not in (
+            'partner_portal', 'pandadoc',
+        ):
+            return jsonify({
+                'success': False,
+                'error': (
+                    'The partner signs their own agreement through the signing '
+                    'link — share it with them from this contract. The Oversight '
+                    'Body cannot record the partner signature on their behalf.'
+                ),
+                'code': 'err.partner_must_sign',
+            }), 422
+        # R-04: the agreement is only complete once BOTH sides have signed —
+        # an independent partner signature first, then Adeso.
+        if status in ('adeso_signed', 'completed') and not c.partner_signed_at:
+            return jsonify({
+                'success': False,
+                'error': (
+                    'The partner has not signed yet. Share the signing link and '
+                    'wait for their signature before Adeso signs or completes.'
+                ),
+                'code': 'err.partner_not_signed',
+            }), 422
         c.status = status
         stamps = {
             'sent': 'sent_at',
@@ -981,6 +1009,12 @@ def api_contract_update(contract_id):
         }
         if status in stamps and not getattr(c, stamps[status]):
             setattr(c, stamps[status], _now())
+
+    # R-04: mint the partner's signing token as soon as the agreement is in a
+    # signable pre-partner-signed state, so the OB always has a link to share
+    # (covers legacy contracts that predate this column too).
+    if c.status in ('drafting', 'sent') and not c.partner_sign_token:
+        c.partner_sign_token = ProximateContract.make_sign_token()
 
     db.session.commit()
     _audit('proximate.contract.updated', 'contract', c.id, status=c.status)

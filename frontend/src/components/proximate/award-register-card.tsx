@@ -38,6 +38,10 @@ interface Contract {
   is_complete: boolean;
   official_name_ar: string | null;
   signatory_name: string | null;
+  // R-04 — partner-facing signing
+  partner_sign_url: string | null;
+  partner_signed_name: string | null;
+  partner_signed_at: string | null;
 }
 
 interface Award {
@@ -212,6 +216,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [copied, setCopied] = useState(false);
   const [approved, setApproved] = useState(a.approved_amount_usd?.toString() || '');
   const [reason, setReason] = useState(a.amount_reason || '');
   const [method, setMethod] = useState(a.decision_method || 'consensus');
@@ -252,11 +257,16 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
 
   async function setContractStatus(status: string) {
     if (!a.contract) return;
-    setBusy(true);
+    setBusy(true); setErr('');
     try {
       await api.patch(`/api/proximate/contracts/${a.contract.id}`, { status });
       onChanged();
-    } catch { /* reload shows truth */ }
+    } catch (e) {
+      // R-04: the server now refuses to record the partner's signature by
+      // hand, and refuses adeso_signed/completed before the partner has
+      // signed — surface that instead of silently no-op'ing.
+      setErr((e as { message?: string })?.message || 'Could not update the agreement.');
+    }
     setBusy(false);
   }
 
@@ -398,10 +408,42 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
                         {t('proximate.cycle.open_pandadoc') || 'Open in PandaDoc'} <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
+                    {a.contract.partner_signed_name && (
+                      <span className="text-[11px] text-emerald-700">
+                        Partner signed: {a.contract.partner_signed_name}
+                      </span>
+                    )}
                   </div>
+                  {/* R-04 — the partner signs via their OWN tokenised link, so
+                      the signature is an independent identity, not an OB
+                      self-attestation. The OB shares the link; they cannot mark
+                      the partner signature themselves (server refuses it). */}
+                  {canEdit && a.contract.partner_sign_url && !a.contract.partner_signed_at && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        size="sm" variant="outline" className="text-xs h-7" disabled={busy}
+                        onClick={() => {
+                          const c = a.contract;
+                          if (!c?.partner_sign_url) return;
+                          const url = `${window.location.origin}${c.partner_sign_url}`;
+                          navigator.clipboard?.writeText(url).then(
+                            () => { setCopied(true); setTimeout(() => setCopied(false), 2000); },
+                            () => {},
+                          );
+                        }}
+                      >
+                        {copied ? 'Link copied' : 'Copy partner signing link'}
+                      </Button>
+                      <span className="text-[11px] text-muted-foreground">
+                        Share with the partner to sign
+                      </span>
+                    </div>
+                  )}
                   {canEdit && (
                     <div className="flex flex-wrap gap-1.5">
-                      {CONTRACT_STATUSES.map((s) => (
+                      {/* partner_signed is intentionally absent — only the
+                          partner can reach that state via their link. */}
+                      {CONTRACT_STATUSES.filter((s) => s !== 'partner_signed').map((s) => (
                         <Button
                           key={s} size="sm" variant="outline" disabled={busy}
                           className="text-xs h-7"
