@@ -190,10 +190,21 @@ def api_round_setup(round_id):
         if field in body:
             setattr(rnd, field, _parse_date(body.get(field)))
 
-    db.session.commit()
-    _audit('proximate.cycle.setup', 'round', rnd.id,
-           region=rnd.target_region, locality=rnd.target_locality,
-           envelope=rnd.envelope_usd, overhead=rnd.admin_overhead_usd)
+    # R-03: the client loads the setup by sending an EMPTY patch (read-via-
+    # write, to keep one response shape). Previously this always committed and
+    # wrote a 'proximate.cycle.setup' audit-chain entry, so *every page render*
+    # minted a phantom "Cycle setup" event and polluted the tamper-evident log.
+    # Only record the mutation when this request actually changed the round.
+    changed = db.session.is_modified(rnd)
+    if changed:
+        db.session.commit()
+        _audit('proximate.cycle.setup', 'round', rnd.id,
+               region=rnd.target_region, locality=rnd.target_locality,
+               envelope=rnd.envelope_usd, overhead=rnd.admin_overhead_usd)
+    else:
+        # No net change (an empty/no-op read patch) — leave the audit chain
+        # untouched and don't emit a write.
+        db.session.rollback()
 
     return jsonify({
         'success': True,
@@ -1005,6 +1016,21 @@ def compute_readiness(partner_id: int, round_id: int) -> dict:
             'code': 'partner_missing',
             'message': 'Partner not found.',
         }], 'warnings': []}
+
+    # 0. Round activation (R-01). Money cannot move until the round itself
+    # has been ACTIVATED by the required independent Oversight Body
+    # signatures. This is the separation-of-duties control at the point of
+    # release; the disbursement endpoint enforces it server-side too.
+    rnd = ProximateRound.query.get(round_id)
+    if not rnd or rnd.status != 'active':
+        blocks.append({
+            'code': 'round_not_active',
+            'message': (
+                'This round has not been activated. It needs the required '
+                'Oversight Body signatures and must be Active before any '
+                'funds can be released.'
+            ),
+        })
 
     # 1. Due diligence
     status = (getattr(partner, 'status', '') or '').lower()
@@ -2014,6 +2040,27 @@ def cycle_state(rnd):
             'partner': None,
             'what': f'{open_issues} unresolved issue(s) in the evidence log',
             'severity': 'warn'})
+
+    # R-06: lifecycle prerequisites. The outstanding list is built by walking
+    # the awards / disbursements / meetings that EXIST — so an untouched round
+    # (no awards, never activated) generates no blockers and would report
+    # itself "ready to close" the moment it is created. "Nothing outstanding
+    # because nothing has happened" is not "finished". A cycle can only be
+    # closed out once it has actually run: it must have been activated, and it
+    # must have awarded at least one partner. These are hard blocks.
+    if rnd.status not in ('active', 'closed'):
+        outstanding.insert(0, {
+            'partner': None,
+            'what': (
+                f'Round is "{rnd.status}", not active — it has not been '
+                'activated, so there is nothing to close out yet.'
+            ),
+            'severity': 'block'})
+    if not awarded:
+        outstanding.insert(0, {
+            'partner': None,
+            'what': 'No partner has been awarded in this cycle — nothing to close out.',
+            'severity': 'block'})
 
     blocks = [o for o in outstanding if o['severity'] == 'block']
     return {

@@ -1003,8 +1003,13 @@ export function ProximateRoundDetailClient() {
             // there's something to see (the original behaviour).
             const rosterMutable =
               !!round && (round.status === 'draft' || round.status === 'active');
-            const showRoster =
-              participants.length > 0 || (isOperator && rosterMutable);
+            // R-05: an operator must ALWAYS see the roster card (heading +
+            // count + empty state), not a blank tab. Previously the card only
+            // rendered for OB when the round was draft/active, so on an
+            // in_review (or closed) round with no enrolled participants the
+            // whole Partners tab returned null — no heading, no empty state,
+            // no error. The "Add partner" CTA stays gated on rosterMutable.
+            const showRoster = participants.length > 0 || isOperator;
             if (!showRoster) return null;
             return (
             <Card id="round-roster" className="p-4 scroll-mt-4">
@@ -1031,7 +1036,11 @@ export function ProximateRoundDetailClient() {
               </div>
               {participants.length === 0 && (
                 <p className="text-xs text-muted-foreground italic py-4 text-center">
-                  No partners on the roster yet. Click <span className="font-medium">Add partner</span> to enrol the first NGO.
+                  {isOperator && rosterMutable ? (
+                    <>No partners on the roster yet. Click <span className="font-medium">Add partner</span> to enrol the first NGO.</>
+                  ) : (
+                    <>No partners have been enrolled on this round&rsquo;s roster.</>
+                  )}
                 </p>
               )}
               <ul className="space-y-1.5">

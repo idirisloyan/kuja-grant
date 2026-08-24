@@ -4777,6 +4777,37 @@ def api_record_disbursement():
             f"Proximate: disbursement on non-cleared partner id={partner.id} status={partner.status}"
         )
 
+    # ---- R-01: two-signer activation gate (2026-08-24) ------------------
+    # Separation of duties at the exact point where money leaves. A release
+    # tied to a round may ONLY happen once that round has been ACTIVATED —
+    # i.e. it collected the required number of INDEPENDENT Oversight Body
+    # signatures (status 'in_review' → 'active', activated_at populated).
+    # A round still in draft/in_review (or cancelled/closed) has not cleared
+    # the two-signer control, so recording a disbursement against it bypasses
+    # separation of duties. This is a HARD server-side guard — it holds even
+    # if a caller forges a request straight to the API, and the UI readiness
+    # checklist surfaces the same condition (see cycle compute_readiness).
+    _guard_round_id = payload.get('round_id')
+    if _guard_round_id:
+        _guard_round = ProximateRound.query.filter_by(
+            id=_guard_round_id, network_id=net.id,
+        ).first()
+        if not _guard_round:
+            return jsonify({'success': False, 'error': 'Round not in tenant'}), 404
+        if _guard_round.status != 'active':
+            return jsonify({
+                'success': False,
+                'error': (
+                    f'This round is "{_guard_round.status}", not active. It must be '
+                    f'activated by {ROUND_SIGNERS_REQUIRED} independent Oversight Body '
+                    'signatures before any funds can be released.'
+                ),
+                'code': 'err.round_not_active',
+                'round_status': _guard_round.status,
+                'signed_count': _guard_round.signed_count,
+                'signers_required': ROUND_SIGNERS_REQUIRED,
+            }), 422
+
     # ---- Cycle authorisation gate (2026-07-24) --------------------------
     # Money may not leave without a panel award decision behind it and a
     # completed agreement in front of it. Both are recorded elsewhere; this

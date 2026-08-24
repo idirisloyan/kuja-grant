@@ -247,7 +247,7 @@ export default function ProximateReportPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div translate="no" className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto">
           <Card className="p-6 text-center">
             <p className="text-sm text-red-600">{loadError}</p>
@@ -259,7 +259,7 @@ export default function ProximateReportPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div translate="no" className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto space-y-4">
           <Card className="p-8 text-center">
             <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-4" />
@@ -295,7 +295,7 @@ export default function ProximateReportPage() {
   // collapses to the thanks-only screen.
   if (meta?.has_report && meta?.ack_message) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <div translate="no" className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
         <div className="max-w-2xl mx-auto space-y-4">
           <Card className="p-8 text-center">
             <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-4" />

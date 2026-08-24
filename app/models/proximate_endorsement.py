@@ -560,40 +560,55 @@ class Endorsement(db.Model):
                 return False
             return al == bl or al in bl or bl in al
 
+        # R-02: the endorsing party may be an Endorser OR a seated panel
+        # member (ProximatePanelCandidate). They don't share a schema — a
+        # panel candidate exposes `location`, not `locality`, and carries
+        # none of the Endorser COI fields (village_name/family_name/employer).
+        # Reading them directly raised AttributeError → the public panelist
+        # portal 500'd for every valid token. Read every COI field through
+        # getattr so a party missing a field simply yields no signal for it.
+        end_locality = (
+            getattr(endorser, "locality", None)
+            or getattr(endorser, "location", None)
+        )
+        end_village = getattr(endorser, "village_name", None)
+        end_family = getattr(endorser, "family_name", None)
+        end_employer = getattr(endorser, "employer", None)
+
         # Locality match (e.g., partner in القضارف, endorser from القضارف)
-        if _matches(endorser.locality, partner.locality):
+        if _matches(end_locality, partner.locality):
             signals["shared_locality"] = {
-                "endorser": endorser.locality,
+                "endorser": end_locality,
                 "partner": partner.locality,
             }
 
         # Village — substring match against partner name / intake
         # form. Partner doesn't have a structured 'village' field;
         # check name + locality.
-        if endorser.village_name and (
-            _matches(endorser.village_name, partner.name)
-            or _matches(endorser.village_name, partner.name_ar)
-            or _matches(endorser.village_name, partner.locality)
+        if end_village and (
+            _matches(end_village, partner.name)
+            or _matches(end_village, partner.name_ar)
+            or _matches(end_village, partner.locality)
         ):
-            signals["shared_village"] = endorser.village_name
+            signals["shared_village"] = end_village
 
         # Family name — match against partner name (informal groups
         # often carry the founding family's name) AND the partner's
         # bank-account-holder name.
-        if endorser.family_name and (
-            _matches(endorser.family_name, partner.name)
-            or _matches(endorser.family_name, partner.name_ar)
-            or _matches(endorser.family_name, partner.bank_account_holder_name)
+        if end_family and (
+            _matches(end_family, partner.name)
+            or _matches(end_family, partner.name_ar)
+            or _matches(end_family, partner.bank_account_holder_name)
         ):
-            signals["shared_family_name"] = endorser.family_name
+            signals["shared_family_name"] = end_family
 
         # Employer — typically caught by name match (the partner IS
         # the employer for the endorser if there's a shared employer).
-        if endorser.employer and (
-            _matches(endorser.employer, partner.name)
-            or _matches(endorser.employer, partner.name_ar)
+        if end_employer and (
+            _matches(end_employer, partner.name)
+            or _matches(end_employer, partner.name_ar)
         ):
-            signals["shared_employer"] = endorser.employer
+            signals["shared_employer"] = end_employer
 
         return signals
 
