@@ -8008,70 +8008,85 @@ def api_round_retrospective_pdf(round_id):
     sustained_pcts = []
     for o in submitted_outcomes:
         ans = o.get_answers()
-        s = ans.get('still_in_state_n'); t = ans.get('total_intended_n')
-        if isinstance(s, (int, float)) and isinstance(t, (int, float)) and t > 0:
-            sustained_pcts.append(min(100, max(0, (s / t) * 100)))
+        s = ans.get('still_in_state_n'); total_n = ans.get('total_intended_n')
+        if isinstance(s, (int, float)) and isinstance(total_n, (int, float)) and total_n > 0:
+            sustained_pcts.append(min(100, max(0, (s / total_n) * 100)))
     sustained_avg = (
         sum(sustained_pcts) / len(sustained_pcts) if sustained_pcts else None
     )
 
     # Render PDF
     import io
+    from app.utils.arabic_pdf import ensure_arabic_fonts, has_arabic, shape_ar
+    lang = resolve_display_lang(net.id)
+    try:
+        arabic_ok = ensure_arabic_fonts()
+    except Exception:
+        arabic_ok = False
+
+    def _tp(key, **pp):
+        return t(key, lang=lang, **pp)
+
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     width, height = A4
     y = height - 2 * cm
-    c.setFont('Helvetica-Bold', 16)
-    c.drawString(2 * cm, y, f'Proximate Round Retrospective')
-    y -= 0.7 * cm
-    c.setFont('Helvetica', 11)
-    c.drawString(2 * cm, y, f'{r.title}')
-    y -= 0.6 * cm
-    c.setFont('Helvetica', 9)
-    c.drawString(
-        2 * cm, y,
-        f'Closed {closed.strftime("%Y-%m-%d")} · '
-        f'{age_days} days ago · Generated '
-        f'{datetime.now(timezone.utc).strftime("%Y-%m-%d")}'
-    )
+
+    def _hdr(text, size, bold=True):
+        nonlocal y
+        text = str(text or '')
+        if arabic_ok and has_arabic(text):
+            c.setFont('Amiri-Bold' if bold else 'Amiri', size)
+            c.drawRightString(width - 2 * cm, y, shape_ar(text))
+        else:
+            c.setFont('Helvetica-Bold' if bold else 'Helvetica', size)
+            c.drawString(2 * cm, y, text)
+
+    _hdr(_tp('proximate.pdf.retro.title'), 16); y -= 0.7 * cm
+    _hdr(r.title, 11, bold=False); y -= 0.6 * cm
+    _hdr(_tp('proximate.pdf.retro.closed_meta',
+             closed=closed.strftime("%Y-%m-%d"), days=age_days,
+             gen=datetime.now(timezone.utc).strftime("%Y-%m-%d")), 9, bold=False)
     y -= 1 * cm
 
     def line(label, value):
+        # Two columns, mirrored for RTL: label at the right margin, value to
+        # its left. LTR keeps the original left-anchored layout.
         nonlocal y
-        c.setFont('Helvetica-Bold', 10); c.drawString(2 * cm, y, label)
-        c.setFont('Helvetica', 10); c.drawString(8 * cm, y, str(value))
+        if arabic_ok and has_arabic(label):
+            c.setFont('Amiri-Bold', 10)
+            c.drawRightString(width - 2 * cm, y, shape_ar(label))
+            c.setFont('Amiri', 10)
+            c.drawRightString(width - 8 * cm, y, shape_ar(str(value)))
+        else:
+            c.setFont('Helvetica-Bold', 10); c.drawString(2 * cm, y, label)
+            c.setFont('Helvetica', 10); c.drawString(8 * cm, y, str(value))
         y -= 0.5 * cm
 
-    c.setFont('Helvetica-Bold', 12)
-    c.drawString(2 * cm, y, '1. Envelope use'); y -= 0.6 * cm
-    line('Committed envelope', f'${float(r.envelope_usd or 0):,.0f}')
-    line('Disbursed', f'${disbursed:,.0f}')
-    line('Disbursement count', f'{len(spendable)}')
-    line('Partners served', f'{len(partner_ids)}')
+    _hdr(_tp('proximate.pdf.retro.s1'), 12); y -= 0.6 * cm
+    line(_tp('proximate.pdf.retro.committed'), f'${float(r.envelope_usd or 0):,.0f}')
+    line(_tp('proximate.pdf.retro.disbursed'), f'${disbursed:,.0f}')
+    line(_tp('proximate.pdf.retro.disb_count'), f'{len(spendable)}')
+    line(_tp('proximate.pdf.retro.partners'), f'{len(partner_ids)}')
     y -= 0.4 * cm
 
-    c.setFont('Helvetica-Bold', 12)
-    c.drawString(2 * cm, y, '2. 90-day outcome attestation'); y -= 0.6 * cm
-    line('Total obligations', f'{len(outcomes)}')
-    line('Attested by partner', f'{len(submitted_outcomes)}')
-    line('OB-verified', f'{len(verified_outcomes)}')
-    line(
-        'Sustained-impact average',
-        f'{sustained_avg:.1f}% (n={len(sustained_pcts)})'
-        if sustained_avg is not None else 'no data yet'
-    )
+    _hdr(_tp('proximate.pdf.retro.s2'), 12); y -= 0.6 * cm
+    line(_tp('proximate.pdf.retro.obligations'), f'{len(outcomes)}')
+    line(_tp('proximate.pdf.retro.attested'), f'{len(submitted_outcomes)}')
+    line(_tp('proximate.pdf.retro.verified'), f'{len(verified_outcomes)}')
+    line(_tp('proximate.pdf.retro.sustained'),
+         _tp('proximate.pdf.retro.sustained_val',
+             pct=f'{sustained_avg:.1f}', n=len(sustained_pcts))
+         if sustained_avg is not None else _tp('proximate.pdf.retro.no_data'))
     y -= 0.4 * cm
 
-    c.setFont('Helvetica-Bold', 12)
-    c.drawString(2 * cm, y, '3. Honest scope'); y -= 0.6 * cm
-    c.setFont('Helvetica', 9)
+    _hdr(_tp('proximate.pdf.retro.s3'), 12); y -= 0.6 * cm
     for fragment in (
-        'This retrospective summarises platform-recorded data only.',
-        'Counterfactual reflection themes from partners are surfaced',
-        'on /proximate/admin → outcomes rollup, not in this PDF.',
-        'Email delivery to donors requires SMTP — currently disabled.',
+        _tp('proximate.pdf.retro.scope1'),
+        _tp('proximate.pdf.retro.scope2'),
+        _tp('proximate.pdf.retro.scope3'),
     ):
-        c.drawString(2 * cm, y, fragment); y -= 0.4 * cm
+        _hdr(fragment, 9, bold=False); y -= 0.4 * cm
 
     c.save()
     pdf_bytes = buf.getvalue()
