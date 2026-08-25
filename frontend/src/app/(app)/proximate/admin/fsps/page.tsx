@@ -87,7 +87,11 @@ export default function FspListPage() {
                     </p>
                   </div>
                   <Badge variant="outline" className="text-xs shrink-0">
-                    {KIND_LABEL[f.kind] || f.kind}
+                    {(() => {
+                      const k = `proximate.fsp_kind.${f.kind}`;
+                      const v = t(k);
+                      return v && v !== k ? v : (KIND_LABEL[f.kind] || f.kind);
+                    })()}
                   </Badge>
                 </div>
               </Card>

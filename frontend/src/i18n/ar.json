@@ -4583,5 +4583,12 @@
   "proximate.grants.ref": "مرجع",
   "proximate.grants.allocated": "مخصّص",
   "proximate.grants.remaining": "المتبقّي",
-  "proximate.grants.period": "الفترة"
+  "proximate.grants.period": "الفترة",
+  "proximate.grievance_category.fraud": "احتيال",
+  "proximate.grievance_category.safety": "سلامة",
+  "proximate.grievance_category.other": "أخرى",
+  "proximate.fsp_kind.bank": "بنك",
+  "proximate.fsp_kind.hawala": "حوالة",
+  "proximate.fsp_kind.mobile_money": "أموال عبر الهاتف",
+  "proximate.status.rolled_in": "مُدرَجة في تقرير"
 }

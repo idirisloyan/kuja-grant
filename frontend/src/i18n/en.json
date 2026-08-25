@@ -4606,5 +4606,12 @@
   "proximate.grants.ref": "Ref",
   "proximate.grants.allocated": "Allocated",
   "proximate.grants.remaining": "Remaining",
-  "proximate.grants.period": "Period"
+  "proximate.grants.period": "Period",
+  "proximate.grievance_category.fraud": "Fraud",
+  "proximate.grievance_category.safety": "Safety",
+  "proximate.grievance_category.other": "Other",
+  "proximate.fsp_kind.bank": "Bank",
+  "proximate.fsp_kind.hawala": "Hawala",
+  "proximate.fsp_kind.mobile_money": "Mobile money",
+  "proximate.status.rolled_in": "Rolled in"
 }

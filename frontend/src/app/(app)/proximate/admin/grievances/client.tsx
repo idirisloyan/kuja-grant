@@ -164,7 +164,11 @@ export function ProximateGrievanceQueueClient() {
                         CATEGORY_TONE[g.category] || CATEGORY_TONE.other
                       }`}
                     >
-                      {g.category}
+                      {(() => {
+                        const k = `proximate.grievance_category.${g.category}`;
+                        const v = t(k);
+                        return v && v !== k ? v : g.category;
+                      })()}
                     </span>
                     <span className="text-sm font-medium">
                       {g.partner_name || t('proximate.grievance_queue.about_fund')}
