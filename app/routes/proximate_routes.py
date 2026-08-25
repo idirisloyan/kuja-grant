@@ -3166,8 +3166,8 @@ def api_submit_endorser_invite(token):
         email=placeholder_email,
         password_hash=generate_password_hash(secrets.token_hex(24)),
         role='ngo',
-        first_name=inv.invitee_name.split(' ')[0][:50] if inv.invitee_name else 'Endorser',
-        last_name=' '.join(inv.invitee_name.split(' ')[1:])[:50] or 'Invited',
+        name=((inv.invitee_name or '').strip() or 'Invited Endorser')[:255],
+        language=resolve_network_lang(partner.network_id),
         is_active=True,
     )
     db.session.add(user)
