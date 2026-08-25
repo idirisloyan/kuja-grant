@@ -76,18 +76,27 @@ def provision(net):
     db.session.commit()
 
 
+# Tenant isolation (2026-08): X-Network-Override is IGNORED for authenticated
+# non-admins, and _proximate_network() no longer falls back to Proximate when
+# the host resolved to a different tenant. So the tenant MUST be established
+# via the Host header — proximate.kuja.org resolves to slug 'proximate' — the
+# same way production does. (Sending the override too is harmless: it's honored
+# only for the anonymous /login brand paint.)
+_PROX_HEADERS = {"X-Network-Override": "proximate", "Host": "proximate.kuja.org"}
+
+
 def client_for(email, pw):
     c = app.test_client()
     r = c.post("/api/auth/login",
                json={"email": email, "password": pw},
-               headers={"X-Network-Override": "proximate"})
+               headers=_PROX_HEADERS)
     if r.status_code != 200:
         failures.append(f"LOGIN FAILED for {email}: {r.status_code} {r.get_data(as_text=True)[:120]}")
     return c
 
 
 def _get(c, path):
-    return c.get(path, headers={"X-Network-Override": "proximate"})
+    return c.get(path, headers=_PROX_HEADERS)
 
 
 def check(persona, path, c, *, expect_status, forbid=(), require=()):
