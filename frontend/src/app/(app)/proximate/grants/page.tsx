@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { FileText, Loader2, Plus, DollarSign } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/proximate/empty-state';
@@ -50,13 +51,14 @@ export default function ProximateGrantsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { persona } = useProximatePersona();
+  const { t } = useTranslation();
   const isOb = persona === 'ob' || persona === 'admin';
 
   useEffect(() => {
     let cancelled = false;
     api.get<{ success: boolean; grants: Grant[] }>('/api/proximate/grants')
       .then((r) => { if (!cancelled) setGrants(r.grants || []); })
-      .catch(() => { if (!cancelled) setError('Failed to load grants.'); })
+      .catch(() => { if (!cancelled) setError(t('proximate.grants.load_error')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -70,18 +72,18 @@ export default function ProximateGrantsListPage() {
   return (
     <PageShell>
       <PageHeader
-        title={isOb ? 'Adeso grants (inbound)' : 'Your grants to Adeso'}
+        title={isOb ? t('proximate.grants.title_ob') : t('proximate.grants.title_donor')}
         subtitle={
           isOb
-            ? 'Grants Adeso holds from institutional donors funding Proximate Fund'
-            : 'Track how Adeso is deploying your commitment'
+            ? t('proximate.grants.subtitle_ob')
+            : t('proximate.grants.subtitle_donor')
         }
       />
       <PageMain>
         {loading && (
           <p className="text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin inline me-2" />
-            Loading grants…
+            {t('proximate.grants.loading')}
           </p>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -96,25 +98,25 @@ export default function ProximateGrantsListPage() {
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Committed
+                      {t('proximate.grants.committed')}
                     </p>
                   </div>
                   <p className="text-xl font-semibold">{fmtUsd(totalCommitted)}</p>
                   <p className="text-xs text-muted-foreground">
-                    across {grants.length} grant{grants.length === 1 ? '' : 's'}
+                    {t('proximate.grants.across_n', { n: grants.length })}
                   </p>
                 </Card>
                 <Card className="p-3">
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Allocated to rounds
+                      {t('proximate.grants.allocated_to_rounds')}
                     </p>
                   </div>
                   <p className="text-xl font-semibold">{fmtUsd(totalAllocated)}</p>
                   <p className="text-xs text-muted-foreground">
                     {totalCommitted
-                      ? `${((totalAllocated / totalCommitted) * 100).toFixed(0)}% of committed`
+                      ? t('proximate.grants.pct_of_committed', { pct: ((totalAllocated / totalCommitted) * 100).toFixed(0) })
                       : ''}
                   </p>
                 </Card>
@@ -122,12 +124,12 @@ export default function ProximateGrantsListPage() {
                   <div className="flex items-center gap-1.5">
                     <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Uncommitted
+                      {t('proximate.grants.uncommitted')}
                     </p>
                   </div>
                   <p className="text-xl font-semibold">{fmtUsd(totalRemaining)}</p>
                   <p className="text-xs text-muted-foreground">
-                    available for future rounds
+                    {t('proximate.grants.available_future')}
                   </p>
                 </Card>
               </div>
@@ -139,7 +141,7 @@ export default function ProximateGrantsListPage() {
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-muted-foreground" />
                   <p className="text-sm font-medium">
-                    Grant register ({grants.length})
+                    {t('proximate.grants.register_n', { n: grants.length })}
                   </p>
                 </div>
                 {isOb && (
@@ -148,7 +150,7 @@ export default function ProximateGrantsListPage() {
                     className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
                   >
                     <Plus className="w-3 h-3" />
-                    Upload signed agreement
+                    {t('proximate.grants.upload_agreement')}
                   </Link>
                 )}
               </div>
@@ -156,10 +158,10 @@ export default function ProximateGrantsListPage() {
                 <EmptyState
                   compact
                   icon={FileText}
-                  title="No grants recorded yet"
+                  title={t('proximate.grants.empty_title')}
                   hint={isOb
-                    ? 'Upload a signed donor agreement to bring its budget, reporting cadence and deliverables into the fund.'
-                    : 'Grants your organization commits to Adeso will appear here once recorded.'}
+                    ? t('proximate.grants.empty_hint_ob')
+                    : t('proximate.grants.empty_hint_donor')}
                 />
               )}
               {grants.length > 0 && (
@@ -188,9 +190,9 @@ export default function ProximateGrantsListPage() {
                                 {g.title}
                               </p>
                               <p className="text-xs text-muted-foreground truncate">
-                                {g.donor_name || 'Donor TBD'}
+                                {g.donor_name || t('proximate.grants.donor_tbd')}
                                 {g.donor_grant_ref
-                                  ? ` · Ref ${g.donor_grant_ref}`
+                                  ? ` · ${t('proximate.grants.ref')} ${g.donor_grant_ref}`
                                   : ''}
                               </p>
                             </div>
@@ -198,31 +200,31 @@ export default function ProximateGrantsListPage() {
                               variant="outline"
                               className={`text-[10px] ${statusCls}`}
                             >
-                              {labelForProximateStatus(g.status)}
+                              {labelForProximateStatus(g.status, t)}
                             </Badge>
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                             <div>
                               <p className="text-[10px] uppercase text-muted-foreground">
-                                Committed
+                                {t('proximate.grants.committed')}
                               </p>
                               <p className="font-mono">{fmtUsd(g.amount_committed_usd)}</p>
                             </div>
                             <div>
                               <p className="text-[10px] uppercase text-muted-foreground">
-                                Allocated
+                                {t('proximate.grants.allocated')}
                               </p>
                               <p className="font-mono">{fmtUsd(g.amount_allocated_usd)}</p>
                             </div>
                             <div>
                               <p className="text-[10px] uppercase text-muted-foreground">
-                                Remaining
+                                {t('proximate.grants.remaining')}
                               </p>
                               <p className="font-mono">{fmtUsd(g.amount_remaining_usd)}</p>
                             </div>
                             <div>
                               <p className="text-[10px] uppercase text-muted-foreground">
-                                Period
+                                {t('proximate.grants.period')}
                               </p>
                               {/* Funding period on the collapsed card (spec);
                                   reporting cadence lives on the detail page. */}
