@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Donor { id: number; display_name: string; contact_email: string | null }
 
@@ -62,15 +63,15 @@ interface ExtractResponse {
 
 const CADENCES = ['monthly', 'quarterly', 'semi_annual', 'annual', 'one_time'];
 
-const EXTRACT_STAGES = [
-  'Reading the agreement…',
-  'Extracting deliverables and targets…',
-  'Mapping reporting requirements…',
-  'Quoting restriction clauses…',
-  'Flagging compliance obligations…',
-];
-
 export default function ProximateGrantWizardPage() {
+  const { t } = useTranslation();
+  const EXTRACT_STAGES = [
+    t('proximate.gw.stage_reading'),
+    t('proximate.gw.stage_deliverables'),
+    t('proximate.gw.stage_reporting'),
+    t('proximate.gw.stage_restrictions'),
+    t('proximate.gw.stage_flags'),
+  ];
   const [step, setStep] = useState<'upload' | 'extracting' | 'review' | 'saving'>('upload');
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -95,6 +96,11 @@ export default function ProximateGrantWizardPage() {
   const [purpose, setPurpose] = useState('');
   const [newFlag, setNewFlag] = useState('');
 
+  const cadenceLabel = (c: string) => {
+    const v = t(`proximate.gw.cadence.${c}`);
+    return v === `proximate.gw.cadence.${c}` ? c.replace('_', '-') : v;
+  };
+
   useEffect(() => {
     api.get<{ success: boolean; donors: Donor[] }>('/api/proximate/donors')
       .then((r) => setDonors(r.donors || []))
@@ -103,11 +109,11 @@ export default function ProximateGrantWizardPage() {
 
   useEffect(() => {
     if (step !== 'extracting') return;
-    const t = setInterval(
+    const iv = setInterval(
       () => setStageIdx((i) => (i + 1) % EXTRACT_STAGES.length), 4000,
     );
-    return () => clearInterval(t);
-  }, [step]);
+    return () => clearInterval(iv);
+  }, [step, EXTRACT_STAGES.length]);
 
   async function runExtraction() {
     if (!file) return;
@@ -140,7 +146,7 @@ export default function ProximateGrantWizardPage() {
       setPurpose(e.restrictions?.purpose || '');
       setStep('review');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Extraction failed — try again.';
+      const msg = err instanceof Error ? err.message : t('proximate.gw.extract_failed');
       setError(msg);
       setStep('upload');
     }
@@ -152,7 +158,7 @@ export default function ProximateGrantWizardPage() {
 
   async function acceptAndCreate() {
     if (!ex) return;
-    if (!title.trim()) { setError('Give the grant a title.'); return; }
+    if (!title.trim()) { setError(t('proximate.gw.title_required')); return; }
     setError(null);
     setStep('saving');
     try {
@@ -185,7 +191,7 @@ export default function ProximateGrantWizardPage() {
       );
       window.location.href = `/proximate/admin/grants/${r.grant.id}`;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not create the grant.';
+      const msg = err instanceof Error ? err.message : t('proximate.gw.create_failed');
       setError(msg);
       setStep('review');
     }
@@ -197,8 +203,8 @@ export default function ProximateGrantWizardPage() {
   return (
     <PageShell>
       <PageHeader
-        title="New grant from signed agreement"
-        subtitle="Upload the signed PDF — AI extracts the terms, you review and accept. Nothing is saved until you accept."
+        title={t('proximate.gw.title')}
+        subtitle={t('proximate.gw.subtitle')}
       />
       <PageMain>
         <div className="max-w-3xl space-y-4">
@@ -206,7 +212,7 @@ export default function ProximateGrantWizardPage() {
             href="/proximate/grants"
             className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:underline"
           >
-            <ArrowLeft className="w-3 h-3" /> Back to grants
+            <ArrowLeft className="w-3 h-3" /> {t('proximate.gw.back')}
           </Link>
 
           {error && (
@@ -240,10 +246,10 @@ export default function ProximateGrantWizardPage() {
                 ) : (
                   <>
                     <p className="text-sm font-medium">
-                      Drop the signed agreement here, or click to choose
+                      {t('proximate.gw.drop')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Text-based PDF (not a scan), up to 15 MB
+                      {t('proximate.gw.drop_hint')}
                     </p>
                   </>
                 )}
@@ -261,7 +267,7 @@ export default function ProximateGrantWizardPage() {
                 className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4" />
-                Extract terms with AI
+                {t('proximate.gw.extract_btn')}
               </button>
             </Card>
           )}
@@ -271,7 +277,7 @@ export default function ProximateGrantWizardPage() {
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600 mb-4" />
               <p className="text-sm font-medium">{EXTRACT_STAGES[stageIdx]}</p>
               <p className="text-xs text-muted-foreground mt-2">
-                Usually 20–60 seconds for a full agreement.
+                {t('proximate.gw.extract_wait')}
               </p>
             </Card>
           )}
@@ -282,7 +288,7 @@ export default function ProximateGrantWizardPage() {
               <Card className="p-4 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-emerald-600" />
-                  <p className="text-sm font-medium">AI extraction complete</p>
+                  <p className="text-sm font-medium">{t('proximate.gw.extract_complete')}</p>
                   {confidencePct !== null && (
                     <Badge
                       variant="outline"
@@ -292,18 +298,18 @@ export default function ProximateGrantWizardPage() {
                           : 'bg-amber-50 text-amber-800 border-amber-300'
                       }
                     >
-                      {confidencePct}% confidence
+                      {t('proximate.gw.confidence', { pct: confidencePct })}
                     </Badge>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Review every field — you are accepting a legal record.
+                  {t('proximate.gw.review_every_field')}
                 </p>
               </Card>
               {ex.not_an_agreement_reason && (
                 <Card className="p-3 border-amber-300 bg-amber-50">
                   <p className="text-sm text-amber-800">
-                    ⚠ The AI doubts this is a grant agreement:{' '}
+                    {t('proximate.gw.not_agreement')}{' '}
                     {ex.not_an_agreement_reason}
                   </p>
                 </Card>
@@ -311,10 +317,10 @@ export default function ProximateGrantWizardPage() {
 
               {/* Basics */}
               <Card className="p-4 space-y-3">
-                <p className="text-sm font-semibold">Grant basics</p>
+                <p className="text-sm font-semibold">{t('proximate.gw.basics')}</p>
                 <div className="grid md:grid-cols-2 gap-3">
                   <label className="block md:col-span-2">
-                    <span className="text-xs text-muted-foreground">Title</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.grant_title')}</span>
                     <input
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
@@ -323,21 +329,21 @@ export default function ProximateGrantWizardPage() {
                   </label>
                   <label className="block">
                     <span className="text-xs text-muted-foreground">
-                      Donor (extracted: {ex.donor || '—'})
+                      {t('proximate.gw.donor_extracted', { donor: ex.donor || '—' })}
                     </span>
                     <select
                       value={donorId}
                       onChange={(e) => setDonorId(e.target.value)}
                       className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
                     >
-                      <option value="">— not in registry —</option>
+                      <option value="">{t('proximate.gw.not_in_registry')}</option>
                       {donors.map((d) => (
                         <option key={d.id} value={d.id}>{d.display_name}</option>
                       ))}
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">Donor reference</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.donor_ref')}</span>
                     <input
                       value={ref}
                       onChange={(e) => setRef(e.target.value)}
@@ -346,7 +352,9 @@ export default function ProximateGrantWizardPage() {
                   </label>
                   <label className="block">
                     <span className="text-xs text-muted-foreground">
-                      Committed (USD{ex.total_amount ? ` — extracted: ${ex.total_amount}` : ''})
+                      {ex.total_amount
+                        ? t('proximate.gw.committed_extracted', { amount: ex.total_amount })
+                        : t('proximate.gw.committed')}
                     </span>
                     <input
                       type="number"
@@ -356,7 +364,7 @@ export default function ProximateGrantWizardPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">Currency</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.currency')}</span>
                     <input
                       value={currency}
                       maxLength={3}
@@ -365,7 +373,7 @@ export default function ProximateGrantWizardPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">Start date</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.start_date')}</span>
                     <input
                       type="date"
                       value={startDate}
@@ -374,7 +382,7 @@ export default function ProximateGrantWizardPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">End date</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.end_date')}</span>
                     <input
                       type="date"
                       value={endDate}
@@ -383,14 +391,14 @@ export default function ProximateGrantWizardPage() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">Reporting cadence</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.reporting_cadence')}</span>
                     <select
                       value={cadence}
                       onChange={(e) => setCadence(e.target.value)}
                       className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
                     >
                       {CADENCES.map((c) => (
-                        <option key={c} value={c}>{c.replace('_', '-')}</option>
+                        <option key={c} value={c}>{cadenceLabel(c)}</option>
                       ))}
                     </select>
                   </label>
@@ -400,7 +408,7 @@ export default function ProximateGrantWizardPage() {
               {/* Deliverables */}
               <Card className="p-4 space-y-2">
                 <p className="text-sm font-semibold">
-                  Key deliverables ({ex.key_deliverables.length})
+                  {t('proximate.gw.deliverables', { n: ex.key_deliverables.length })}
                 </p>
                 {ex.key_deliverables.map((d, i) => (
                   <div key={i} className="flex gap-2 items-center">
@@ -412,7 +420,7 @@ export default function ProximateGrantWizardPage() {
                         patchEx({ key_deliverables: next });
                       }}
                       className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
-                      placeholder="Deliverable"
+                      placeholder={t('proximate.gw.deliverable_ph')}
                     />
                     <input
                       type="number"
@@ -426,7 +434,7 @@ export default function ProximateGrantWizardPage() {
                         patchEx({ key_deliverables: next });
                       }}
                       className="w-24 border rounded-md px-2 py-1.5 text-sm bg-background"
-                      placeholder="Target"
+                      placeholder={t('proximate.gw.target_ph')}
                     />
                     <input
                       value={d.unit ?? ''}
@@ -436,7 +444,7 @@ export default function ProximateGrantWizardPage() {
                         patchEx({ key_deliverables: next });
                       }}
                       className="w-28 border rounded-md px-2 py-1.5 text-sm bg-background"
-                      placeholder="Unit"
+                      placeholder={t('proximate.gw.unit_ph')}
                     />
                     <button
                       onClick={() =>
@@ -445,7 +453,7 @@ export default function ProximateGrantWizardPage() {
                         })
                       }
                       className="p-1.5 text-muted-foreground hover:text-rose-600"
-                      aria-label="Remove deliverable"
+                      aria-label={t('proximate.gw.remove_deliverable')}
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -462,14 +470,14 @@ export default function ProximateGrantWizardPage() {
                   }
                   className="text-xs inline-flex items-center gap-1 text-emerald-700 hover:underline"
                 >
-                  <Plus className="w-3 h-3" /> Add deliverable
+                  <Plus className="w-3 h-3" /> {t('proximate.gw.add_deliverable')}
                 </button>
               </Card>
 
               {/* Reporting requirements */}
               <Card className="p-4 space-y-2">
                 <p className="text-sm font-semibold">
-                  Reporting requirements ({ex.reporting_requirements.length})
+                  {t('proximate.gw.reporting_reqs', { n: ex.reporting_requirements.length })}
                 </p>
                 {ex.reporting_requirements.map((r, i) => (
                   <div key={i} className="flex gap-2 items-center">
@@ -481,7 +489,7 @@ export default function ProximateGrantWizardPage() {
                         patchEx({ reporting_requirements: next });
                       }}
                       className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
-                      placeholder="Report type (e.g. financial)"
+                      placeholder={t('proximate.gw.report_type_ph')}
                     />
                     <select
                       value={r.cadence}
@@ -493,7 +501,7 @@ export default function ProximateGrantWizardPage() {
                       className="w-32 border rounded-md px-2 py-1.5 text-sm bg-background"
                     >
                       {CADENCES.map((c) => (
-                        <option key={c} value={c}>{c.replace('_', '-')}</option>
+                        <option key={c} value={c}>{cadenceLabel(c)}</option>
                       ))}
                     </select>
                     <input
@@ -509,8 +517,8 @@ export default function ProximateGrantWizardPage() {
                         patchEx({ reporting_requirements: next });
                       }}
                       className="w-24 border rounded-md px-2 py-1.5 text-sm bg-background"
-                      placeholder="Due +days"
-                      title="Days after period end that the report is due"
+                      placeholder={t('proximate.gw.due_days_ph')}
+                      title={t('proximate.gw.due_days_tip')}
                     />
                     <button
                       onClick={() =>
@@ -520,7 +528,7 @@ export default function ProximateGrantWizardPage() {
                         })
                       }
                       className="p-1.5 text-muted-foreground hover:text-rose-600"
-                      aria-label="Remove requirement"
+                      aria-label={t('proximate.gw.remove_requirement')}
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -537,16 +545,16 @@ export default function ProximateGrantWizardPage() {
                   }
                   className="text-xs inline-flex items-center gap-1 text-emerald-700 hover:underline"
                 >
-                  <Plus className="w-3 h-3" /> Add requirement
+                  <Plus className="w-3 h-3" /> {t('proximate.gw.add_requirement')}
                 </button>
               </Card>
 
               {/* Restrictions */}
               <Card className="p-4 space-y-3">
-                <p className="text-sm font-semibold">Restrictions</p>
+                <p className="text-sm font-semibold">{t('proximate.gw.restrictions')}</p>
                 <label className="block">
                   <span className="text-xs text-muted-foreground">
-                    Verbatim clauses (quoted from the agreement)
+                    {t('proximate.gw.verbatim')}
                   </span>
                   <textarea
                     value={ex.restrictions_verbatim}
@@ -558,7 +566,7 @@ export default function ProximateGrantWizardPage() {
                 <div className="grid md:grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-xs text-muted-foreground">
-                      Geographies (comma-separated)
+                      {t('proximate.gw.geographies')}
                     </span>
                     <input
                       value={geos}
@@ -568,7 +576,7 @@ export default function ProximateGrantWizardPage() {
                   </label>
                   <label className="block">
                     <span className="text-xs text-muted-foreground">
-                      Sectors (comma-separated)
+                      {t('proximate.gw.sectors')}
                     </span>
                     <input
                       value={sectors}
@@ -577,7 +585,7 @@ export default function ProximateGrantWizardPage() {
                     />
                   </label>
                   <label className="block md:col-span-2">
-                    <span className="text-xs text-muted-foreground">Purpose (one line)</span>
+                    <span className="text-xs text-muted-foreground">{t('proximate.gw.purpose')}</span>
                     <input
                       value={purpose}
                       onChange={(e) => setPurpose(e.target.value)}
@@ -590,7 +598,7 @@ export default function ProximateGrantWizardPage() {
               {/* Compliance flags */}
               <Card className="p-4 space-y-2">
                 <p className="text-sm font-semibold">
-                  Compliance flags ({ex.compliance_flags.length})
+                  {t('proximate.gw.compliance_flags', { n: ex.compliance_flags.length })}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {ex.compliance_flags.map((f, i) => (
@@ -607,7 +615,7 @@ export default function ProximateGrantWizardPage() {
                               ex.compliance_flags.filter((_, j) => j !== i),
                           })
                         }
-                        aria-label={`Remove ${f}`}
+                        aria-label={t('proximate.gw.remove_flag', { flag: f })}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -618,7 +626,7 @@ export default function ProximateGrantWizardPage() {
                   <input
                     value={newFlag}
                     onChange={(e) => setNewFlag(e.target.value)}
-                    placeholder="add_flag_in_snake_case"
+                    placeholder={t('proximate.gw.flag_ph')}
                     className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
                   />
                   <button
@@ -630,7 +638,7 @@ export default function ProximateGrantWizardPage() {
                     }}
                     className="text-xs px-3 py-1.5 rounded-md border hover:bg-muted"
                   >
-                    Add
+                    {t('proximate.gw.add')}
                   </button>
                 </div>
               </Card>
@@ -645,14 +653,14 @@ export default function ProximateGrantWizardPage() {
                   {step === 'saving'
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <CheckCircle2 className="w-4 h-4" />}
-                  Accept &amp; create grant
+                  {t('proximate.gw.accept_create')}
                 </button>
                 <button
                   onClick={() => { setStep('upload'); setEx(null); setFile(null); }}
                   disabled={step === 'saving'}
                   className="text-sm text-muted-foreground hover:underline"
                 >
-                  Start over
+                  {t('proximate.gw.start_over')}
                 </button>
               </div>
             </div>

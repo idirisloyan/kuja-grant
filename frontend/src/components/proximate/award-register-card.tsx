@@ -432,10 +432,10 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
                           );
                         }}
                       >
-                        {copied ? 'Link copied' : 'Copy partner signing link'}
+                        {copied ? t('proximate.award.link_copied') : t('proximate.award.copy_sign_link')}
                       </Button>
                       <span className="text-[11px] text-muted-foreground">
-                        Share with the partner to sign
+                        {t('proximate.award.share_to_sign')}
                       </span>
                     </div>
                   )}
@@ -505,7 +505,7 @@ function AddAwardDialog({ roundId, onClose, onAdded }: {
       <Card className="w-full max-w-md p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">{t('proximate.cycle.add_to_register') || 'Add a partner to the register'}</h3>
-          <button type="button" onClick={onClose} aria-label="Close">
+          <button type="button" onClick={onClose} aria-label={t('proximate.award.close')}>
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>

@@ -173,7 +173,7 @@ export function ProximateReportPackageClient() {
           : 'bg-muted text-muted-foreground border-border'}`}
     >
       <Flag className="w-3 h-3" />
-      {it.change_request ? 'Flagged' : 'Flag'}
+      {it.change_request ? t('proximate.rpkg.flagged') : t('proximate.rpkg.flag')}
     </button>
   );
 
@@ -186,7 +186,7 @@ export function ProximateReportPackageClient() {
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-semibold truncate">
-            {data.partner?.name} — Implementation report
+            {data.partner?.name} — {t('proximate.rpkg.impl_report')}
           </h1>
           <p className="text-xs text-muted-foreground">{data.round?.title}</p>
         </div>
@@ -264,7 +264,7 @@ export function ProximateReportPackageClient() {
                 api.patch(`/api/proximate/report-packages/${pkg.id}`,
                           { narrative }))}>
               {busy === 'save' && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
-              Save narrative
+              {t('proximate.rpkg.save_narrative')}
             </Button>
           </div>
         ) : (
@@ -280,7 +280,7 @@ export function ProximateReportPackageClient() {
             ))}
             {!narrative && (
               <p className="text-xs text-muted-foreground italic">
-                No narrative compiled yet.
+                {t('proximate.rpkg.no_narrative')}
               </p>
             )}
           </div>
@@ -292,7 +292,7 @@ export function ProximateReportPackageClient() {
         <Card className="p-4 space-y-2">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-sm font-semibold flex-1">
-              Financials — actual vs approved
+              {t('proximate.rpkg.financials')}
             </h2>
             {isOperator && (
               <div className="flex items-center gap-1 text-[11px]">
@@ -301,7 +301,7 @@ export function ProximateReportPackageClient() {
                 </span>
                 <input
                   type="number" inputMode="decimal" min={0}
-                  value={rateInput} placeholder="rate"
+                  value={rateInput} placeholder={t('proximate.rpkg.rate_ph')}
                   onChange={(e) => setRateInput(e.target.value)}
                   className="w-20 rounded-md border bg-background px-1.5 py-1 text-xs"
                 />
@@ -361,16 +361,15 @@ export function ProximateReportPackageClient() {
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold flex-1">
-            Evidence ({items.length})
+            {t('proximate.rpkg.evidence', { n: items.length })}
           </h2>
           {isOperator ? (
             <p className="text-[10px] text-muted-foreground">
-              Everything is internal until you make it donor-visible.
+              {t('proximate.rpkg.internal_until_visible')}
             </p>
           ) : (
             <p className="text-[10px] text-muted-foreground">
-              Evidence included in this report has passed quality and
-              safeguarding review.
+              {t('proximate.rpkg.passed_review')}
             </p>
           )}
         </div>
@@ -398,14 +397,14 @@ export function ProximateReportPackageClient() {
                           : 'bg-muted text-muted-foreground border-border'}`}
                     >
                       {it.donor_visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                      {it.donor_visible ? 'Donor' : 'Internal'}
+                      {it.donor_visible ? t('proximate.rpkg.donor') : t('proximate.rpkg.internal')}
                     </button>
                   )}
                   {flagButton(it)}
                 </figcaption>
                 {it.change_request && isOperator && (
                   <p className="px-1.5 pb-1.5 text-[9px] text-amber-700">
-                    Fix requested: {it.change_request}
+                    {t('proximate.rpkg.fix_requested', { msg: it.change_request })}
                   </p>
                 )}
               </figure>
@@ -430,26 +429,26 @@ export function ProximateReportPackageClient() {
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                       : 'bg-muted text-muted-foreground border-border'}`}
                 >
-                  {it.donor_visible ? 'Donor-visible' : 'Internal'}
+                  {it.donor_visible ? t('proximate.rpkg.donor_visible') : t('proximate.rpkg.internal')}
                 </button>
               )}
               {flagButton(it)}
             </div>
             {it.change_request && isOperator && (
               <p className="text-[10px] text-amber-700">
-                Fix requested: {it.change_request}
+                {t('proximate.rpkg.fix_requested', { msg: it.change_request })}
               </p>
             )}
           </div>
         ))}
         {voices.length > 0 && isOperator && (
           <div className="space-y-2">
-            <p className="text-xs font-medium">Voice answers (internal)</p>
+            <p className="text-xs font-medium">{t('proximate.rpkg.voice_answers')}</p>
             {voices.map((it) => (
               <details key={it.id} className="text-xs rounded-md border bg-muted/30 p-2">
                 <summary className="cursor-pointer">
-                  {it.question_key?.replace(/_/g, ' ') || 'voice note'}
-                  {it.transcript ? ' — transcript ready' : ' — transcribing…'}
+                  {it.question_key?.replace(/_/g, ' ') || t('proximate.rpkg.voice_note')}
+                  {it.transcript ? t('proximate.rpkg.transcript_ready') : t('proximate.rpkg.transcribing')}
                 </summary>
                 <audio controls className="w-full my-1.5"
                        src={`/api/proximate/report-items/${it.id}/file`} />
@@ -480,21 +479,21 @@ export function ProximateReportPackageClient() {
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                     : 'bg-muted text-muted-foreground border-border'}`}
               >
-                {it.donor_visible ? 'Donor-visible' : 'Internal'}
+                {it.donor_visible ? t('proximate.rpkg.donor_visible') : t('proximate.rpkg.internal')}
               </button>
             )}
             {flagButton(it)}
           </div>
         ))}
         {items.length === 0 && (
-          <p className="text-xs text-muted-foreground italic">No evidence yet.</p>
+          <p className="text-xs text-muted-foreground italic">{t('proximate.rpkg.no_evidence')}</p>
         )}
       </Card>
 
       {/* OB decision */}
       {isOperator && pkg.status !== 'published' && (
         <Card className="p-4 space-y-2">
-          <h2 className="text-sm font-semibold">Decision</h2>
+          <h2 className="text-sm font-semibold">{t('proximate.rpkg.decision')}</h2>
           <textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
             placeholder={t('proximate.reports.notes_ph')}
@@ -505,7 +504,7 @@ export function ProximateReportPackageClient() {
               onClick={() => act('changes', () =>
                 api.post(`/api/proximate/report-packages/${pkg.id}/review`,
                          { action: 'request_changes', notes }))}>
-              <Undo2 className="w-3.5 h-3.5 me-1" /> Request changes
+              <Undo2 className="w-3.5 h-3.5 me-1" /> {t('proximate.rpkg.request_changes')}
             </Button>
             <Button size="sm" disabled={!!busy}
               onClick={() => act('publish', () =>
@@ -514,13 +513,11 @@ export function ProximateReportPackageClient() {
               {busy === 'publish'
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
                 : <Send className="w-3.5 h-3.5 me-1" />}
-              Publish to donor
+              {t('proximate.rpkg.publish')}
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Publishing shows the donor the narrative, financials and ONLY
-            the items you marked donor-visible. The tally of approved items
-            is recorded on the audit chain.
+            {t('proximate.rpkg.publish_hint')}
           </p>
         </Card>
       )}

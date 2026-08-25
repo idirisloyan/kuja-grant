@@ -24,8 +24,15 @@ interface Activity {
 }
 interface Participant { partner_id: number; partner_name: string | null; stage: string }
 
-const DEFAULT_LINES = ['Personnel', 'Supplies & Materials',
-  'Transport & Logistics', 'Direct Beneficiary Support', 'Admin / Overheads'];
+// `v` is the canonical value STORED in budget_lines (kept English so the
+// partner report page keeps matching by label); `k` translates the display.
+const DEFAULT_LINES = [
+  { v: 'Personnel', k: 'proximate.activities.line_personnel' },
+  { v: 'Supplies & Materials', k: 'proximate.activities.line_supplies' },
+  { v: 'Transport & Logistics', k: 'proximate.activities.line_transport' },
+  { v: 'Direct Beneficiary Support', k: 'proximate.activities.line_beneficiary' },
+  { v: 'Admin / Overheads', k: 'proximate.activities.line_admin' },
+];
 
 export function ApprovedActivitiesCard({
   roundId, participants, isOperator,
@@ -63,7 +70,7 @@ export function ApprovedActivitiesCard({
     setError('');
     try {
       const budget_lines = DEFAULT_LINES
-        .map((label) => ({ label, amount: Number(amounts[label] || 0) }))
+        .map((ln) => ({ label: ln.v, amount: Number(amounts[ln.v] || 0) }))
         .filter((l) => l.amount > 0);
       await api.post(`/api/proximate/rounds/${roundId}/approved-activities`,
                      { partner_id: Number(partnerId), name: name.trim(),
@@ -72,7 +79,7 @@ export function ApprovedActivitiesCard({
       setAmounts({});
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save');
+      setError(e instanceof Error ? e.message : t('proximate.activities.save_error'));
     } finally {
       setBusy(false);
     }
@@ -101,8 +108,7 @@ export function ApprovedActivitiesCard({
       {open && (
         <div className="mt-3 space-y-3">
           <p className="text-[11px] text-muted-foreground">
-            The reporting baseline: partners report actual spend against
-            these budget lines (USD) on their phone page.
+            {t('proximate.activities.baseline')}
           </p>
           {acts.map((a) => (
             <div key={a.id} className="rounded-md border px-3 py-2 text-xs space-y-0.5">
@@ -111,7 +117,7 @@ export function ApprovedActivitiesCard({
                   {partnerName(a.partner_id)} — {a.name}
                 </span>
                 <button type="button" onClick={() => remove(a.id)} disabled={busy}
-                        aria-label="Delete activity"
+                        aria-label={t('proximate.activities.delete')}
                         className="text-muted-foreground hover:text-rose-600">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -119,7 +125,7 @@ export function ApprovedActivitiesCard({
               <p className="text-muted-foreground">
                 {(a.budget_lines || []).map((l) =>
                   `${l.label} $${Number(l.amount).toLocaleString()}`).join(' · ')
-                  || 'No budget lines'}
+                  || t('proximate.activities.no_lines')}
               </p>
             </div>
           ))}
@@ -128,7 +134,7 @@ export function ApprovedActivitiesCard({
             <div className="flex gap-2 flex-wrap">
               <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}
                       className="text-xs rounded-md border bg-background px-2 py-1.5 min-w-[160px]">
-                <option value="">Partner…</option>
+                <option value="">{t('proximate.activities.partner_ph')}</option>
                 {roster.map((p) => (
                   <option key={p.partner_id} value={p.partner_id}>
                     {p.partner_name || `Partner #${p.partner_id}`}
@@ -136,17 +142,17 @@ export function ApprovedActivitiesCard({
                 ))}
               </select>
               <input value={name} onChange={(e) => setName(e.target.value)}
-                     placeholder="Activity name (e.g. Emergency shelter kits)"
+                     placeholder={t('proximate.activities.name_ph')}
                      className="flex-1 min-w-[200px] text-xs rounded-md border bg-background px-2 py-1.5" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {DEFAULT_LINES.map((label) => (
-                <label key={label} className="text-[10px] text-muted-foreground space-y-0.5">
-                  {label} (USD)
+              {DEFAULT_LINES.map((ln) => (
+                <label key={ln.v} className="text-[10px] text-muted-foreground space-y-0.5">
+                  {t(ln.k)} (USD)
                   <input type="number" inputMode="numeric" min={0}
-                         value={amounts[label] || ''}
+                         value={amounts[ln.v] || ''}
                          onChange={(e) => setAmounts((prev) =>
-                           ({ ...prev, [label]: e.target.value }))}
+                           ({ ...prev, [ln.v]: e.target.value }))}
                          placeholder="0"
                          className="w-full text-xs rounded-md border bg-background px-2 py-1 text-foreground" />
                 </label>
@@ -156,7 +162,7 @@ export function ApprovedActivitiesCard({
                     onClick={add}>
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
                     : <Plus className="w-3.5 h-3.5 me-1" />}
-              Add activity
+              {t('proximate.activities.add')}
             </Button>
             {error && <p className="text-[10px] text-rose-600">{error}</p>}
           </div>

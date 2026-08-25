@@ -16,6 +16,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useOrigin } from '@/components/proximate/token-page-support';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface VoteInvite {
   id: number;
@@ -58,6 +59,7 @@ export function SelectionVoteCard({
   roundId, isOperator,
 }: { roundId: number; isOperator: boolean }) {
   const origin = useOrigin();
+  const { t } = useTranslation();
   const [data, setData] = useState<VoteResp | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -87,12 +89,11 @@ export function SelectionVoteCard({
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg.includes('no_appointed_panelists')) {
-        setError('Appoint panel members first — set their status to '
-          + '"appointed" in the panel roster below.');
+        setError(t('proximate.vote.err_no_panelists'));
       } else if (msg.includes('roster_empty')) {
-        setError('Add partners to the roster before opening a vote.');
+        setError(t('proximate.vote.err_roster_empty'));
       } else {
-        setError(msg || 'Could not open the vote.');
+        setError(msg || t('proximate.vote.err_open'));
       }
     } finally {
       setBusy(false);
@@ -106,7 +107,7 @@ export function SelectionVoteCard({
       await api.post(`/api/proximate/rounds/${roundId}/selection-vote/close`, {});
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not close the vote.');
+      setError(e instanceof Error ? e.message : t('proximate.vote.err_close'));
     } finally {
       setBusy(false);
     }
@@ -126,8 +127,9 @@ export function SelectionVoteCard({
   };
 
   const waHref = (inv: VoteInvite) => {
-    const text = `Salaam ${inv.voter_name}. Please open your Proximate panel `
-      + `selection ballot and submit your choices: ${shareUrl(inv.vote_token)}`;
+    const text = t('proximate.vote.wa_msg', {
+      name: inv.voter_name, url: shareUrl(inv.vote_token),
+    });
     const phone = (inv.voter_phone || '').replace(/[^\d]/g, '');
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
@@ -136,27 +138,27 @@ export function SelectionVoteCard({
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <Vote className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">Panel selection vote</h3>
+        <h3 className="text-sm font-semibold flex-1">{t('proximate.vote.title')}</h3>
         {session?.status === 'open' && (
           <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300">
-            {data.voted} of {data.invited} voted
+            {t('proximate.vote.voted_count', { voted: data.voted ?? 0, invited: data.invited ?? 0 })}
           </Badge>
         )}
         {session?.status === 'closed' && (
           <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">
-            Decided
+            {t('proximate.vote.decided')}
           </Badge>
         )}
         {!session && (
           <Button size="sm" disabled={busy} onClick={open}>
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
-            Open selection vote
+            {t('proximate.vote.open_btn')}
           </Button>
         )}
         {session?.status === 'open' && (
           <Button size="sm" variant="outline" disabled={busy} onClick={close}>
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
-            Close vote
+            {t('proximate.vote.close_btn')}
           </Button>
         )}
       </div>
@@ -165,9 +167,7 @@ export function SelectionVoteCard({
 
       {!session && (
         <p className="text-xs text-muted-foreground">
-          Replaces the physical selection meeting: every appointed panelist
-          gets a personal one-tap ballot link. Votes are visible to the
-          Oversight Body only, and the tally lands on the audit chain.
+          {t('proximate.vote.intro')}
         </p>
       )}
 
@@ -178,11 +178,11 @@ export function SelectionVoteCard({
               <span className="flex-1 min-w-0 truncate">{inv.voter_name}</span>
               {inv.voted_at ? (
                 <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">
-                  Voted
+                  {t('proximate.vote.voted_badge')}
                 </Badge>
               ) : (
                 <>
-                  <Badge variant="outline" className="text-[10px]">Awaiting</Badge>
+                  <Badge variant="outline" className="text-[10px]">{t('proximate.vote.awaiting')}</Badge>
                   <button
                     type="button"
                     onClick={() => copyLink(inv)}
@@ -191,7 +191,7 @@ export function SelectionVoteCard({
                     {copiedId === inv.id
                       ? <Check className="w-3 h-3" />
                       : <Copy className="w-3 h-3" />}
-                    {copiedId === inv.id ? 'Copied' : 'Copy link'}
+                    {copiedId === inv.id ? t('proximate.vote.copied') : t('proximate.vote.copy_link')}
                   </button>
                   <a
                     href={waHref(inv)}
@@ -214,21 +214,23 @@ export function SelectionVoteCard({
         return (
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground">
-              {sel.size} of {session.ballot.length} partners selected by
-              majority ({session.outcome.voted} of {session.outcome.invited}{' '}
-              panelists voted). The tally is recorded on the audit chain —
-              apply the decision to the roster.
+              {t('proximate.vote.outcome', {
+                sel: sel.size,
+                total: session.ballot.length,
+                voted: session.outcome.voted,
+                invited: session.outcome.invited,
+              })}
             </p>
             <ul className="space-y-1">
               {session.ballot.map((b) => {
-                const t = session.outcome!.tally[String(b.participant_id)]
+                const tal = session.outcome!.tally[String(b.participant_id)]
                   || { select: 0, pass: 0 };
                 const isSel = sel.has(b.participant_id);
                 return (
                   <li key={b.participant_id} className="flex items-center gap-2 text-sm">
                     <span className="flex-1 min-w-0 truncate">{b.partner_name}</span>
                     <span className="text-[10px] text-muted-foreground tabular-nums">
-                      {t.select}–{t.pass}
+                      {tal.select}–{tal.pass}
                     </span>
                     <Badge
                       variant="outline"
@@ -236,7 +238,7 @@ export function SelectionVoteCard({
                         ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                         : 'bg-muted text-muted-foreground border-border'}`}
                     >
-                      {isSel ? 'Selected' : 'Not selected'}
+                      {isSel ? t('proximate.vote.selected') : t('proximate.vote.not_selected')}
                     </Badge>
                   </li>
                 );

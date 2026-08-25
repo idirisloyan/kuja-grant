@@ -817,7 +817,7 @@ export function ProximateRoundDetailClient() {
                 {signatures.map((s) => (
                   <li key={s.id} className="flex items-center gap-2">
                     <span className="text-muted-foreground">{t('proximate.rounds.signer')} #{s.user_id}</span>
-                    <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{t(`proximate.rounds.sig_status.${s.status}`)}</Badge>
                     {s.acted_at && (
                       <span className="text-muted-foreground ms-auto">
                         {new Date(s.acted_at).toLocaleDateString()}
@@ -1026,11 +1026,11 @@ export function ProximateRoundDetailClient() {
                       className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
                     >
                       <UserPlus className="w-3 h-3" />
-                      Add partner
+                      {t('proximate.rounds.add_partner')}
                     </button>
                   )}
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Stage per partner
+                    {t('proximate.rounds.stage_per_partner')}
                   </p>
                 </div>
               </div>
@@ -1091,7 +1091,7 @@ export function ProximateRoundDetailClient() {
                       <Link
                         href={`/proximate/endorse/${p.partner_id}?tab=history`}
                         className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-muted"
-                        title="Open partner record & history"
+                        title={t('proximate.rounds.open_record_tip')}
                       >
                         History
                       </Link>
@@ -1108,7 +1108,7 @@ export function ProximateRoundDetailClient() {
                           onClick={() => openInviteEndorser(p.partner_id, p.partner_name || `Partner #${p.partner_id}`)}
                           className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
                         >
-                          Invite endorser
+                          {t('proximate.rounds.invite_endorser')}
                         </button>
                       )}
                     </li>
@@ -1167,7 +1167,7 @@ export function ProximateRoundDetailClient() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between p-4 border-b">
-                  <p className="text-sm font-medium">Add partner to round</p>
+                  <p className="text-sm font-medium">{t('proximate.rounds.addp.title')}</p>
                   <button
                     type="button"
                     onClick={() => setShowAddPartner(false)}
@@ -1180,7 +1180,7 @@ export function ProximateRoundDetailClient() {
                   <input
                     type="text"
                     autoFocus
-                    placeholder="Filter by name…"
+                    placeholder={t('proximate.rounds.filter_name')}
                     value={addFilter}
                     onChange={(e) => setAddFilter(e.target.value)}
                     className="w-full text-sm rounded-md border bg-background p-2"
@@ -1188,14 +1188,13 @@ export function ProximateRoundDetailClient() {
                   {/* OB-006/007 — UAT safety: the roster picker draws from ALL
                       tenant partners, live ones included. */}
                   <p className="mt-2 text-[11px] text-amber-800 dark:text-amber-300">
-                    This list can include live partners. During UAT, add only
-                    test records (tagged <span className="font-semibold">TEST</span>).
+                    {t('proximate.rounds.addp.uat_warning')}
                   </p>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                   {availablePartners === null && (
                     <p className="text-xs text-muted-foreground p-4 text-center">
-                      Loading partners…
+                      {t('proximate.rounds.addp.loading')}
                     </p>
                   )}
                   {availablePartners !== null && (() => {
@@ -1215,8 +1214,8 @@ export function ProximateRoundDetailClient() {
                       return (
                         <p className="text-xs text-muted-foreground p-4 text-center">
                           {addFilter.trim()
-                            ? 'No partners match your filter.'
-                            : 'All tenant partners are already on the roster.'}
+                            ? t('proximate.rounds.addp.no_match')
+                            : t('proximate.rounds.addp.all_on_roster')}
                         </p>
                       );
                     }
@@ -1254,7 +1253,7 @@ export function ProximateRoundDetailClient() {
                               ) : (
                                 <Plus className="w-3 h-3" />
                               )}
-                              Add
+                              {t('proximate.rounds.addp.add')}
                             </button>
                           </li>
                         ))}
@@ -1264,7 +1263,7 @@ export function ProximateRoundDetailClient() {
                 </div>
                 <div className="p-3 border-t bg-muted/30">
                   <p className="text-[10px] text-muted-foreground">
-                    Partners land on the roster at stage <span className="font-mono">planned</span>. Stage auto-advances as endorsements, disbursements, and reports come in.
+                    {t('proximate.rounds.addp.footer')}
                   </p>
                 </div>
               </div>
@@ -1285,9 +1284,9 @@ export function ProximateRoundDetailClient() {
               >
                 <div className="flex items-center justify-between p-4 border-b">
                   <div>
-                    <p className="text-sm font-medium">Invite endorser</p>
+                    <p className="text-sm font-medium">{t('proximate.rounds.invite_endorser')}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      for {invitePartnerName}
+                      {t('proximate.rounds.invite.for', { name: invitePartnerName })}
                     </p>
                   </div>
                   <button
@@ -1302,7 +1301,7 @@ export function ProximateRoundDetailClient() {
                   <div className="p-4 space-y-3 flex-1 overflow-y-auto">
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Elder&apos;s name *
+                        {t('proximate.rounds.invite.elder_name')} *
                       </label>
                       <input
                         type="text"
@@ -1310,12 +1309,12 @@ export function ProximateRoundDetailClient() {
                         className="w-full text-sm rounded-md border bg-background p-2"
                         value={inviteName}
                         onChange={(e) => setInviteName(e.target.value)}
-                        placeholder="e.g. Sarah Musa"
+                        placeholder={t('proximate.rounds.invite.elder_name_ph')}
                       />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Phone (for WhatsApp)
+                        {t('proximate.rounds.invite.phone')}
                       </label>
                       <input
                         type="tel"
@@ -1327,25 +1326,25 @@ export function ProximateRoundDetailClient() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Locality
+                        {t('proximate.nom.locality')}
                       </label>
                       <input
                         type="text"
                         className="w-full text-sm rounded-md border bg-background p-2"
                         value={inviteLocality}
                         onChange={(e) => setInviteLocality(e.target.value)}
-                        placeholder="e.g. Kassala"
+                        placeholder={t('proximate.rounds.invite.locality_ph')}
                       />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Note (shown to the elder)
+                        {t('proximate.rounds.invite.note')}
                       </label>
                       <textarea
                         className="w-full text-sm rounded-md border bg-background p-2 min-h-[70px]"
                         value={inviteNote}
                         onChange={(e) => setInviteNote(e.target.value)}
-                        placeholder="e.g. Because you know the Kassala community"
+                        placeholder={t('proximate.rounds.invite.note_ph')}
                       />
                     </div>
                     <div className="flex gap-2 pt-2">
@@ -1354,13 +1353,13 @@ export function ProximateRoundDetailClient() {
                         disabled={inviteSubmitting || !inviteName.trim()}
                       >
                         {inviteSubmitting && <Loader2 className="w-4 h-4 animate-spin me-2" />}
-                        Generate invite
+                        {t('proximate.rounds.invite.generate')}
                       </Button>
                       <Button
                         variant="ghost"
                         onClick={() => setInviteOpen(false)}
                       >
-                        Cancel
+                        {t('proximate.rounds.invite.cancel')}
                       </Button>
                     </div>
                   </div>
@@ -1368,15 +1367,15 @@ export function ProximateRoundDetailClient() {
                   <div className="p-4 space-y-3 flex-1 overflow-y-auto">
                     <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3">
                       <p className="text-sm font-medium text-emerald-800">
-                        Invitation ready
+                        {t('proximate.rounds.invite.ready')}
                       </p>
                       <p className="text-[11px] text-emerald-700 mt-1">
-                        Send this link to {inviteName} — they can open it on their phone with no login.
+                        {t('proximate.rounds.invite.send_hint', { name: inviteName })}
                       </p>
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">
-                        Shareable URL
+                        {t('proximate.rounds.invite.shareable_url')}
                       </label>
                       <input
                         type="text"
@@ -1393,7 +1392,7 @@ export function ProximateRoundDetailClient() {
                         rel="noopener noreferrer"
                         className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
                       >
-                        Open in WhatsApp
+                        {t('proximate.rounds.invite.open_whatsapp')}
                       </a>
                       <button
                         type="button"
@@ -1402,7 +1401,7 @@ export function ProximateRoundDetailClient() {
                         }}
                         className="w-full py-2 rounded-md border bg-background text-sm hover:bg-muted/40"
                       >
-                        Copy link
+                        {t('proximate.rounds.invite.copy_link')}
                       </button>
                     </div>
                     <div className="pt-2 border-t">
@@ -1417,7 +1416,7 @@ export function ProximateRoundDetailClient() {
                         }}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
-                        + Invite another endorser for this partner
+                        {t('proximate.rounds.invite.another')}
                       </button>
                     </div>
                   </div>
