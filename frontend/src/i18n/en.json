@@ -4669,5 +4669,11 @@
   "proximate.reports.general_activity": "General activity",
   "proximate.reports.donor_visible_hide": "Visible to donor — click to hide",
   "proximate.reports.internal_only_approve": "Internal only — click to approve for donor",
-  "proximate.reports.notes_ph": "Notes to the partner (required for changes)…"
+  "proximate.reports.notes_ph": "Notes to the partner (required for changes)…",
+  "proximate.preflight.partner_cleared": "Partner cleared for disbursement",
+  "proximate.preflight.award_recorded": "Panel award recorded",
+  "proximate.preflight.amount_approved": "Approved amount set",
+  "proximate.preflight.contract_exists": "Contract opened",
+  "proximate.preflight.contract_complete": "Contract signed and complete",
+  "proximate.preflight.verified_route": "Verified payment route"
 }

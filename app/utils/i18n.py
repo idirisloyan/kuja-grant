@@ -102,6 +102,25 @@ def resolve_network_lang(network_id=None):
     return 'en'
 
 
+def resolve_display_lang(network_id=None):
+    """Display language for server-generated labels on AUTHENTICATED surfaces.
+
+    Mirrors the frontend useTranslation() precedence: the logged-in user's
+    explicit choice wins, otherwise fall back to the tenant network's default
+    (so an operator on an Arabic-first tenant who never set a language still
+    sees Arabic), then 'en'. Use this for API-response labels the frontend
+    renders raw on operator/OB/donor dashboards; use resolve_network_lang()
+    for anonymous token portals with no user.
+    """
+    try:
+        if (getattr(current_user, 'is_authenticated', False)
+                and getattr(current_user, 'language', None) in SUPPORTED_LANGUAGES):
+            return current_user.language
+    except Exception:
+        pass
+    return resolve_network_lang(network_id)
+
+
 def t(key, lang=None, **params):
     """Translate a key to the given (or current user's) language.
 

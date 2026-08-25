@@ -44,7 +44,7 @@ from app.models import (
 )
 from app.utils.network import ob_required
 from app.utils.helpers import get_request_json, aware_utc
-from app.utils.i18n import t, SUPPORTED_LANGUAGES, resolve_network_lang
+from app.utils.i18n import t, SUPPORTED_LANGUAGES, resolve_network_lang, resolve_display_lang
 
 logger = logging.getLogger('kuja')
 
@@ -2514,6 +2514,16 @@ def api_disbursement_preflight():
         'ok': verified_methods > 0,
         'href': href_routes,
     })
+
+    # Localize the readiness-checklist labels server-side: the frontend
+    # renders `label` raw (disbursements/new), so it must arrive in the
+    # operator's language. The English `label` above stays as the fallback
+    # for any code without a catalog entry.
+    _lang = resolve_display_lang(net.id)
+    for _item in checklist:
+        _tr = t(f'proximate.preflight.{_item["code"]}', lang=_lang)
+        if _tr and _tr != f'proximate.preflight.{_item["code"]}':
+            _item['label'] = _tr
 
     return jsonify({
         'success': True,

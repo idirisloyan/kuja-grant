@@ -4646,5 +4646,11 @@
   "proximate.reports.general_activity": "نشاط عام",
   "proximate.reports.donor_visible_hide": "مرئي للمانح — انقر للإخفاء",
   "proximate.reports.internal_only_approve": "داخلي فقط — انقر للاعتماد للمانح",
-  "proximate.reports.notes_ph": "ملاحظات للشريك (مطلوبة عند طلب تغييرات)…"
+  "proximate.reports.notes_ph": "ملاحظات للشريك (مطلوبة عند طلب تغييرات)…",
+  "proximate.preflight.partner_cleared": "الشريك مُجاز للصرف",
+  "proximate.preflight.award_recorded": "تم تسجيل قرار منحة اللجنة",
+  "proximate.preflight.amount_approved": "تم تحديد المبلغ المعتمد",
+  "proximate.preflight.contract_exists": "تم فتح العقد",
+  "proximate.preflight.contract_complete": "العقد موقّع ومكتمل",
+  "proximate.preflight.verified_route": "مسار دفع مُتحقَّق منه"
 }
