@@ -2052,28 +2052,36 @@ def cycle_state(rnd):
         ).all():
             partner_names[p.id] = p.name
 
+    # Display strings (`what`) are localized to the operator's language so the
+    # closeout tab AND the closeout PDF read in Arabic on an Arabic-first tenant.
+    # severity/partner drive logic and stay language-neutral.
+    lang = resolve_display_lang(getattr(rnd, 'network_id', None))
+
+    def _w(key, **p):
+        return t(key, lang=lang, **p)
+
     outstanding = []
     for a in awarded:
         nm = partner_names.get(a.partner_id, f'Partner #{a.partner_id}')
         c = contracts.get(a.id)
         if not c or not c.is_complete:
             outstanding.append({'partner': nm,
-                                'what': 'Agreement not completed',
+                                'what': _w('proximate.closeout.what.agreement_incomplete'),
                                 'severity': 'block'})
         if not a.decision_is_attributable:
             outstanding.append({
                 'partner': nm,
-                'what': 'Award has no meeting, minutes or panel confirmation',
+                'what': _w('proximate.closeout.what.award_unattributable'),
                 'severity': 'warn'})
     for d in disbs:
         nm = partner_names.get(d.partner_id, f'Partner #{d.partner_id}')
         if d.sent_at and not d.receipt_confirmed_at:
             outstanding.append({'partner': nm,
-                                'what': 'Receipt of funds not confirmed',
+                                'what': _w('proximate.closeout.what.receipt_unconfirmed'),
                                 'severity': 'block'})
         if not d.report_submitted_at:
             outstanding.append({
-                'partner': nm, 'what': 'Partner report not received',
+                'partner': nm, 'what': _w('proximate.closeout.what.report_missing'),
                 'severity': 'block' if d.is_overdue() else 'warn'})
 
     held = {m.meeting_type for m in meetings}
@@ -2081,7 +2089,8 @@ def cycle_state(rnd):
         if required not in held:
             outstanding.append({
                 'partner': None,
-                'what': f'No {required.replace("_", " ")} meeting recorded',
+                'what': _w('proximate.closeout.what.no_meeting',
+                           v=_w(f'proximate.closeout.meeting.{required}')),
                 'severity': 'warn'})
 
     open_issues = ProximateEvidence.query.filter_by(
@@ -2090,7 +2099,7 @@ def cycle_state(rnd):
     if open_issues:
         outstanding.append({
             'partner': None,
-            'what': f'{open_issues} unresolved issue(s) in the evidence log',
+            'what': _w('proximate.closeout.what.open_issues', n=open_issues),
             'severity': 'warn'})
 
     # R-06: lifecycle prerequisites. The outstanding list is built by walking
@@ -2103,15 +2112,13 @@ def cycle_state(rnd):
     if rnd.status not in ('active', 'closed'):
         outstanding.insert(0, {
             'partner': None,
-            'what': (
-                f'Round is "{rnd.status}", not active — it has not been '
-                'activated, so there is nothing to close out yet.'
-            ),
+            'what': _w('proximate.closeout.what.not_active',
+                       status=_w(f'proximate.status.{rnd.status}')),
             'severity': 'block'})
     if not awarded:
         outstanding.insert(0, {
             'partner': None,
-            'what': 'No partner has been awarded in this cycle — nothing to close out.',
+            'what': _w('proximate.closeout.what.no_awards'),
             'severity': 'block'})
 
     blocks = [o for o in outstanding if o['severity'] == 'block']
@@ -2346,6 +2353,11 @@ def api_cycle_closeout_pdf(round_id):
     except Exception:
         arabic_ok = False
 
+    lang = resolve_display_lang(getattr(rnd, 'network_id', None))
+
+    def _t(key, **p):
+        return t(key, lang=lang, **p)
+
     buf = _io.BytesIO()
     c = _canvas.Canvas(buf, pagesize=A4)
     W, H = A4
@@ -2386,61 +2398,64 @@ def api_cycle_closeout_pdf(round_id):
         # The most important line in the document. A donor reading this pack
         # is entitled to know the cycle was signed off with open items, what
         # they were, and on what stated grounds — before any of the numbers.
-        line('This cycle was closed with unfinished items.',
+        line(_t('proximate.closeout.pdf.closed_unfinished'),
              bold=True, size=12, colour=(0.7, 0.1, 0.1))
-        line(f'Reason given: {data.get("close_override_reason") or "—"}',
+        line(_t('proximate.closeout.pdf.reason_given',
+                v=data.get("close_override_reason") or "—"),
              size=9, colour=(0.35, 0.1, 0.1))
         for o in (data.get('close_blockers_at_close') or []):
-            line(f'  • unresolved at closing: '
+            line(f'  • {_t("proximate.closeout.pdf.unresolved_at_close")}: '
                  f'{(o.get("partner") + ": ") if o.get("partner") else ""}'
                  f'{o.get("what")}', size=9, colour=(0.5, 0.15, 0.15))
         y -= 4
     elif data['ready_to_close']:
-        line('Nothing is blocking closeout.', bold=True)
+        line(_t('proximate.closeout.pdf.nothing_blocking'), bold=True)
     else:
-        line(f'{data["blocking_count"]} item(s) must be finished first.',
+        line(_t('proximate.closeout.pdf.items_first', n=data["blocking_count"]),
              bold=True, colour=(0.7, 0.1, 0.1))
     y -= 4
 
     blocks = [o for o in data['outstanding'] if o['severity'] == 'block']
     warns = [o for o in data['outstanding'] if o['severity'] != 'block']
     if blocks:
-        line('Must be resolved', bold=True, size=11)
+        line(_t('proximate.closeout.pdf.must_resolve'), bold=True, size=11)
         for o in blocks:
             line(f'  • {(o["partner"] + ": ") if o["partner"] else ""}{o["what"]}',
                  size=9, colour=(0.6, 0.1, 0.1))
         y -= 4
     if warns:
-        line('Worth noting', bold=True, size=11)
+        line(_t('proximate.closeout.pdf.worth_noting'), bold=True, size=11)
         for o in warns:
             line(f'  • {(o["partner"] + ": ") if o["partner"] else ""}{o["what"]}',
                  size=9, colour=(0.5, 0.35, 0.05))
         y -= 4
 
     rule()
-    line('The cycle in summary', bold=True, size=11)
+    line(_t('proximate.closeout.pdf.summary'), bold=True, size=11)
     m = data['money']
+    _receipts = _t('proximate.closeout.pdf.n_of_m',
+                   a=data["disbursements"]["receipts_confirmed"],
+                   b=data["disbursements"]["count"])
     for label, value in [
-        ('Panel members seated', data['panel']['confirmed']),
-        ('Localities represented', len(data['panel']['localities'])),
-        ('Meetings recorded', len(data['meetings'])),
-        ('Partners considered', data['awards']['considered']),
-        ('Awarded', data['awards']['awarded']),
-        ('Total approved', f'${data["awards"]["total_approved_usd"]:,.0f}'),
-        ('Total sent', f'${data["disbursements"]["total_sent_usd"]:,.0f}'),
-        ('Receipts confirmed',
-         f'{data["disbursements"]["receipts_confirmed"]} of '
-         f'{data["disbursements"]["count"]}'),
-        ('Donor envelope', f'${m["envelope_usd"]:,.0f}'),
-        ('Administration', f'${m["admin_overhead_usd"]:,.0f}'),
-        ('Available for partners', f'${m["disbursable_usd"]:,.0f}'),
-        ('Unspent', f'${m["uncommitted_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.panel_seated'), data['panel']['confirmed']),
+        (_t('proximate.closeout.pdf.localities'), len(data['panel']['localities'])),
+        (_t('proximate.closeout.pdf.meetings'), len(data['meetings'])),
+        (_t('proximate.closeout.pdf.considered'), data['awards']['considered']),
+        (_t('proximate.closeout.pdf.awarded'), data['awards']['awarded']),
+        (_t('proximate.closeout.pdf.total_approved'), f'${data["awards"]["total_approved_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.total_sent'), f'${data["disbursements"]["total_sent_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.receipts_confirmed'), _receipts),
+        (_t('proximate.closeout.pdf.donor_envelope'), f'${m["envelope_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.administration'), f'${m["admin_overhead_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.available_partners'), f'${m["disbursable_usd"]:,.0f}'),
+        (_t('proximate.closeout.pdf.unspent'), f'${m["uncommitted_usd"]:,.0f}'),
     ]:
         line(f'  {label}: {value}', size=9)
 
     if data['panel']['localities']:
         y -= 4
-        line('Panel drawn from: ' + ', '.join(data['panel']['localities']),
+        line(_t('proximate.closeout.pdf.panel_from',
+                v=', '.join(data['panel']['localities'])),
              size=9, colour=(0.45, 0.45, 0.45))
 
     c.showPage()
