@@ -4724,5 +4724,14 @@
   "proximate.pdf.grant.exec_summary": "الملخّص التنفيذي",
   "proximate.pdf.grant.fin_summary": "الملخّص المالي",
   "proximate.pdf.grant.impact": "سرد الأثر",
-  "proximate.pdf.grant.compliance": "ملاحظة الامتثال"
+  "proximate.pdf.grant.compliance": "ملاحظة الامتثال",
+  "proximate.pdf.rpt.subtitle": "تقرير تنفيذ الشريك",
+  "proximate.pdf.rpt.status": "الحالة: {v}",
+  "proximate.pdf.rpt.locality": "المنطقة: {v}",
+  "proximate.pdf.rpt.summary": "الملخّص",
+  "proximate.pdf.rpt.financials": "البيانات المالية (الفعلي مقابل المعتمَد)",
+  "proximate.pdf.rpt.rate_used": "سعر الصرف المستخدم: {rate} {ccy} لكل دولار أمريكي",
+  "proximate.pdf.rpt.general_activity": "نشاط عام",
+  "proximate.pdf.rpt.people_reached": "عدد المستفيدين: {n} {unit}",
+  "proximate.pdf.rpt.photos": "أدلة مصوّرة"
 }

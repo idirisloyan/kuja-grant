@@ -10746,6 +10746,10 @@ def api_report_package_pdf(package_id):
         ensure_arabic_fonts, has_arabic, shape_ar, wrap_arabic,
     )
     arabic_ok = ensure_arabic_fonts()
+    lang = resolve_display_lang(net.id)
+
+    def _tp(key, **pp):
+        return t(key, lang=lang, **pp)
 
     view = _package_view(pkg, for_donor=not is_ob)
     narrative = pkg.get_narrative() or {}
@@ -10809,8 +10813,13 @@ def api_report_package_pdf(package_id):
     c.setFillColorRGB(1, 1, 1)
     c.setFont('Helvetica-Bold', 16)
     c.drawString(20 * mm, H - 13 * mm, 'Proximate Fund')
-    c.setFont('Helvetica', 11)
-    c.drawString(20 * mm, H - 19 * mm, 'Partner Implementation Report')
+    _subtitle = _tp('proximate.pdf.rpt.subtitle')
+    if arabic_ok and has_arabic(_subtitle):
+        c.setFont('Amiri', 11)
+        c.drawRightString(W - 20 * mm, H - 19 * mm, shape_ar(_subtitle))
+    else:
+        c.setFont('Helvetica', 11)
+        c.drawString(20 * mm, H - 19 * mm, _subtitle)
     c.setFont('Helvetica', 9)
     when = pkg.published_at or pkg.submitted_at
     c.drawRightString(W - 20 * mm, H - 13 * mm,
@@ -10820,12 +10829,13 @@ def api_report_package_pdf(package_id):
     _line(f"{partner.get('name', '')} — {rnd.get('title', '')}", 12, bold=True)
     if arabic_ok and partner.get('name_ar'):
         _line(partner['name_ar'], 11, bold=True)
-    _line(f"Status: {pkg.status}"
-          + (f"   Locality: {partner.get('locality')}"
-             if partner.get('locality') else ''), 9, color=(0.45, 0.43, 0.42))
+    _status = _tp('proximate.pdf.rpt.status', v=t(f'proximate.status.{pkg.status}', lang=lang))
+    if partner.get('locality'):
+        _status += '   ' + _tp('proximate.pdf.rpt.locality', v=partner.get('locality'))
+    _line(_status, 9, color=(0.45, 0.43, 0.42))
     y -= 3 * mm
     if narrative.get('summary_en') or narrative.get('summary_ar'):
-        _section('Summary')
+        _section(_tp('proximate.pdf.rpt.summary'))
         if narrative.get('summary_en'):
             _line(narrative['summary_en'], 10)
         if arabic_ok and narrative.get('summary_ar'):
@@ -10847,13 +10857,14 @@ def api_report_package_pdf(package_id):
     blocks = (answers.get('activities') or {})
     if blocks:
         rate = pkg.exchange_rate
-        _section('Financials (actual vs approved)')
+        _section(_tp('proximate.pdf.rpt.financials'))
         if rate:
-            _line(f'Rate used: {rate:,.0f} {pkg.spend_currency} per 1 USD',
+            _line(_tp('proximate.pdf.rpt.rate_used',
+                      rate=f'{rate:,.0f}', ccy=pkg.spend_currency),
                   8.5, color=(0.45, 0.43, 0.42))
         for aid, block in blocks.items():
             approved = acts.get(aid, {})
-            _line(approved.get('name', 'General activity'), 10, bold=True)
+            _line(approved.get('name') or _tp('proximate.pdf.rpt.general_activity'), 10, bold=True)
             approved_lines = {l['label']: l['amount']
                               for l in approved.get('budget_lines', [])}
             for label, amount in (block.get('spend') or {}).items():
@@ -10864,14 +10875,15 @@ def api_report_package_pdf(package_id):
                       + (f'  (approved {app_amt:,.0f} USD)'
                          if app_amt is not None else ''), 9)
             if block.get('people_reached') is not None:
-                _line(f"  People reached: {block['people_reached']:,.0f} "
-                      f"{block.get('unit', '')}", 9)
+                _line('  ' + _tp('proximate.pdf.rpt.people_reached',
+                                 n=f"{block['people_reached']:,.0f}",
+                                 unit=block.get('unit', '')), 9)
         y -= 2 * mm
 
     photos = [i for i in view['items'] if i['kind'] == 'photo'][:6]
     others = [i for i in view['items'] if i['kind'] != 'photo']
     if photos:
-        _section('Photo evidence')
+        _section(_tp('proximate.pdf.rpt.photos'))
         x = 20 * mm
         thumb = 50 * mm
         for it in photos:

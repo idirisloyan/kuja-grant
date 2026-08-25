@@ -4747,5 +4747,14 @@
   "proximate.pdf.grant.exec_summary": "Executive summary",
   "proximate.pdf.grant.fin_summary": "Financial summary",
   "proximate.pdf.grant.impact": "Impact narrative",
-  "proximate.pdf.grant.compliance": "Compliance note"
+  "proximate.pdf.grant.compliance": "Compliance note",
+  "proximate.pdf.rpt.subtitle": "Partner Implementation Report",
+  "proximate.pdf.rpt.status": "Status: {v}",
+  "proximate.pdf.rpt.locality": "Locality: {v}",
+  "proximate.pdf.rpt.summary": "Summary",
+  "proximate.pdf.rpt.financials": "Financials (actual vs approved)",
+  "proximate.pdf.rpt.rate_used": "Rate used: {rate} {ccy} per 1 USD",
+  "proximate.pdf.rpt.general_activity": "General activity",
+  "proximate.pdf.rpt.people_reached": "People reached: {n} {unit}",
+  "proximate.pdf.rpt.photos": "Photo evidence"
 }
