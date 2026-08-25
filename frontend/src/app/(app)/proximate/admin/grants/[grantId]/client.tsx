@@ -172,6 +172,15 @@ export function ProximateGrantDetailClient() {
   const { t } = useTranslation();
   const isOb = persona === 'ob' || persona === 'admin';
 
+  // Localize a system enum via `<prefix>.<value>`, falling back to the raw
+  // value for anything the catalog doesn't cover (e.g. AI-extracted sectors).
+  const enumLabel = (prefix: string, val: string): string => {
+    if (!val) return val;
+    const k = `${prefix}.${val}`;
+    const v = t(k);
+    return v && v !== k ? v : val;
+  };
+
   // Phase 721d — deliverables vs targets + report scoring
   const [deliverables, setDeliverables] = useState<DeliverableProgress[]>([]);
   const [scoringId, setScoringId] = useState<number | null>(null);
@@ -402,7 +411,7 @@ export function ProximateGrantDetailClient() {
                                   : t('prox_grant.source_untracked')
                           }
                         >
-                          {d.source.startsWith('auto') ? t('prox_grant.live') : d.source}
+                          {d.source.startsWith('auto') ? t('prox_grant.live') : enumLabel('prox_grant.dsource', d.source)}
                         </Badge>
                         {isOb && !d.source.startsWith('auto') && (
                           editIdx === d.index ? (
@@ -464,7 +473,7 @@ export function ProximateGrantDetailClient() {
                 <p className="text-[10px] uppercase text-muted-foreground">
                   {t('prox_grant.reporting_cadence')}
                 </p>
-                <p className="mt-1 font-mono">{g.reporting_cadence}</p>
+                <p className="mt-1 font-mono">{enumLabel('prox_grant.cadence', g.reporting_cadence)}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase text-muted-foreground">
@@ -508,7 +517,7 @@ export function ProximateGrantDetailClient() {
                     </span>
                     {g.restrictions.sectors.map((s) => (
                       <Badge key={s} variant="outline" className="text-[10px]">
-                        {s}
+                        {enumLabel('prox_grant.sector', s)}
                       </Badge>
                     ))}
                   </div>
@@ -580,7 +589,7 @@ export function ProximateGrantDetailClient() {
                         variant="outline"
                         className={`text-[10px] ${reportStatusStyles[r.status] || ''}`}
                       >
-                        {r.status}
+                        {enumLabel('prox_grant.report_status', r.status)}
                       </Badge>
                     </li>
                   ))}
@@ -687,7 +696,7 @@ export function ProximateGrantDetailClient() {
                             variant="outline"
                             className={`text-[10px] ${reportStatusStyles[r.status] || ''}`}
                           >
-                            {r.status}
+                            {enumLabel('prox_grant.report_status', r.status)}
                           </Badge>
                         </div>
                         {r.compliance_score?.length > 0 && (
