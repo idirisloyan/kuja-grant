@@ -4657,5 +4657,17 @@
   "proximate.setup.date_warning.disbursement": "مرّ الموعد المستهدف للصرف منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
   "proximate.setup.date_warning.report": "مرّ الموعد المستهدف للتقرير منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
   "proximate.donor.partner_reports": "تقارير الشركاء",
-  "proximate.donor.view_report": "عرض التقرير"
+  "proximate.donor.view_report": "عرض التقرير",
+  "proximate.pdf.round.title": "تقرير نهاية الدورة: {title}",
+  "proximate.pdf.round.trigger": "المحفّز: {v}",
+  "proximate.pdf.round.donor": "الجهة المانحة: {v}",
+  "proximate.pdf.round.country": "البلد: {v}",
+  "proximate.pdf.round.envelope": "المظروف: {v}",
+  "proximate.pdf.round.used": "المُستخدَم: {v}",
+  "proximate.pdf.round.remaining": "المتبقّي: {v}",
+  "proximate.pdf.round.disb_count": "عدد الصرفيات: {v}",
+  "proximate.pdf.round.partners_served": "الشركاء المستفيدون: {v}",
+  "proximate.pdf.round.disbursements": "الصرفيات",
+  "proximate.pdf.round.people_helped": "عدد المستفيدين: {v}",
+  "proximate.pdf.round.audit_anchor": "مرساة التدقيق: تسلسل={seq} بصمة={hash}…"
 }

@@ -4680,5 +4680,17 @@
   "proximate.setup.date_warning.disbursement": "The target disbursement date passed {n} day(s) ago. This is a note, not a block — carry on.",
   "proximate.setup.date_warning.report": "The target report date passed {n} day(s) ago. This is a note, not a block — carry on.",
   "proximate.donor.partner_reports": "Partner reports",
-  "proximate.donor.view_report": "View report"
+  "proximate.donor.view_report": "View report",
+  "proximate.pdf.round.title": "End-of-round report: {title}",
+  "proximate.pdf.round.trigger": "Trigger: {v}",
+  "proximate.pdf.round.donor": "Donor: {v}",
+  "proximate.pdf.round.country": "Country: {v}",
+  "proximate.pdf.round.envelope": "Envelope: {v}",
+  "proximate.pdf.round.used": "Used: {v}",
+  "proximate.pdf.round.remaining": "Remaining: {v}",
+  "proximate.pdf.round.disb_count": "Disbursements: {v}",
+  "proximate.pdf.round.partners_served": "Partners served: {v}",
+  "proximate.pdf.round.disbursements": "Disbursements",
+  "proximate.pdf.round.people_helped": "people helped: {v}",
+  "proximate.pdf.round.audit_anchor": "Audit anchor: seq={seq} hash={hash}…"
 }

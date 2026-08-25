@@ -4039,6 +4039,23 @@ def api_round_report_pdf(round_id):
     )
     envelope_remaining = envelope_total - envelope_used
 
+    from app.utils.arabic_pdf import ensure_arabic_fonts, has_arabic, shape_ar
+    lang = resolve_display_lang(net.id)
+    try:
+        arabic_ok = ensure_arabic_fonts()
+    except Exception:
+        arabic_ok = False
+
+    def _tt(status):  # localized round trigger type
+        k = f'proximate.round_type.{status}'
+        v = t(k, lang=lang)
+        return v if v != k else (status or '—')
+
+    def _st(status):  # localized disbursement status
+        k = f'proximate.status.{status}'
+        v = t(k, lang=lang)
+        return v if v != k else (status or '')
+
     buf = BytesIO()
     p = _canvas.Canvas(buf, pagesize=A4)
     width, height = A4
@@ -4046,48 +4063,45 @@ def api_round_report_pdf(round_id):
 
     def _line(txt, size=10, spacing=12, font='Helvetica'):
         nonlocal y
-        p.setFont(font, size)
-        p.drawString(20 * mm, y, txt[:120])
+        txt = str(txt or '')[:200]
+        if arabic_ok and has_arabic(txt):
+            p.setFont('Amiri-Bold' if font.endswith('Bold') else 'Amiri', size)
+            p.drawRightString(width - 20 * mm, y, shape_ar(txt))
+        else:
+            p.setFont(font, size)
+            p.drawString(20 * mm, y, txt[:120])
         y -= spacing
 
-    _line(f"End-of-round report: {r.title}", 16, 20, 'Helvetica-Bold')
+    _line(t('proximate.pdf.round.title', lang=lang, title=r.title),
+          16, 20, 'Helvetica-Bold')
     if r.title_ar:
         _line(r.title_ar, 11, 16)
-    _line(
-        f"Trigger: {r.trigger_type or '—'}    Donor: {r.donor_name or '—'}    "
-        f"Country: {r.target_country or '—'}",
-        9, 14,
-    )
+    # One value per line — reads correctly in both LTR and RTL.
+    _line(t('proximate.pdf.round.trigger', lang=lang, v=_tt(r.trigger_type)), 9, 13)
+    _line(t('proximate.pdf.round.donor', lang=lang, v=r.donor_name or '—'), 9, 13)
+    _line(t('proximate.pdf.round.country', lang=lang, v=r.target_country or '—'), 9, 14)
     y -= 4
-    _line(
-        f"Envelope: ${envelope_total:,.0f}    Used: ${envelope_used:,.0f}    "
-        f"Remaining: ${envelope_remaining:,.0f}",
-        11, 16, 'Helvetica-Bold',
-    )
-    _line(
-        f"Disbursements: {len(disbursements)}    "
-        f"Partners served: {len({d.partner_id for d in disbursements if d.partner_id})}",
-        10, 14,
-    )
+    _line(t('proximate.pdf.round.envelope', lang=lang, v=f"${envelope_total:,.0f}"),
+          11, 15, 'Helvetica-Bold')
+    _line(t('proximate.pdf.round.used', lang=lang, v=f"${envelope_used:,.0f}"), 10, 13)
+    _line(t('proximate.pdf.round.remaining', lang=lang, v=f"${envelope_remaining:,.0f}"), 10, 14)
+    _line(t('proximate.pdf.round.disb_count', lang=lang, v=len(disbursements)), 10, 13)
+    _line(t('proximate.pdf.round.partners_served', lang=lang,
+            v=len({d.partner_id for d in disbursements if d.partner_id})), 10, 14)
     y -= 6
-    _line('Disbursements', 12, 16, 'Helvetica-Bold')
+    _line(t('proximate.pdf.round.disbursements', lang=lang), 12, 16, 'Helvetica-Bold')
 
     for d in disbursements:
         partner = ProximatePartner.query.get(d.partner_id) if d.partner_id else None
         partner_name = partner.name if partner else f"Partner #{d.partner_id}"
         amt = float(d.amount_usd) if d.amount_usd is not None else 0
-        _line(
-            f"  • {partner_name} — ${amt:,.0f} — {d.status}",
-            10, 12,
-        )
+        _line(f"  • {partner_name} — ${amt:,.0f} — {_st(d.status)}", 10, 12)
         if d.report_json:
             try:
                 rep = _json.loads(d.report_json)
                 if rep.get('people_helped') is not None:
-                    _line(
-                        f"      people helped: {rep['people_helped']}",
-                        9, 11,
-                    )
+                    _line(t('proximate.pdf.round.people_helped', lang=lang,
+                            v=rep['people_helped']), 9, 11)
             except (ValueError, TypeError):
                 pass
         if y < 30 * mm:
@@ -4102,10 +4116,8 @@ def api_round_report_pdf(round_id):
         .first()
     )
     if audit_last:
-        _line(
-            f"Audit anchor: seq={audit_last.seq} hash={audit_last.payload_hash[:16]}…",
-            8, 11,
-        )
+        _line(t('proximate.pdf.round.audit_anchor', lang=lang,
+                seq=audit_last.seq, hash=audit_last.payload_hash[:16]), 8, 11)
 
     p.showPage()
     p.save()
