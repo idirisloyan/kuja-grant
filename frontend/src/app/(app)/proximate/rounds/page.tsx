@@ -8,8 +8,9 @@
  * "New round" CTA; everyone else can browse.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EmptyState } from '@/components/proximate/empty-state';
+import { LoadError } from '@/components/proximate/load-error';
 import Link from 'next/link';
 import { Loader2, Plus, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -52,15 +53,19 @@ export default function ProximateRoundsPage() {
     persona === 'ob' || persona === 'admin' || user?.role === 'admin';
   const [rounds, setRounds] = useState<Round[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     api.get<{ rounds: Round[] }>('/api/proximate/rounds')
-      .then((r) => { if (!cancelled) setRounds(r.rounds || []); })
-      .catch(() => { if (!cancelled) setRounds([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((r) => { setRounds(r.rounds || []); })
+      // F-02: a failed fetch must not read as "No funding rounds yet".
+      .catch((e: unknown) => { setLoadError(e); })
+      .finally(() => { setLoading(false); });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   // Redesign Stage 3b — status filter chips with counts; selection
   // lives in the URL (same history.replaceState pattern as the
@@ -112,7 +117,10 @@ export default function ProximateRoundsPage() {
             {t('proximate.rounds.loading')}
           </p>
         )}
-        {rounds !== null && rounds.length === 0 && !loading && (
+        {loadError != null && !loading && (
+          <LoadError error={loadError} onRetry={load} />
+        )}
+        {!loadError && rounds !== null && rounds.length === 0 && !loading && (
           <Card className="p-8 text-center space-y-3">
             <p className="text-sm text-muted-foreground">
               {t('proximate.rounds.empty') || 'No funding rounds yet.'}
@@ -127,7 +135,7 @@ export default function ProximateRoundsPage() {
             )}
           </Card>
         )}
-        {rounds !== null && rounds.length > 0 && (
+        {!loadError && rounds !== null && rounds.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             {['all', 'draft', 'in_review', 'active', 'closed', 'cancelled']
               .filter((s) => s === 'all' || statusCounts[s])

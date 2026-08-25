@@ -7,7 +7,7 @@
  * Donor view: only their own grants (scoped server-side).
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FileText, Loader2, Plus, DollarSign } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -16,6 +16,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/proximate/empty-state';
+import { LoadError } from '@/components/proximate/load-error';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import {
@@ -49,19 +50,21 @@ function fmtUsd(v: number | null | undefined): string {
 export default function ProximateGrantsListPage() {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const { persona } = useProximatePersona();
   const { t } = useTranslation();
   const isOb = persona === 'ob' || persona === 'admin';
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     api.get<{ success: boolean; grants: Grant[] }>('/api/proximate/grants')
-      .then((r) => { if (!cancelled) setGrants(r.grants || []); })
-      .catch(() => { if (!cancelled) setError(t('proximate.grants.load_error')); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((r) => { setGrants(r.grants || []); })
+      .catch((e: unknown) => { setError(e); })
+      .finally(() => { setLoading(false); });
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const totalCommitted = grants.reduce(
     (a, g) => a + (g.amount_committed_usd || 0), 0,
@@ -86,9 +89,9 @@ export default function ProximateGrantsListPage() {
             {t('proximate.grants.loading')}
           </p>
         )}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error != null && !loading && <LoadError error={error} onRetry={load} />}
 
-        {!loading && !error && (
+        {!loading && error == null && (
           <div className="space-y-4">
             {/* Rollup — compact stat row (Stage 4): summary strip, not
                 oversized cards, matching the partners register. */}

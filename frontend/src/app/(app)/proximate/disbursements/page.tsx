@@ -9,7 +9,7 @@
  * is surfaced inline so the OB can copy the partner-facing URL.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
+import { LoadError } from '@/components/proximate/load-error';
 import { isTestRecord, splitTestRecords } from '@/lib/test-records';
 import {
   PageShell, PageHeader, PageMain,
@@ -56,6 +57,7 @@ export default function ProximateDisbursementsPage() {
 
   const [rows, setRows] = useState<Disbursement[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [copied, setCopied] = useState<number | null>(null);
   // Redesign Stage 3c — status filter chips, URL-persisted (same
   // pattern as the rounds and partners registers).
@@ -102,15 +104,19 @@ export default function ProximateDisbursementsPage() {
     [countedRows, statusFilter],
   );
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!isOperator) return; // Don't even fetch — donors aren't supposed to see this.
-    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
     api.get<{ disbursements: Disbursement[] }>('/api/proximate/disbursements')
-      .then((r) => { if (!cancelled) setRows(r.disbursements || []); })
-      .catch(() => { if (!cancelled) setRows([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((r) => { setRows(r.disbursements || []); })
+      // F-02: a failed fetch must NOT become "No disbursements yet". Surface
+      // the real error (auth / permission / server / network) with a retry.
+      .catch((e: unknown) => { setLoadError(e); })
+      .finally(() => { setLoading(false); });
   }, [isOperator]);
+
+  useEffect(() => { load(); }, [load]);
 
   // Donor gate: show a friendly "OB only" panel and a link back to
   // the donor portal. Operator UI is never rendered for donors.
@@ -182,14 +188,17 @@ export default function ProximateDisbursementsPage() {
             {t('proximate.disbursements.loading')}
           </p>
         )}
-        {rows !== null && rows.length === 0 && !loading && (
+        {loadError != null && !loading && (
+          <LoadError error={loadError} onRetry={load} />
+        )}
+        {!loadError && rows !== null && rows.length === 0 && !loading && (
           <Card className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
               {t('proximate.disbursements.empty')}
             </p>
           </Card>
         )}
-        {rows !== null && rows.length > 0 && (
+        {!loadError && rows !== null && rows.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-2">
             {['all', 'draft', 'pending_cosign', 'disbursed', 'pending_report',
               'reported', 'verified', 'flagged']
