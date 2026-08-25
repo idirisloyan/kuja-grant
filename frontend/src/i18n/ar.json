@@ -4610,5 +4610,18 @@
   "prox_grant.sector.health": "الصحة",
   "prox_grant.sector.education": "التعليم",
   "prox_grant.sector.nutrition": "التغذية",
-  "prox_grant.sector.livelihoods": "سبل العيش"
+  "prox_grant.sector.livelihoods": "سبل العيش",
+  "proximate.traceability.title": "مسار الأموال",
+  "proximate.traceability.subtitle": "تابعوا كل دولار من التزام المنحة إلى تقرير الشريك والنتيجة ومرساة التدقيق المقاومة للعبث.",
+  "proximate.traceability.no_grant": "لم تُحدَّد منحة.",
+  "proximate.traceability.load_error": "تعذّر تحميل مسار الأموال لهذه المنحة.",
+  "proximate.traceability.no_rounds": "لم تُموَّل أي دورة من هذه المنحة بعد.",
+  "proximate.traceability.allocation": "المخصّص",
+  "proximate.traceability.no_disbursements": "لا توجد صرفيات بعد.",
+  "proximate.traceability.col_partner": "الشريك",
+  "proximate.traceability.col_amount": "المبلغ",
+  "proximate.traceability.col_report": "التقرير",
+  "proximate.traceability.col_verified": "مُتحقَّق",
+  "proximate.traceability.col_audit": "مرساة التدقيق",
+  "proximate.traceability.audit_note": "ترتبط مراسي التدقيق بسجل التدقيق المتسلسل بالتجزئة للمستأجر — أي تغيير في إدخال سابق يكسر كل مرساة تليه."
 }

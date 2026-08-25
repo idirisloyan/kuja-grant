@@ -4633,5 +4633,18 @@
   "prox_grant.sector.health": "Health",
   "prox_grant.sector.education": "Education",
   "prox_grant.sector.nutrition": "Nutrition",
-  "prox_grant.sector.livelihoods": "Livelihoods"
+  "prox_grant.sector.livelihoods": "Livelihoods",
+  "proximate.traceability.title": "Money trail",
+  "proximate.traceability.subtitle": "Follow every dollar from the grant commitment to the partner report, outcome, and its tamper-evident audit anchor.",
+  "proximate.traceability.no_grant": "No grant specified.",
+  "proximate.traceability.load_error": "Could not load the money trail for this grant.",
+  "proximate.traceability.no_rounds": "No rounds have been funded from this grant yet.",
+  "proximate.traceability.allocation": "Allocation",
+  "proximate.traceability.no_disbursements": "No disbursements yet.",
+  "proximate.traceability.col_partner": "Partner",
+  "proximate.traceability.col_amount": "Amount",
+  "proximate.traceability.col_report": "Report",
+  "proximate.traceability.col_verified": "Verified",
+  "proximate.traceability.col_audit": "Audit anchor",
+  "proximate.traceability.audit_note": "Audit anchors reference the tenant's hash-chained audit log — any change to a prior entry breaks every anchor after it."
 }

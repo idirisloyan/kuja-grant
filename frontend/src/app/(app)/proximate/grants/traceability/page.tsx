@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -49,6 +50,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function TraceabilityPage() {
+  const { t } = useTranslation();
   const [grantId, setGrantId] = useState<string | null>(null);
   const [data, setData] = useState<Trace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,23 +60,23 @@ export default function TraceabilityPage() {
     if (typeof window === 'undefined') return;
     const gid = new URLSearchParams(window.location.search).get('grant');
     setGrantId(gid);
-    if (!gid) { setLoading(false); setError('No grant specified.'); return; }
+    if (!gid) { setLoading(false); setError(t('proximate.traceability.no_grant')); return; }
     api.get<Trace>(`/api/proximate/grants/${gid}/traceability`)
       .then((r) => setData(r))
-      .catch(() => setError('Could not load the money trail for this grant.'))
+      .catch(() => setError(t('proximate.traceability.load_error')))
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <PageShell>
-      <PageHeader title="Money trail"
-        subtitle="Follow every dollar from the grant commitment to the partner report, outcome, and its tamper-evident audit anchor." />
+      <PageHeader title={t('proximate.traceability.title')}
+        subtitle={t('proximate.traceability.subtitle')} />
       <PageMain>
         <Link href="/proximate/donor" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
-          <ArrowLeft className="w-4 h-4" /> Back
+          <ArrowLeft className="w-4 h-4" /> {t('common.back')}
         </Link>
 
-        {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {loading && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {data && (
@@ -87,15 +89,15 @@ export default function TraceabilityPage() {
               )}
               <div className="flex flex-wrap gap-4 mt-3 text-sm">
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Committed</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.grants.committed')}</p>
                   <p className="font-semibold">{money(data.committed_usd)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Allocated to rounds</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.grants.allocated_to_rounds')}</p>
                   <p className="font-semibold">{money(data.allocated_usd)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Disbursements</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.cycle.tab_disbursements')}</p>
                   <p className="font-semibold">{data.disbursement_count}</p>
                 </div>
               </div>
@@ -103,7 +105,7 @@ export default function TraceabilityPage() {
 
             {data.chain.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No rounds have been funded from this grant yet.
+                {t('proximate.traceability.no_rounds')}
               </p>
             )}
 
@@ -117,28 +119,28 @@ export default function TraceabilityPage() {
                       {row.round.title}
                     </Link>
                     {row.round.status && (
-                      <Badge variant="outline" className="text-xs">{row.round.status}</Badge>
+                      <Badge variant="outline" className="text-xs">{labelForProximateStatus(row.round.status, t)}</Badge>
                     )}
                   </div>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Allocation: </span>
+                    <span className="text-muted-foreground">{t('proximate.traceability.allocation')}: </span>
                     <span className="font-semibold">{money(row.round.allocation_usd)}</span>
                   </p>
                 </div>
 
                 {row.disbursements.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No disbursements yet.</p>
+                  <p className="text-xs text-muted-foreground">{t('proximate.traceability.no_disbursements')}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-xs text-muted-foreground text-left border-b">
-                          <th className="py-1.5 pe-3 font-medium">Partner</th>
-                          <th className="py-1.5 pe-3 font-medium">Amount</th>
-                          <th className="py-1.5 pe-3 font-medium">Status</th>
-                          <th className="py-1.5 pe-3 font-medium">Report</th>
-                          <th className="py-1.5 pe-3 font-medium">Verified</th>
-                          <th className="py-1.5 font-medium">Audit anchor</th>
+                          <th className="py-1.5 pe-3 font-medium">{t('proximate.traceability.col_partner')}</th>
+                          <th className="py-1.5 pe-3 font-medium">{t('proximate.traceability.col_amount')}</th>
+                          <th className="py-1.5 pe-3 font-medium">{t('common.status')}</th>
+                          <th className="py-1.5 pe-3 font-medium">{t('proximate.traceability.col_report')}</th>
+                          <th className="py-1.5 pe-3 font-medium">{t('proximate.traceability.col_verified')}</th>
+                          <th className="py-1.5 font-medium">{t('proximate.traceability.col_audit')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -152,7 +154,7 @@ export default function TraceabilityPage() {
                             <td className="py-2 pe-3 tabular-nums">{money(d.amount_usd)}</td>
                             <td className="py-2 pe-3">
                               <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${STATUS_TONE[d.status] || 'bg-muted text-muted-foreground'}`}>
-                                {labelForProximateStatus(d.status)}
+                                {labelForProximateStatus(d.status, t)}
                               </span>
                             </td>
                             <td className="py-2 pe-3">
@@ -184,7 +186,7 @@ export default function TraceabilityPage() {
             ))}
 
             <p className="text-xs text-muted-foreground">
-              Audit anchors reference the tenant&apos;s hash-chained audit log — any change to a prior entry breaks every anchor after it.
+              {t('proximate.traceability.audit_note')}
             </p>
           </div>
         )}
