@@ -4655,5 +4655,7 @@
   "proximate.preflight.verified_route": "مسار دفع مُتحقَّق منه",
   "proximate.setup.date_warning.award": "مرّ الموعد المستهدف لقرار المنح منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
   "proximate.setup.date_warning.disbursement": "مرّ الموعد المستهدف للصرف منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
-  "proximate.setup.date_warning.report": "مرّ الموعد المستهدف للتقرير منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا."
+  "proximate.setup.date_warning.report": "مرّ الموعد المستهدف للتقرير منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
+  "proximate.donor.partner_reports": "تقارير الشركاء",
+  "proximate.donor.view_report": "عرض التقرير"
 }

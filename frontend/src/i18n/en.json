@@ -4678,5 +4678,7 @@
   "proximate.preflight.verified_route": "Verified payment route",
   "proximate.setup.date_warning.award": "The target award date passed {n} day(s) ago. This is a note, not a block — carry on.",
   "proximate.setup.date_warning.disbursement": "The target disbursement date passed {n} day(s) ago. This is a note, not a block — carry on.",
-  "proximate.setup.date_warning.report": "The target report date passed {n} day(s) ago. This is a note, not a block — carry on."
+  "proximate.setup.date_warning.report": "The target report date passed {n} day(s) ago. This is a note, not a block — carry on.",
+  "proximate.donor.partner_reports": "Partner reports",
+  "proximate.donor.view_report": "View report"
 }

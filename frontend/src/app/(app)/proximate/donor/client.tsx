@@ -19,7 +19,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { DonorMoneyFunnel, computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
 import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
@@ -344,7 +344,7 @@ export function ProximateDonorClient() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {r.trigger_type}
+                    {labelForRoundType(r.trigger_type, t)}
                     {r.created_at && (
                       <span> · {new Date(r.created_at).toLocaleDateString()}</span>
                     )}
@@ -637,7 +637,7 @@ function DonorPublishedReports() {
     <section className="space-y-3">
       <h2 className="text-lg font-medium flex items-center gap-2">
         <FileText className="w-4 h-4 text-muted-foreground" />
-        Partner reports
+        {t('proximate.donor.partner_reports')}
       </h2>
       {/* QA-18 items 9+10 — donor-grade report cards: partner name as
           the title, round + date as metadata, a Published badge, and
@@ -666,7 +666,7 @@ function DonorPublishedReports() {
                 e.stopPropagation();
                 window.location.href = `/proximate/reports/${r.id}`;
               }}>
-                View report
+                {t('proximate.donor.view_report')}
               </Button>
               <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => {
                 e.stopPropagation();
@@ -676,7 +676,7 @@ function DonorPublishedReports() {
                 );
               }}>
                 <FileText className="w-3.5 h-3.5 me-1" />
-                Download PDF
+                {t('proximate.donor.download_pdf')}
               </Button>
             </div>
           </Card>
