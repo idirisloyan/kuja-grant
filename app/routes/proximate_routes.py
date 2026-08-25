@@ -9204,6 +9204,18 @@ def api_grant_donor_pack_pdf(grant_id):
             break
 
     # ---- render ---------------------------------------------------------
+    from app.utils.arabic_pdf import (
+        ensure_arabic_fonts, has_arabic, shape_ar, wrap_arabic,
+    )
+    lang = resolve_display_lang(getattr(g, 'network_id', None))
+    try:
+        arabic_ok = ensure_arabic_fonts()
+    except Exception:
+        arabic_ok = False
+
+    def _tp(key, **pp):
+        return t(key, lang=lang, **pp)
+
     buf = BytesIO()
     p = _canvas.Canvas(buf, pagesize=A4)
     width, height = A4
@@ -9214,46 +9226,50 @@ def api_grant_donor_pack_pdf(grant_id):
         if y < 30 * mm:
             p.showPage()
             y = height - 25 * mm
-        p.setFont(font, size)
-        p.drawString(20 * mm, y, str(txt)[:120])
+        txt = str(txt or '')
+        if arabic_ok and has_arabic(txt):
+            p.setFont('Amiri-Bold' if font.endswith('Bold') else 'Amiri', size)
+            p.drawRightString(width - 20 * mm, y, shape_ar(txt[:200]))
+        else:
+            p.setFont(font, size)
+            p.drawString(20 * mm, y, txt[:120])
         y -= spacing
 
     def _wrapped(txt, size=9, spacing=11, chars=100):
-        for word_line in str(txt).splitlines():
-            while word_line:
-                _line(word_line[:chars], size, spacing)
-                word_line = word_line[chars:]
+        for para in str(txt).splitlines():
+            if arabic_ok and has_arabic(para):
+                # Word-safe Arabic wrap (char slicing would break shaping).
+                for wl in wrap_arabic(para, 'Amiri', size, width - 40 * mm):
+                    _line(wl, size, spacing, 'Amiri')
+            else:
+                while para:
+                    _line(para[:chars], size, spacing)
+                    para = para[chars:]
+                if not txt:
+                    _line('', size, spacing)
 
-    _line(f"Donor Pack: {g.title}", 16, 20, 'Helvetica-Bold')
-    _line(
-        f"Donor: {g.donor_name_cache or '—'}    "
-        f"Ref: {g.donor_grant_ref or '—'}    Status: {g.status}",
-        9, 13,
-    )
-    _line(
-        f"Period: {g.start_date or '—'} → {g.end_date or '—'}    "
-        f"Cadence: {g.reporting_cadence}",
-        9, 16,
-    )
+    _line(_tp('proximate.pdf.grant.title', title=g.title), 16, 20, 'Helvetica-Bold')
+    _line(_tp('proximate.pdf.grant.donor', v=g.donor_name_cache or '—'), 9, 12)
+    _line(_tp('proximate.pdf.grant.ref', v=g.donor_grant_ref or '—'), 9, 12)
+    _line(_tp('proximate.pdf.grant.status',
+             v=t(f'proximate.status.{g.status}', lang=lang)), 9, 13)
+    _line(_tp('proximate.pdf.grant.period',
+             start=g.start_date or '—', end=g.end_date or '—'), 9, 12)
+    _line(_tp('proximate.pdf.grant.cadence',
+             v=t(f'prox_grant.cadence.{g.reporting_cadence}', lang=lang)), 9, 16)
 
-    _line('Financial reconciliation', 12, 16, 'Helvetica-Bold')
-    _line(
-        f"Committed: ${committed:,.0f}    "
-        f"Allocated to rounds: ${total_allocated:,.0f}    "
-        f"Unallocated: ${committed - total_allocated:,.0f}",
-        10, 14, 'Helvetica-Bold',
-    )
+    _line(_tp('proximate.pdf.grant.financial'), 12, 16, 'Helvetica-Bold')
+    _line(_tp('proximate.pdf.grant.committed', v=f"${committed:,.0f}"), 10, 13, 'Helvetica-Bold')
+    _line(_tp('proximate.pdf.grant.allocated', v=f"${total_allocated:,.0f}"), 10, 13)
+    _line(_tp('proximate.pdf.grant.unallocated', v=f"${committed - total_allocated:,.0f}"), 10, 14)
     for rr in round_rows:
-        _line(
-            f"  • {rr['title']} — allocated ${rr['allocated']:,.0f} "
-            f"(round total disbursed: ${rr['round_disbursed']:,.0f})",
-            9, 12,
-        )
+        _line(_tp('proximate.pdf.grant.alloc_row', title=rr['title'],
+                 a=f"${rr['allocated']:,.0f}", d=f"${rr['round_disbursed']:,.0f}"), 9, 12)
     if not round_rows:
-        _line('  (no allocations yet)', 9, 12)
+        _line(_tp('proximate.pdf.grant.no_allocations'), 9, 12)
     y -= 4
 
-    _line('Deliverables vs targets', 12, 16, 'Helvetica-Bold')
+    _line(_tp('proximate.pdf.grant.deliverables'), 12, 16, 'Helvetica-Bold')
     for d in deliverables:
         cur = d['current'] if d['current'] is not None else '—'
         pct = f"{d['pct']}%" if d['pct'] is not None else d['source']
@@ -9263,10 +9279,10 @@ def api_grant_donor_pack_pdf(grant_id):
             9, 12,
         )
     if not deliverables:
-        _line('  (no deliverables extracted from the agreement)', 9, 12)
+        _line(_tp('proximate.pdf.grant.no_deliverables'), 9, 12)
     y -= 4
 
-    _line('Reporting timeline', 12, 16, 'Helvetica-Bold')
+    _line(_tp('proximate.pdf.grant.reporting'), 12, 16, 'Helvetica-Bold')
     for rep in reports:
         score_txt = ''
         if rep.compliance_score_json:
@@ -9280,29 +9296,31 @@ def api_grant_donor_pack_pdf(grant_id):
                     score_txt = f"    compliance {round(sum(vals)/len(vals))}/100"
             except (ValueError, TypeError, AttributeError):
                 pass
+        _rt = t(f'prox_grant.cadence.{rep.report_type}', lang=lang)
+        _rs = t(f'prox_grant.report_status.{rep.status}', lang=lang)
+        _due = ('  ' + _tp('proximate.pdf.grant.due', v=rep.due_date)) if rep.due_date else ''
         _line(
-            f"  • {rep.report_type} {rep.period_start or ''}–"
-            f"{rep.period_end or ''} — {rep.status}"
-            f"{'  due ' + str(rep.due_date) if rep.due_date else ''}"
-            f"{score_txt}",
+            f"  • {_rt} {rep.period_start or ''}–{rep.period_end or ''} — {_rs}"
+            f"{_due}{score_txt}",
             9, 12,
         )
     if not reports:
-        _line('  (no reports yet)', 9, 12)
+        _line(_tp('proximate.pdf.grant.no_reports'), 9, 12)
     y -= 4
 
     if narrative:
         rep, content = narrative
         _line(
-            f"Latest narrative ({rep.report_type} "
-            f"{rep.period_start or ''}–{rep.period_end or ''})",
+            _tp('proximate.pdf.grant.latest_narrative',
+                type=t(f'prox_grant.cadence.{rep.report_type}', lang=lang),
+                period=f"{rep.period_start or ''}–{rep.period_end or ''}"),
             12, 16, 'Helvetica-Bold',
         )
         for key, label in (
-            ('executive_summary', 'Executive summary'),
-            ('financial_summary', 'Financial summary'),
-            ('impact_narrative', 'Impact narrative'),
-            ('compliance_note', 'Compliance note'),
+            ('executive_summary', _tp('proximate.pdf.grant.exec_summary')),
+            ('financial_summary', _tp('proximate.pdf.grant.fin_summary')),
+            ('impact_narrative', _tp('proximate.pdf.grant.impact')),
+            ('compliance_note', _tp('proximate.pdf.grant.compliance')),
         ):
             txt = (content or {}).get(key)
             if txt:
@@ -9318,11 +9336,8 @@ def api_grant_donor_pack_pdf(grant_id):
         .first()
     )
     if audit_last:
-        _line(
-            f"Audit anchor: seq={audit_last.seq} "
-            f"hash={audit_last.payload_hash[:16]}…",
-            8, 11,
-        )
+        _line(_tp('proximate.pdf.round.audit_anchor',
+                 seq=audit_last.seq, hash=audit_last.payload_hash[:16]), 8, 11)
 
     p.showPage()
     p.save()
