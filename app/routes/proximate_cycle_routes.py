@@ -2024,10 +2024,9 @@ def api_partner_history(partner_id):
             'evidence_items': len(ev),
             'open_issues': len([x for x in ev if x.is_open_issue]),
         },
-        'note': (
-            'These are observations, not a rating. Report timing in Sudan '
-            'reflects connectivity and conflict as much as diligence — read '
-            'them alongside what you know about the context.'
+        'note': t(
+            'proximate.history.observations_note',
+            lang=resolve_display_lang(nid),
         ),
     })
 

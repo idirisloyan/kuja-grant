@@ -272,6 +272,7 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
   const [link, setLink] = useState('');
   const [summary, setSummary] = useState('');
   const [verdict, setVerdict] = useState('no_footprint');
+  const { t } = useTranslation();
 
   const refresh = useCallback(() => {
     api.get<{ latest: MediaVerification | null }>(
@@ -308,7 +309,7 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
       );
       refresh();
     } catch {
-      setAiError('Web check failed — try again or record manually.');
+      setAiError(t('proximate.mediaverif.web_check_failed'));
     } finally {
       setAiBusy(false);
     }
@@ -318,23 +319,23 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-2">
         <Globe2 className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">Media verification</h3>
+        <h3 className="text-sm font-semibold flex-1">{t('proximate.mediaverif.title')}</h3>
         {latest && (
           <Badge variant="outline" className={`text-[10px] ${VERDICT_STYLES[latest.overall_verdict] || ''}`}>
-            {latest.overall_verdict.replace(/_/g, ' ')}
+            {t(`proximate.mediaverif.verdict.${latest.overall_verdict}`)}
           </Badge>
         )}
         {latest?.source === 'ai_web_search' && (
           <Badge variant="outline" className="text-[10px] bg-violet-100 text-violet-800 border-violet-300">
-            AI draft
+            {t('proximate.mediaverif.ai_draft')}
           </Badge>
         )}
         <Button size="sm" variant="outline" disabled={aiBusy} onClick={runAiCheck}>
           {aiBusy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
-          {aiBusy ? 'Searching…' : 'Run web check'}
+          {aiBusy ? t('proximate.mediaverif.searching') : t('proximate.mediaverif.run_web_check')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setFormOpen((v) => !v)}>
-          {latest ? 'Re-verify' : 'Record check'}
+          {latest ? t('proximate.mediaverif.reverify') : t('proximate.mediaverif.record_check')}
         </Button>
       </div>
       {aiError && <p className="text-xs text-rose-600 mb-2">{aiError}</p>}
@@ -350,24 +351,24 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
           )}
           {latest.reviewed_at && (
             <p className="text-[10px] text-muted-foreground">
-              Checked {new Date(latest.reviewed_at).toLocaleDateString()}
+              {t('proximate.mediaverif.checked')} {new Date(latest.reviewed_at).toLocaleDateString()}
             </p>
           )}
         </div>
       ) : (
         <p className="text-xs text-muted-foreground italic">
-          No social-footprint check recorded yet.
+          {t('proximate.mediaverif.none_yet')}
         </p>
       )}
       {formOpen && (
         <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
           <input
-            type="url" placeholder="Link (Facebook page, website)…"
+            type="url" placeholder={t('proximate.mediaverif.link_ph')}
             value={link} onChange={(e) => setLink(e.target.value)}
             className="w-full text-xs rounded-md border bg-background p-2"
           />
           <textarea
-            placeholder="Evidence summary (followers, activities, interaction)…"
+            placeholder={t('proximate.mediaverif.summary_ph')}
             value={summary} onChange={(e) => setSummary(e.target.value)}
             rows={2}
             className="w-full text-xs rounded-md border bg-background p-2"
@@ -377,14 +378,14 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
               value={verdict} onChange={(e) => setVerdict(e.target.value)}
               className="text-xs rounded-md border bg-background p-1.5"
             >
-              <option value="positive">Positive</option>
-              <option value="no_footprint">No footprint</option>
-              <option value="inconclusive">Inconclusive</option>
-              <option value="negative">Negative</option>
+              <option value="positive">{t('proximate.mediaverif.verdict.positive')}</option>
+              <option value="no_footprint">{t('proximate.mediaverif.verdict.no_footprint')}</option>
+              <option value="inconclusive">{t('proximate.mediaverif.verdict.inconclusive')}</option>
+              <option value="negative">{t('proximate.mediaverif.verdict.negative')}</option>
             </select>
             <Button size="sm" disabled={busy} onClick={submit}>
               {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
-              Save
+              {t('proximate.mediaverif.save')}
             </Button>
           </div>
         </div>

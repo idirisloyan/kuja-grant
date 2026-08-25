@@ -52,14 +52,14 @@ import {
 // linear wizard flow; the tab bar and CSS-hiding apply only to the
 // Oversight Body view (same technique as the round detail).
 const PARTNER_TABS = [
-  { key: 'overview', label: 'Overview' },
+  { key: 'overview', label: 'Overview', k: 'proximate.cycle.tab_overview' },
   // 2026-07-24 — one record, revealed by stage. "Record" sits first
   // because it is the whole partner; the tabs after it are the parts
   // of that record that have their own machinery.
   { key: 'record', label: 'Record', k: 'proximate.cycle.tab_record' },
-  { key: 'endorsements', label: 'Endorsements' },
-  { key: 'dd', label: 'Due diligence' },
-  { key: 'disbursements', label: 'Disbursements' },
+  { key: 'endorsements', label: 'Endorsements', k: 'proximate.cycle.tab_endorsements' },
+  { key: 'dd', label: 'Due diligence', k: 'proximate.cycle.tab_dd' },
+  { key: 'disbursements', label: 'Disbursements', k: 'proximate.cycle.tab_disbursements' },
   { key: 'evidence', label: 'Evidence', k: 'proximate.cycle.tab_evidence' },
   { key: 'history', label: 'History', k: 'proximate.cycle.tab_history' },
 ];
@@ -570,7 +570,7 @@ export default function ProximateEndorseWizardClient() {
                       : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {x.label}
+                  {x.k ? t(x.k) : x.label}
                 </button>
               ))}
             </div>
@@ -782,7 +782,7 @@ export default function ProximateEndorseWizardClient() {
             <ProximateAttachmentsPanel
               subjectKind="partner"
               subjectId={Number(partnerId)}
-              title="Due-diligence evidence"
+              title={t('proximate.dd.evidence_title')}
             />
           )}
           </div>
