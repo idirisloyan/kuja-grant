@@ -81,11 +81,10 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
   async function load() {
     setLoading(true);
     try {
-      // The setup payload is returned by the PATCH; for the initial read
-      // we ask for it with an empty patch so there is one shape to
-      // maintain rather than two.
-      const r = await api.patch<{ success: boolean; round: Setup }>(
-        `/api/proximate/rounds/${roundId}/setup`, {},
+      // F-04: read with GET — a passive page render must not fire a mutation
+      // verb. The GET returns the same shape the PATCH does.
+      const r = await api.get<{ success: boolean; round: Setup }>(
+        `/api/proximate/rounds/${roundId}/setup`,
       );
       if (r?.success) {
         setSetup(r.round);

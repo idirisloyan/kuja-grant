@@ -138,14 +138,22 @@ def _f(v):
 # Cycle setup
 # ===============================================================
 
-@cycle_bp.route('/rounds/<int:round_id>/setup', methods=['PATCH'])
+@cycle_bp.route('/rounds/<int:round_id>/setup', methods=['GET', 'PATCH'])
 @login_required
 @ob_required
 def api_round_setup(round_id):
-    """Set the area, the grant size and the money split for a cycle."""
+    """GET reads the area, grant size and money split for a cycle; PATCH
+    sets them. F-04: the page previously READ via an empty PATCH (a mutation
+    verb on passive render), which showed up as a write in the network tab
+    and — before the R-03 gate — minted phantom audit events. Reads now use
+    GET so opening a round fires no mutation request at all."""
     rnd = _scoped_round(round_id)
     if not rnd:
         return jsonify({'success': False, 'error': 'Round not found'}), 404
+
+    # Pure read — never touches the round or the audit chain.
+    if request.method == 'GET':
+        return jsonify({'success': True, 'round': _round_setup_dict(rnd)})
 
     body = get_request_json() or {}
 
