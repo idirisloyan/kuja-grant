@@ -548,7 +548,7 @@ export function ProximateGrantDetailClient() {
                   {overdue.map((r) => (
                     <li key={r.id} className="flex items-center gap-2">
                       <span className="flex-1">
-                        {r.report_type} · {t('prox_grant.due', { date: r.due_date ?? '' })}
+                        {enumLabel('prox_grant.cadence', r.report_type)} · {t('prox_grant.due', { date: r.due_date ?? '' })}
                       </span>
                       {isOb && (
                         <ReportActions
@@ -575,7 +575,7 @@ export function ProximateGrantDetailClient() {
                       className="flex items-center gap-2 border-b border-border/60 pb-1.5 last:border-b-0"
                     >
                       <span className="flex-1">
-                        {r.report_type} · {t('prox_grant.due', { date: r.due_date ?? '' })}
+                        {enumLabel('prox_grant.cadence', r.report_type)} · {t('prox_grant.due', { date: r.due_date ?? '' })}
                       </span>
                       {isOb && (
                         <ReportActions
@@ -668,7 +668,7 @@ export function ProximateGrantDetailClient() {
                       >
                         <div className="flex items-center gap-2">
                           <span className="flex-1">
-                            {r.report_type} · {r.period_start} – {r.period_end}
+                            {enumLabel('prox_grant.cadence', r.report_type)} · {r.period_start} – {r.period_end}
                           </span>
                           {avg !== null && (
                             <Badge
@@ -773,7 +773,7 @@ export function ProximateGrantDetailClient() {
                       </span>
                       {a.round_status && (
                         <span className="text-[10px] text-muted-foreground">
-                          {a.round_status}
+                          {enumLabel('proximate.status', a.round_status)}
                         </span>
                       )}
                     </Link>
