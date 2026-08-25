@@ -75,7 +75,7 @@ class AuditChainEntry(db.Model):
         fails we log to stderr and return None (no chain entry created).
         """
         from sqlalchemy import text as _sa_text
-        from sqlalchemy.exc import IntegrityError
+        from sqlalchemy.exc import IntegrityError, OperationalError
 
         # Derive network_id if not passed explicitly. Prefer
         # g.audit_network_id — set by route layers that resolve the
@@ -109,8 +109,11 @@ class AuditChainEntry(db.Model):
         for _attempt in range(6):
             try:
                 try:
-                    if (db.session.bind is not None
-                            and db.session.bind.dialect.name == 'postgresql'):
+                    # db.engine.dialect.name is the reliable detector —
+                    # db.session.bind is frequently None in Flask-SQLAlchemy,
+                    # which silently SKIPPED the lock and left only the retry
+                    # (one entry could still be lost under heavy concurrency).
+                    if db.engine.dialect.name == 'postgresql':
                         db.session.execute(
                             _sa_text('SELECT pg_advisory_xact_lock(:k)'),
                             {'k': _AUDIT_CHAIN_LOCK_KEY})
@@ -150,9 +153,10 @@ class AuditChainEntry(db.Model):
                 db.session.add(entry)
                 db.session.commit()
                 return entry
-            except IntegrityError:
-                # seq collided with a concurrent append — roll back and retry
-                # against the new tail (the advisory lock makes this rare).
+            except (IntegrityError, OperationalError):
+                # seq collided with a concurrent append, or a transient DB
+                # error (deadlock/serialization) — roll back and retry against
+                # the current tail (the advisory lock makes collisions rare).
                 try:
                     db.session.rollback()
                 except Exception:
