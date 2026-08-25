@@ -4623,5 +4623,13 @@
   "proximate.traceability.col_report": "التقرير",
   "proximate.traceability.col_verified": "مُتحقَّق",
   "proximate.traceability.col_audit": "مرساة التدقيق",
-  "proximate.traceability.audit_note": "ترتبط مراسي التدقيق بسجل التدقيق المتسلسل بالتجزئة للمستأجر — أي تغيير في إدخال سابق يكسر كل مرساة تليه."
+  "proximate.traceability.audit_note": "ترتبط مراسي التدقيق بسجل التدقيق المتسلسل بالتجزئة للمستأجر — أي تغيير في إدخال سابق يكسر كل مرساة تليه.",
+  "proximate.reports.partner_reporting": "تقارير الشركاء",
+  "proximate.reports.partner_reporting_sub": "رابط هاتف لكل شريك — صور وفيديوهات وإيصالات وصوت",
+  "proximate.reports.open_reporting": "فتح باب التقرير",
+  "proximate.reports.approved_activities": "الأنشطة المعتمدة ({n})",
+  "proximate.reports.evidence_pack": "حزمة الأدلة",
+  "proximate.reports.panel_roster": "قائمة أعضاء اللجنة",
+  "proximate.reports.add_candidate_ph": "أضف اسم مرشّح…",
+  "proximate.reports.no_panel_candidates": "لا يوجد مرشّحون للجنة بعد."
 }

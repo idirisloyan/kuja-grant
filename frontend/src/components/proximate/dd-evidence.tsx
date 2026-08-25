@@ -415,6 +415,7 @@ const PANEL_STATUS_STYLES: Record<string, string> = {
 };
 
 export function PanelRosterPanel({ roundId }: { roundId?: number }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<PanelCandidate[]>([]);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -469,15 +470,15 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
         <Users2 className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">Panel roster</h3>
+        <h3 className="text-sm font-semibold flex-1">{t('proximate.reports.panel_roster')}</h3>
         <input
-          type="text" placeholder="Add candidate name…"
+          type="text" placeholder={t('proximate.reports.add_candidate_ph')}
           value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
           className="text-xs rounded-md border bg-background p-1.5 w-44"
         />
         <Button size="sm" variant="outline" disabled={busy || !name.trim()} onClick={add}>
-          Add
+          {t('common.add')}
         </Button>
       </div>
       <input
@@ -490,7 +491,7 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
         }}
       />
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">No panel candidates yet.</p>
+        <p className="text-xs text-muted-foreground italic">{t('proximate.reports.no_panel_candidates')}</p>
       ) : (
         <ul className="space-y-2">
           {rows.map((c) => (

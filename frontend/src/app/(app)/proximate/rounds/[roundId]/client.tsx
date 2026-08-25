@@ -1601,7 +1601,7 @@ export function ProximateRoundDetailClient() {
             <ProximateAttachmentsPanel
               subjectKind="round"
               subjectId={parseInt(roundId, 10)}
-              title="Evidence pack"
+              title={t('proximate.reports.evidence_pack')}
             />
           )}
           {isOperator && roundId && (

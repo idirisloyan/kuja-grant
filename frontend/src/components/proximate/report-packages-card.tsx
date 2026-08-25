@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useOrigin } from '@/components/proximate/token-page-support';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Pkg {
   id: number; partner_id: number; partner_name: string | null;
@@ -36,6 +37,7 @@ export function ReportPackagesCard({
   roundId, participants, isOperator,
 }: { roundId: number; participants: Participant[]; isOperator: boolean }) {
   const origin = useOrigin();
+  const { t } = useTranslation();
   const [pkgs, setPkgs] = useState<Pkg[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -84,9 +86,9 @@ export function ReportPackagesCard({
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-2">
         <FileText className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">Partner reporting</h3>
+        <h3 className="text-sm font-semibold flex-1">{t('proximate.reports.partner_reporting')}</h3>
         <p className="text-[10px] text-muted-foreground">
-          Phone link per partner — photos, videos, receipts, voice
+          {t('proximate.reports.partner_reporting_sub')}
         </p>
       </div>
       <ul className="space-y-1.5">
@@ -126,7 +128,7 @@ export function ReportPackagesCard({
                         onClick={() => open(p.partner_id)}
                         className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted">
                   {busyId === p.partner_id && <Loader2 className="w-3 h-3 animate-spin" />}
-                  Open reporting
+                  {t('proximate.reports.open_reporting')}
                 </button>
               )}
             </li>

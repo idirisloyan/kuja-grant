@@ -4646,5 +4646,13 @@
   "proximate.traceability.col_report": "Report",
   "proximate.traceability.col_verified": "Verified",
   "proximate.traceability.col_audit": "Audit anchor",
-  "proximate.traceability.audit_note": "Audit anchors reference the tenant's hash-chained audit log — any change to a prior entry breaks every anchor after it."
+  "proximate.traceability.audit_note": "Audit anchors reference the tenant's hash-chained audit log — any change to a prior entry breaks every anchor after it.",
+  "proximate.reports.partner_reporting": "Partner reporting",
+  "proximate.reports.partner_reporting_sub": "Phone link per partner — photos, videos, receipts, voice",
+  "proximate.reports.open_reporting": "Open reporting",
+  "proximate.reports.approved_activities": "Approved activities ({n})",
+  "proximate.reports.evidence_pack": "Evidence pack",
+  "proximate.reports.panel_roster": "Panel roster",
+  "proximate.reports.add_candidate_ph": "Add candidate name…",
+  "proximate.reports.no_panel_candidates": "No panel candidates yet."
 }

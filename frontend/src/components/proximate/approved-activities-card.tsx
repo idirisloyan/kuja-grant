@@ -15,6 +15,7 @@ import { Loader2, ClipboardList, Plus, Trash2, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface BudgetLine { label: string; amount: number }
 interface Activity {
@@ -29,6 +30,7 @@ const DEFAULT_LINES = ['Personnel', 'Supplies & Materials',
 export function ApprovedActivitiesCard({
   roundId, participants, isOperator,
 }: { roundId: number; participants: Participant[]; isOperator: boolean }) {
+  const { t } = useTranslation();
   const [acts, setActs] = useState<Activity[] | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -92,7 +94,7 @@ export function ApprovedActivitiesCard({
               className="w-full flex items-center gap-2 text-left">
         <ClipboardList className="w-4 h-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold flex-1">
-          Approved activities ({acts.length})
+          {t('proximate.reports.approved_activities', { n: acts.length })}
         </h2>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
