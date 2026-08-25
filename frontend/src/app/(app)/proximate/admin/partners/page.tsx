@@ -217,7 +217,7 @@ export default function ProximatePartnersPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Partners"
+        title={t('proximate.partners.title')}
         subtitle={t('proximate.partners.subtitle')}
       />
       <PageMain>
@@ -371,7 +371,7 @@ export default function ProximatePartnersPage() {
                           : 'bg-background hover:bg-muted/40'
                       }`}
                     >
-                      {s === 'all' ? 'All' : labelForProximateStatus(s, t)} ({counts[s] || 0})
+                      {s === 'all' ? t('common.all') : labelForProximateStatus(s, t)} ({counts[s] || 0})
                     </button>
                   ))}
                 </div>

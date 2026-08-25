@@ -34,3 +34,17 @@ export function labelForProximateStatus(
   const pretty = status.replace(/_/g, ' ');
   return pretty.charAt(0).toUpperCase() + pretty.slice(1);
 }
+
+// Round trigger type ("disaster" / "programme_cycle") → localized label.
+// i18n key first (`proximate.round_type.<code>`), then a prettified fallback
+// so a new backend type never leaks a raw snake_case token to the OB.
+export function labelForRoundType(
+  tt: string | null | undefined,
+  t?: (key: string) => string,
+): string {
+  if (!tt) return '';
+  const key = `proximate.round_type.${tt}`;
+  const translated = t ? t(key) : '';
+  if (translated && translated !== key) return translated;
+  return tt.replace(/_/g, ' ');
+}

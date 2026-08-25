@@ -20,7 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
-import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -38,15 +38,6 @@ interface Round {
   closed_at: string | null;
   signed_count: number;
   signers_required: number;
-}
-
-// Round trigger type -> localized label (i18n key first, then a prettified
-// fallback so a new backend type never leaks a raw snake_case token).
-function roundTypeLabel(tt: string, t: (k: string) => string): string {
-  if (!tt) return '';
-  const k = `proximate.round_type.${tt}`;
-  const v = t(k);
-  return v && v !== k ? v : tt.replace(/_/g, ' ');
 }
 
 export default function ProximateRoundsPage() {
@@ -187,7 +178,7 @@ export default function ProximateRoundsPage() {
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                          <span>{roundTypeLabel(r.trigger_type, t)}</span>
+                          <span>{labelForRoundType(r.trigger_type, t)}</span>
                           {r.donor_name && <span>· {r.donor_name}</span>}
                           {r.envelope_usd && (
                             <span>· ${r.envelope_usd.toLocaleString()}</span>

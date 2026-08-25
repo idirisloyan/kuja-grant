@@ -4575,5 +4575,12 @@
   "proximate.round_type.programme": "Programme",
   "proximate.round_type.donor": "Donor",
   "proximate.rounds.empty_title": "No rounds match this filter",
-  "proximate.rounds.empty_hint": "Try a different status filter."
+  "proximate.rounds.empty_hint": "Try a different status filter.",
+  "proximate.cycle.tab_overview": "Overview",
+  "proximate.cycle.tab_partners": "Partners",
+  "proximate.cycle.tab_reports": "Reports & closing pack",
+  "proximate.cycle.tab_disbursements": "Disbursements",
+  "proximate.cycle.tab_activity": "Activity",
+  "proximate.rounds.breadcrumb": "Rounds",
+  "proximate.partners.title": "Partners"
 }

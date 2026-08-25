@@ -4552,5 +4552,12 @@
   "proximate.round_type.programme": "برنامج",
   "proximate.round_type.donor": "مانح",
   "proximate.rounds.empty_title": "لا توجد دورات مطابقة لهذا المرشّح",
-  "proximate.rounds.empty_hint": "جرّب مرشّح حالة مختلفًا."
+  "proximate.rounds.empty_hint": "جرّب مرشّح حالة مختلفًا.",
+  "proximate.cycle.tab_overview": "نظرة عامة",
+  "proximate.cycle.tab_partners": "الشركاء",
+  "proximate.cycle.tab_reports": "التقارير وحزمة الإغلاق",
+  "proximate.cycle.tab_disbursements": "الصرفيات",
+  "proximate.cycle.tab_activity": "النشاط",
+  "proximate.rounds.breadcrumb": "الدورات",
+  "proximate.partners.title": "الشركاء"
 }

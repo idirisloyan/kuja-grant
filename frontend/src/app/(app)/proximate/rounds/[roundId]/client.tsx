@@ -22,7 +22,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
-import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
 import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
@@ -118,7 +118,7 @@ interface Resp {
 // unmount), so every existing flow (modals, polling, anchors) is
 // untouched.
 const ROUND_TABS = [
-  { key: 'overview', label: 'Overview' },
+  { key: 'overview', label: 'Overview', k: 'proximate.cycle.tab_overview' },
   // 2026-07-24 — the cycle starts before partners exist. Setup, panel
   // and awards sit ahead of Partners because that is the order the
   // secretariat actually works in.
@@ -126,10 +126,10 @@ const ROUND_TABS = [
   { key: 'panel', label: 'Panel', k: 'proximate.cycle.tab_panel' },
   { key: 'awards', label: 'Awards & contracts', k: 'proximate.cycle.tab_awards' },
   { key: 'closeout', label: 'Closeout', k: 'proximate.cycle.tab_closeout' },
-  { key: 'partners', label: 'Partners' },
-  { key: 'reports', label: 'Reports & closing pack' },
-  { key: 'disbursements', label: 'Disbursements' },
-  { key: 'activity', label: 'Activity' },
+  { key: 'partners', label: 'Partners', k: 'proximate.cycle.tab_partners' },
+  { key: 'reports', label: 'Reports & closing pack', k: 'proximate.cycle.tab_reports' },
+  { key: 'disbursements', label: 'Disbursements', k: 'proximate.cycle.tab_disbursements' },
+  { key: 'activity', label: 'Activity', k: 'proximate.cycle.tab_activity' },
 ];
 
 export function ProximateRoundDetailClient() {
@@ -390,7 +390,7 @@ export function ProximateRoundDetailClient() {
         subtitle={round.title_ar || ''}
         breadcrumbs={[
           { label: 'Proximate', href: '/proximate/admin' },
-          { label: 'Rounds', href: '/proximate/rounds' },
+          { label: t('proximate.rounds.breadcrumb'), href: '/proximate/rounds' },
         ]}
       />
       <PageMain>
@@ -627,7 +627,7 @@ export function ProximateRoundDetailClient() {
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-y-2 gap-x-4 text-xs">
               <div>
                 <dt className="text-muted-foreground">{t('proximate.rounds.trigger')}</dt>
-                <dd className="font-medium">{round.trigger_type}</dd>
+                <dd className="font-medium">{labelForRoundType(round.trigger_type, t)}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">{t('proximate.rounds.donor')}</dt>
