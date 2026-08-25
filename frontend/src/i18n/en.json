@@ -4654,5 +4654,20 @@
   "proximate.reports.evidence_pack": "Evidence pack",
   "proximate.reports.panel_roster": "Panel roster",
   "proximate.reports.add_candidate_ph": "Add candidate name…",
-  "proximate.reports.no_panel_candidates": "No panel candidates yet."
+  "proximate.reports.no_panel_candidates": "No panel candidates yet.",
+  "proximate.status.published": "Published",
+  "proximate.reports.narrative": "Narrative",
+  "proximate.reports.ai_draft": "AI draft",
+  "proximate.reports.recompile": "Recompile",
+  "proximate.reports.compile_ai": "Compile with AI",
+  "proximate.reports.load_failed": "Failed to load",
+  "proximate.reports.action_failed": "Action failed",
+  "proximate.reports.fix_prompt": "What should the partner fix on this item? (leave empty to clear)",
+  "proximate.reports.fix_requested": "Fix requested: {msg}",
+  "proximate.reports.request_fix": "Request a fix from the partner",
+  "proximate.reports.summary_ph": "Summary (English)…",
+  "proximate.reports.general_activity": "General activity",
+  "proximate.reports.donor_visible_hide": "Visible to donor — click to hide",
+  "proximate.reports.internal_only_approve": "Internal only — click to approve for donor",
+  "proximate.reports.notes_ph": "Notes to the partner (required for changes)…"
 }

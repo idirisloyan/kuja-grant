@@ -4631,5 +4631,20 @@
   "proximate.reports.evidence_pack": "حزمة الأدلة",
   "proximate.reports.panel_roster": "قائمة أعضاء اللجنة",
   "proximate.reports.add_candidate_ph": "أضف اسم مرشّح…",
-  "proximate.reports.no_panel_candidates": "لا يوجد مرشّحون للجنة بعد."
+  "proximate.reports.no_panel_candidates": "لا يوجد مرشّحون للجنة بعد.",
+  "proximate.status.published": "منشورة",
+  "proximate.reports.narrative": "السرد",
+  "proximate.reports.ai_draft": "مسودة بالذكاء الاصطناعي",
+  "proximate.reports.recompile": "إعادة التجميع",
+  "proximate.reports.compile_ai": "التجميع بالذكاء الاصطناعي",
+  "proximate.reports.load_failed": "تعذّر التحميل",
+  "proximate.reports.action_failed": "فشل الإجراء",
+  "proximate.reports.fix_prompt": "ما الذي ينبغي أن يصلحه الشريك في هذا العنصر؟ (اتركه فارغًا للمسح)",
+  "proximate.reports.fix_requested": "طُلب إصلاح: {msg}",
+  "proximate.reports.request_fix": "اطلب إصلاحًا من الشريك",
+  "proximate.reports.summary_ph": "ملخّص (بالإنجليزية)…",
+  "proximate.reports.general_activity": "نشاط عام",
+  "proximate.reports.donor_visible_hide": "مرئي للمانح — انقر للإخفاء",
+  "proximate.reports.internal_only_approve": "داخلي فقط — انقر للاعتماد للمانح",
+  "proximate.reports.notes_ph": "ملاحظات للشريك (مطلوبة عند طلب تغييرات)…"
 }

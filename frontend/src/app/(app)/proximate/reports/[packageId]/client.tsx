@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface BudgetLine { label: string; amount: number }
 interface Activity {
@@ -70,6 +71,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export function ProximateReportPackageClient() {
+  const { t } = useTranslation();
   const [packageId, setPackageId] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
     const m = window.location.pathname.match(/\/proximate\/reports\/(\d+)/);
@@ -105,7 +107,7 @@ export function ProximateReportPackageClient() {
         setRateInput(r.package?.exchange_rate
           ? String(r.package.exchange_rate) : '');
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .catch((e) => setError(e instanceof Error ? e.message : t('proximate.reports.load_failed')))
       .finally(() => setLoading(false));
   }, [packageId]);
 
@@ -118,7 +120,7 @@ export function ProximateReportPackageClient() {
       await fn();
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Action failed');
+      setError(e instanceof Error ? e.message : t('proximate.reports.action_failed'));
     } finally {
       setBusy('');
     }
@@ -152,7 +154,7 @@ export function ProximateReportPackageClient() {
   // surface; the note lands on the partner's token page.
   const flagItem = (it: Item) => {
     const note = window.prompt(
-      'What should the partner fix on this item? (leave empty to clear)',
+      t('proximate.reports.fix_prompt'),
       it.change_request || '');
     if (note === null) return;
     act(`flag${it.id}`, () =>
@@ -164,7 +166,7 @@ export function ProximateReportPackageClient() {
     <button
       type="button" onClick={() => flagItem(it)}
       title={it.change_request
-        ? `Fix requested: ${it.change_request}` : 'Request a fix from the partner'}
+        ? t('proximate.reports.fix_requested', { msg: it.change_request }) : t('proximate.reports.request_fix')}
       className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] ${
         it.change_request
           ? 'bg-amber-50 text-amber-800 border-amber-300'
@@ -190,7 +192,7 @@ export function ProximateReportPackageClient() {
         </div>
         <Badge variant="outline"
                className={`text-[10px] ${STATUS_TONE[pkg.status] || ''}`}>
-          {labelForProximateStatus(pkg.status) || pkg.status.replace(/_/g, ' ')}
+          {labelForProximateStatus(pkg.status, t) || pkg.status.replace(/_/g, ' ')}
         </Badge>
         <a href={`/api/proximate/report-packages/${pkg.id}/pdf`}
            className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted">
@@ -203,10 +205,10 @@ export function ProximateReportPackageClient() {
       {/* Narrative */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold flex-1">Narrative</h2>
+          <h2 className="text-sm font-semibold flex-1">{t('proximate.reports.narrative')}</h2>
           {narrative?.source === 'ai' && (
             <Badge variant="outline" className="text-[10px] bg-violet-100 text-violet-800 border-violet-300">
-              AI draft
+              {t('proximate.reports.ai_draft')}
             </Badge>
           )}
           {isOperator && (
@@ -216,7 +218,7 @@ export function ProximateReportPackageClient() {
               {busy === 'compile'
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
                 : <Sparkles className="w-3.5 h-3.5 me-1" />}
-              {narrative ? 'Recompile' : 'Compile with AI'}
+              {narrative ? t('proximate.reports.recompile') : t('proximate.reports.compile_ai')}
             </Button>
           )}
         </div>
@@ -225,7 +227,7 @@ export function ProximateReportPackageClient() {
             <textarea
               value={narrative?.summary_en || ''}
               onChange={(e) => setNarrativeField({ summary_en: e.target.value })}
-              rows={3} placeholder="Summary (English)…"
+              rows={3} placeholder={t('proximate.reports.summary_ph')}
               className="w-full text-sm rounded-md border bg-background p-2"
             />
             <textarea
@@ -324,7 +326,7 @@ export function ProximateReportPackageClient() {
               (approved?.budget_lines || []).map((l) => [l.label, l.amount]));
             return (
               <div key={aid} className="text-sm space-y-1">
-                <p className="font-medium">{approved?.name || 'General activity'}
+                <p className="font-medium">{approved?.name || t('proximate.reports.general_activity')}
                   {block.people_reached != null && (
                     <span className="text-xs text-muted-foreground font-normal">
                       {' '}· {block.people_reached.toLocaleString()} {block.unit || ''} reached
@@ -385,8 +387,8 @@ export function ProximateReportPackageClient() {
                   {isOperator && (
                     <button
                       type="button"
-                      title={it.donor_visible ? 'Visible to donor — click to hide'
-                                              : 'Internal only — click to approve for donor'}
+                      title={it.donor_visible ? t('proximate.reports.donor_visible_hide')
+                                              : t('proximate.reports.internal_only_approve')}
                       onClick={() => act(`vis${it.id}`, () =>
                         api.patch(`/api/proximate/report-packages/${pkg.id}/items/${it.id}`,
                                   { donor_visible: !it.donor_visible }))}
@@ -495,7 +497,7 @@ export function ProximateReportPackageClient() {
           <h2 className="text-sm font-semibold">Decision</h2>
           <textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-            placeholder="Notes to the partner (required for changes)…"
+            placeholder={t('proximate.reports.notes_ph')}
             className="w-full text-xs rounded-md border bg-background p-2"
           />
           <div className="flex items-center gap-2">
