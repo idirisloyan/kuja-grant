@@ -3098,6 +3098,17 @@ def api_get_endorser_invite(token):
     partner = ProximatePartner.query.get(inv.partner_id)
     if not partner:
         return jsonify({'success': False, 'error': 'partner missing'}), 404
+    # Short intake summary derived from the intake-form JSON. There is no
+    # partner.intake_summary_ar COLUMN — referencing it raised AttributeError
+    # and 500'd the whole endorser-invite portal for every token. Derive it
+    # the same way the admin endorsement queue does (see api pending list).
+    import json as _json
+    intake_summary = ''
+    try:
+        _form = _json.loads(partner.intake_form_json) if partner.intake_form_json else {}
+        intake_summary = (_form.get('description_ar') or _form.get('description') or '')[:280]
+    except (ValueError, TypeError):
+        intake_summary = ''
     return jsonify({
         'success': True,
         'invite': {
@@ -3110,7 +3121,7 @@ def api_get_endorser_invite(token):
             'name': partner.name,
             'name_ar': partner.name_ar,
             'locality': partner.locality,
-            'intake_summary_ar': partner.intake_summary_ar,
+            'intake_summary_ar': intake_summary,
         },
     })
 
