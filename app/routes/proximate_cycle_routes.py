@@ -69,7 +69,7 @@ from app.models import (
 )
 from app.utils.network import ob_required, get_current_network
 from app.utils.helpers import get_request_json
-from app.utils.i18n import t, resolve_network_lang
+from app.utils.i18n import t, resolve_network_lang, resolve_display_lang
 
 logger = logging.getLogger('kuja')
 
@@ -269,15 +269,21 @@ def _date_warnings(rnd) -> list:
             continue
         exp_idx = order.index(expected_phase) if expected_phase in order else 0
         if cur_idx <= exp_idx:
+            days = (today - target).days
+            en_msg = (
+                f'The target {label} date passed '
+                f'{days} day(s) ago. '
+                'This is a note, not a block — carry on.'
+            )
+            # Frontend (cycle-setup-card) renders `message` raw, so localize
+            # it server-side to the operator's language.
+            key = f'proximate.setup.date_warning.{label}'
+            tr = t(key, lang=resolve_display_lang(getattr(rnd, 'network_id', None)), n=days)
             out.append({
                 'kind': f'{label}_date_passed',
                 'severity': 'warning',
-                'days_late': (today - target).days,
-                'message': (
-                    f'The target {label} date passed '
-                    f'{(today - target).days} day(s) ago. '
-                    'This is a note, not a block — carry on.'
-                ),
+                'days_late': days,
+                'message': tr if tr and tr != key else en_msg,
             })
     return out
 

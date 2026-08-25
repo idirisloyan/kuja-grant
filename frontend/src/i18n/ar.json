@@ -4652,5 +4652,8 @@
   "proximate.preflight.amount_approved": "تم تحديد المبلغ المعتمد",
   "proximate.preflight.contract_exists": "تم فتح العقد",
   "proximate.preflight.contract_complete": "العقد موقّع ومكتمل",
-  "proximate.preflight.verified_route": "مسار دفع مُتحقَّق منه"
+  "proximate.preflight.verified_route": "مسار دفع مُتحقَّق منه",
+  "proximate.setup.date_warning.award": "مرّ الموعد المستهدف لقرار المنح منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
+  "proximate.setup.date_warning.disbursement": "مرّ الموعد المستهدف للصرف منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا.",
+  "proximate.setup.date_warning.report": "مرّ الموعد المستهدف للتقرير منذ {n} يوم/أيام. هذه ملاحظة وليست عائقًا — تابعوا."
 }

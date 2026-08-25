@@ -4675,5 +4675,8 @@
   "proximate.preflight.amount_approved": "Approved amount set",
   "proximate.preflight.contract_exists": "Contract opened",
   "proximate.preflight.contract_complete": "Contract signed and complete",
-  "proximate.preflight.verified_route": "Verified payment route"
+  "proximate.preflight.verified_route": "Verified payment route",
+  "proximate.setup.date_warning.award": "The target award date passed {n} day(s) ago. This is a note, not a block — carry on.",
+  "proximate.setup.date_warning.disbursement": "The target disbursement date passed {n} day(s) ago. This is a note, not a block — carry on.",
+  "proximate.setup.date_warning.report": "The target report date passed {n} day(s) ago. This is a note, not a block — carry on."
 }
