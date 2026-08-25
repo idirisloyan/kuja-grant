@@ -55,6 +55,9 @@ interface RoundSummary {
 
 interface Portfolio {
   envelope_usd: number;
+  // Money allocated from the donor's grants to rounds (SUM of grant
+  // allocations) — the funnel's "Allocated" figure, matching the grant card.
+  allocated_usd: number;
   disbursed_usd: number;
   partners_served: number;
   disbursement_count: number;
@@ -204,7 +207,7 @@ export function ProximateDonorClient() {
   const committedUsd = grants && grants.length > 0
     ? grants.reduce((sum, g) => sum + (g.amount_committed_usd || 0), 0)
     : null;
-  const funnelTotals = computeFunnelTotals(rounds, committedUsd);
+  const funnelTotals = computeFunnelTotals(rounds, committedUsd, portfolio.allocated_usd);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">

@@ -1460,6 +1460,16 @@ def api_partner_stages(partner_id):
     it is simply not that partner's turn yet.
     """
     nid = _net_id()
+    # Server-translate the PARTNER_STAGES labels/blurbs/field-labels: the
+    # partner-lifecycle card renders them RAW (no t()), so an Arabic OB saw
+    # English here (task_2e947f36). Falls back to the English literal — never
+    # a raw key — if a translation is missing.
+    lang = resolve_display_lang(nid)
+
+    def _lbl(key, fallback):
+        v = t(key, lang=lang)
+        return fallback if v == key else v
+
     partner = ProximatePartner.query.filter_by(
         id=partner_id, network_id=nid,
     ).first()
@@ -1510,7 +1520,8 @@ def api_partner_stages(partner_id):
         for fkey, flabel in stage['fields']:
             value = form.get(fkey)
             fields.append({
-                'key': fkey, 'label': flabel,
+                'key': fkey,
+                'label': _lbl(f'proximate.stage.field.{fkey}', flabel),
                 'value': value if value not in ('', None) else None,
                 'filled': value not in ('', None),
             })
@@ -1553,8 +1564,8 @@ def api_partner_stages(partner_id):
 
         out.append({
             'key': stage['key'],
-            'label': stage['label'],
-            'blurb': stage['blurb'],
+            'label': _lbl(f"proximate.stage.{stage['key']}.label", stage['label']),
+            'blurb': _lbl(f"proximate.stage.{stage['key']}.blurb", stage['blurb']),
             'reached': stage['key'] in reached,
             'locked': stage['key'] not in reached,
             'fields': fields,

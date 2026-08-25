@@ -380,7 +380,7 @@ export function ProximateDisbursementDetailClient() {
         </Card>
 
         {/* Phase 717 — one-line "what happens next" guidance. */}
-        <NextStep info={disbursementNextStep(data)} />
+        <NextStep info={disbursementNextStep(data, t)} />
 
         {/* Phase 662 + Phase 668 — pending cosign banner with ladder progress */}
         {data.status === 'pending_cosign' && (
@@ -513,7 +513,7 @@ export function ProximateDisbursementDetailClient() {
               </h3>
               {data.report.source && (
                 <Badge variant="outline" className="text-[10px]">
-                  {t('proximate.disbursement.via')} {data.report.source}
+                  {t('proximate.disbursement.via')} {t(`proximate.disbursement.source.${data.report.source}`)}
                 </Badge>
               )}
             </div>
@@ -656,22 +656,22 @@ export function ProximateDisbursementDetailClient() {
             <div className="flex items-start gap-2">
               <UserCheck className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-medium">Independent verification</h3>
+                <h3 className="text-sm font-medium">{t('proximate.disbursement.verify.title')}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Assign a random, conflict-free endorser to independently confirm this
-                  disbursement reached the community. They cannot be the partner&apos;s own
-                  endorser, the sender, a cosigner, or the nominator.
+                  {t('proximate.disbursement.verify.desc')}
                 </p>
               </div>
             </div>
             {data.verifier_user_id && !verifierUrl ? (
               <p className="text-xs italic text-muted-foreground">
-                A verifier has been assigned{data.verifier_verdict ? ` (verdict: ${data.verifier_verdict})` : ' — awaiting their attestation'}.
+                {data.verifier_verdict
+                  ? t('proximate.disbursement.verify.assigned_verdict', { verdict: data.verifier_verdict })
+                  : t('proximate.disbursement.verify.assigned_awaiting')}
               </p>
             ) : verifierUrl ? (
               <div className="space-y-1.5">
                 <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                  Verifier assigned. Share this one-time link with them (out of band):
+                  {t('proximate.disbursement.verify.share')}
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   <input readOnly value={verifierUrl}
@@ -687,7 +687,7 @@ export function ProximateDisbursementDetailClient() {
             ) : (
               <Button size="sm" variant="outline" onClick={assignVerifier} disabled={assigning}>
                 {assigning ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <UserCheck className="w-4 h-4 me-1" />}
-                Assign independent verifier
+                {t('proximate.disbursement.verify.assign_btn')}
               </Button>
             )}
             {actionError && <p className="text-sm text-red-600">{actionError}</p>}

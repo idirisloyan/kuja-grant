@@ -16,7 +16,11 @@
  *
  *   Committed  sum of signed grant agreements (amount_committed_usd).
  *              Only knowable when a grant row exists — see below.
- *   Allocated  round envelopes (portfolio.envelope_usd).
+ *   Allocated  money allocated from the donor's grants to rounds
+ *              (portfolio.allocated_usd — SUM of grant allocations), the
+ *              same figure the grant card shows. NOT the round-envelope sum,
+ *              which is a budget ceiling and disagreed with the grant card
+ *              (task_a8466f69).
  *   Disbursed  payments in pending_report | reported | verified | flagged
  *              — i.e. money that has actually left, which is exactly the
  *              server's `disbursed_usd`.
@@ -63,13 +67,14 @@ const REPORTED = ['reported', 'verified', 'flagged'];
 export function computeFunnelTotals(
   rounds: FunnelRoundInput[],
   committedUsd: number | null,
+  allocatedUsd?: number | null,
 ): MoneyFunnelTotals {
-  let allocated = 0;
+  let envelopeSum = 0;
   let disbursed = 0;
   let reported = 0;
   let verified = 0;
   for (const r of rounds) {
-    allocated += r.envelope_usd || 0;
+    envelopeSum += r.envelope_usd || 0;
     const totals = r.status_totals_usd || {};
     // Recompute disbursed from status_totals rather than trusting
     // `disbursed_usd`, so all four stages come from one source and a
@@ -80,7 +85,11 @@ export function computeFunnelTotals(
   }
   return {
     committed_usd: committedUsd,
-    allocated_usd: allocated,
+    // "Allocated" = money moved from the donor's grants to rounds (grant
+    // allocations), which is what the grant card also shows. Use the
+    // server's portfolio.allocated_usd; fall back to the round-envelope sum
+    // only for older payloads that don't send it (task_a8466f69).
+    allocated_usd: allocatedUsd != null ? allocatedUsd : envelopeSum,
     disbursed_usd: disbursed,
     reported_usd: reported,
     verified_usd: verified,

@@ -21,6 +21,12 @@ from datetime import datetime, timezone
 
 from app.extensions import db
 
+# Fixed key for the Postgres transaction-scoped advisory lock that
+# serializes AuditChainEntry.append across Gunicorn workers (task_4d66b5e4).
+# Any stable bigint works; this one just needs to be unique among the app's
+# advisory-lock keys.
+_AUDIT_CHAIN_LOCK_KEY = 913_724_672
+
 
 class AuditChainEntry(db.Model):
     __tablename__ = 'audit_chain'
@@ -68,66 +74,97 @@ class AuditChainEntry(db.Model):
         Best-effort — never raises, never blocks the caller. If anything
         fails we log to stderr and return None (no chain entry created).
         """
-        try:
-            # Derive network_id if not passed explicitly. Prefer
-            # g.audit_network_id — set by route layers that resolve the
-            # true tenant themselves (e.g. proximate_bp's before_request
-            # hook) — over g.network, which is the HOST-resolved network
-            # and is wrong for token-link / override-header / direct-URL
-            # requests that land on the default host (QA 2026-07-14:
-            # proximate rows stamped with the Kuja default network).
-            if network_id is None:
+        from sqlalchemy import text as _sa_text
+        from sqlalchemy.exc import IntegrityError
+
+        # Derive network_id if not passed explicitly. Prefer
+        # g.audit_network_id — set by route layers that resolve the
+        # true tenant themselves (e.g. proximate_bp's before_request
+        # hook) — over g.network, which is the HOST-resolved network
+        # and is wrong for token-link / override-header / direct-URL
+        # requests that land on the default host (QA 2026-07-14:
+        # proximate rows stamped with the Kuja default network).
+        if network_id is None:
+            try:
+                from flask import g
+                explicit = getattr(g, 'audit_network_id', None)
+                if explicit:
+                    network_id = explicit
+                else:
+                    net = getattr(g, 'network', None)
+                    if net is not None and getattr(net, 'id', None):
+                        network_id = net.id
+            except Exception:
+                pass
+
+        # Serialize the seq/prev_hash read-modify-write so two concurrent
+        # appends across Gunicorn workers can't read the same tail, compute
+        # the same seq (unique) + prev_hash, and have one insert silently
+        # dropped on the unique violation — losing an audit entry and risking
+        # a prev_hash chain break (task_4d66b5e4). On Postgres a
+        # transaction-scoped advisory lock queues appends (released on
+        # commit/rollback); SQLite serializes writes at the DB level. The
+        # retry loop is the cross-DB backstop: on a seq collision we roll
+        # back and recompute against the now-current tail.
+        for _attempt in range(6):
+            try:
                 try:
-                    from flask import g
-                    explicit = getattr(g, 'audit_network_id', None)
-                    if explicit:
-                        network_id = explicit
-                    else:
-                        net = getattr(g, 'network', None)
-                        if net is not None and getattr(net, 'id', None):
-                            network_id = net.id
+                    if (db.session.bind is not None
+                            and db.session.bind.dialect.name == 'postgresql'):
+                        db.session.execute(
+                            _sa_text('SELECT pg_advisory_xact_lock(:k)'),
+                            {'k': _AUDIT_CHAIN_LOCK_KEY})
                 except Exception:
                     pass
 
-            tail = cls.query.order_by(cls.seq.desc()).first()
-            seq = (tail.seq + 1) if tail else 1
-            prev_hash = tail.payload_hash if tail else None
-            payload = {
-                'seq': seq,
-                'prev_hash': prev_hash,
-                'action': action,
-                'actor_email': actor_email,
-                'subject_kind': subject_kind,
-                'subject_id': subject_id,
-                'details': details or {},
-                # No timestamp in the canonical hash — would make replay
-                # awkward across timezones. created_at is non-canonical metadata.
-                # network_id deliberately excluded from the canonical hash so
-                # existing chains keep verifying after Phase 672 lands.
-            }
-            payload_hash = hashlib.sha256(
-                cls._canonical(payload).encode('utf-8')
-            ).hexdigest()
-            entry = cls(
-                seq=seq,
-                prev_hash=prev_hash,
-                payload_hash=payload_hash,
-                action=action,
-                actor_email=actor_email,
-                subject_kind=subject_kind,
-                subject_id=subject_id,
-                details_json=json.dumps(details or {}, default=str)[:8000],
-                network_id=network_id,
-            )
-            db.session.add(entry)
-            db.session.commit()
-            return entry
-        except Exception:
-            try:
-                db.session.rollback()
+                tail = cls.query.order_by(cls.seq.desc()).first()
+                seq = (tail.seq + 1) if tail else 1
+                prev_hash = tail.payload_hash if tail else None
+                payload = {
+                    'seq': seq,
+                    'prev_hash': prev_hash,
+                    'action': action,
+                    'actor_email': actor_email,
+                    'subject_kind': subject_kind,
+                    'subject_id': subject_id,
+                    'details': details or {},
+                    # No timestamp in the canonical hash — would make replay
+                    # awkward across timezones. created_at is non-canonical.
+                    # network_id deliberately excluded from the canonical hash
+                    # so existing chains keep verifying after Phase 672 lands.
+                }
+                payload_hash = hashlib.sha256(
+                    cls._canonical(payload).encode('utf-8')
+                ).hexdigest()
+                entry = cls(
+                    seq=seq,
+                    prev_hash=prev_hash,
+                    payload_hash=payload_hash,
+                    action=action,
+                    actor_email=actor_email,
+                    subject_kind=subject_kind,
+                    subject_id=subject_id,
+                    details_json=json.dumps(details or {}, default=str)[:8000],
+                    network_id=network_id,
+                )
+                db.session.add(entry)
+                db.session.commit()
+                return entry
+            except IntegrityError:
+                # seq collided with a concurrent append — roll back and retry
+                # against the new tail (the advisory lock makes this rare).
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                continue
             except Exception:
-                pass
-            return None
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                return None
+        return None
 
     @classmethod
     def verify(cls, *, limit: int | None = None) -> dict:

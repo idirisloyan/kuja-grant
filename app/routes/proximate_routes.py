@@ -106,6 +106,43 @@ def _stamp_proximate_audit_scope():
 
 # ---- Tenant guard -----------------------------------------------------
 
+def _user_belongs_to_proximate(proximate_net) -> bool:
+    """True if the authenticated user is a real Proximate participant — an
+    OB seat, an active org member, a registered donor, or an endorser.
+
+    Used ONLY for the no-host fallback in _proximate_network() (tests /
+    internal direct hits without a tenant Host header). Production requests
+    always resolve the tenant from the host, so this path is not reached
+    for normal traffic."""
+    if not (proximate_net and current_user.is_authenticated):
+        return False
+    nid = proximate_net.id
+    try:
+        from app.utils.network import is_oversight_body_member
+        if is_oversight_body_member(current_user, network_id=nid):
+            return True
+    except Exception:
+        pass
+    try:
+        from app.models import (
+            NetworkMembership, ProximateDonor, Endorser,
+        )
+        if getattr(current_user, 'org_id', None) and (
+            NetworkMembership.query.filter_by(
+                network_id=nid, org_id=current_user.org_id,
+                status='active').first()):
+            return True
+        if ProximateDonor.query.filter_by(
+                network_id=nid, primary_user_id=current_user.id).first():
+            return True
+        if Endorser.query.filter_by(
+                network_id=nid, user_id=current_user.id).first():
+            return True
+    except Exception:
+        db.session.rollback()
+    return False
+
+
 def _proximate_network():
     """Return the Proximate Network row for the current request, or None
     if the caller isn't in the Proximate tenant. Source of truth is the
@@ -114,14 +151,21 @@ def _proximate_network():
     net = getattr(g, 'network', None)
     if net and net.slug == 'proximate':
         return net
-    # Fallback for tests / direct hits without host-header — accept the
-    # tenant from the user's network membership. This is the same shape
-    # NEAR uses.
+    # SECURITY — tenant isolation (task_8690e2f9): the host IS the tenant
+    # boundary. If the request already resolved to a DIFFERENT tenant, never
+    # fall back to Proximate — otherwise /api/proximate/* would be reachable
+    # on the fund / near / saxansaxo hosts. (Per-user scoping already kept
+    # confidentiality, but serving the endpoints cross-host at all is the
+    # bypass we're closing.)
+    if net is not None:
+        return None
+    # Only when NO network resolved from the host (tests / internal direct
+    # hits without a tenant Host header) fall back to the authenticated
+    # user's real Proximate membership.
     if current_user.is_authenticated:
-        # Allow super-admins to operate against Proximate from any host;
-        # the explicit slug check below is the safety gate.
         proximate = Network.query.filter_by(slug='proximate').first()
-        return proximate
+        if _user_belongs_to_proximate(proximate):
+            return proximate
     return None
 
 
@@ -174,6 +218,21 @@ def _system_actor_user_id(net):
         return admin.id
     any_user = User.query.order_by(User.id.asc()).first()
     return any_user.id if any_user else None
+
+
+def _compliance_overall(items) -> int | None:
+    """Mean of per-criterion compliance scores, rounded HALF-UP to match the
+    web UI (the frontend's avgScore uses JS Math.round). Python's built-in
+    round() is banker's rounding (half-even), which disagreed with the web by
+    1 on exact-.5 means — the PDF / donor-pack showed e.g. 72 where the web
+    showed 73 (FINDING 3). One convention on every surface. Scores are 0-100
+    (non-negative), so floor(x + 0.5) is exactly JS Math.round here."""
+    import math
+    vals = [s.get('score') for s in (items or [])
+            if isinstance(s, dict) and isinstance(s.get('score'), (int, float))]
+    if not vals:
+        return None
+    return int(math.floor(sum(vals) / len(vals) + 0.5))
 
 
 # ---- Endorser self-register -------------------------------------------
@@ -3799,7 +3858,7 @@ def api_score_grant_report(grant_id, report_id):
     r.compliance_score_json = _json.dumps(scores)
     r.compliance_scored_at = datetime.now(timezone.utc)
     db.session.commit()
-    avg = round(sum(s['score'] for s in scores) / len(scores)) if scores else None
+    avg = _compliance_overall(scores)
     AuditChainEntry.append(
         action='proximate.grant_report.compliance_scored',
         actor_email=current_user.email,
@@ -7723,7 +7782,7 @@ def api_donor_dashboard():
     empty list, never the whole tenant.
     """
     from app.models import (
-        ProximateOutcomeAttestation, ProximatePartner,
+        ProximateOutcomeAttestation, ProximatePartner, ProximateGrant,
     )
     donor, err = _require_donor()
     if err:
@@ -7742,6 +7801,14 @@ def api_donor_dashboard():
     out_rounds = []
     portfolio = {
         'envelope_usd': 0.0,
+        # Money actually allocated FROM this donor's grants TO rounds
+        # (SUM of ProximateGrantAllocation) — the honest "Allocated" figure
+        # the money funnel should show, matching the grant card's "Allocated
+        # to rounds". Distinct from envelope_usd, which is the rounds' budget
+        # ceilings (task_a8466f69: the funnel used envelopes and disagreed
+        # with the grant card, so a funder saw two different "Allocated"
+        # numbers).
+        'allocated_usd': 0.0,
         'disbursed_usd': 0.0,
         'partners_served': set(),
         'disbursement_count': 0,
@@ -7813,6 +7880,17 @@ def api_donor_dashboard():
         portfolio['flagged_count'] += status_counts.get('flagged', 0)
 
     portfolio['partners_served'] = len(portfolio['partners_served'])
+
+    # Allocated = SUM of this donor's grants' amount_allocated_usd (money
+    # moved from grants to rounds). Computed from the grants, NOT round
+    # envelopes, so the funnel's "Allocated" stage matches the grant card
+    # (task_a8466f69).
+    donor_grants = ProximateGrant.query.filter_by(
+        network_id=donor.network_id, donor_id=donor.id,
+    ).all()
+    portfolio['allocated_usd'] = float(
+        sum((g.amount_allocated_usd or 0) for g in donor_grants))
+
     return jsonify({
         'success': True,
         'donor': donor.to_dict(),
@@ -9316,10 +9394,9 @@ def api_grant_donor_pack_pdf(grant_id):
                 scores = _json.loads(rep.compliance_score_json)
                 items = scores if isinstance(scores, list) else \
                     scores.get('items', [])
-                vals = [s.get('score') for s in items
-                        if isinstance(s.get('score'), (int, float))]
-                if vals:
-                    score_txt = f"    compliance {round(sum(vals)/len(vals))}/100"
+                _ov = _compliance_overall(items)
+                if _ov is not None:
+                    score_txt = f"    compliance {_ov}/100"
             except (ValueError, TypeError, AttributeError):
                 pass
         _rt = t(f'prox_grant.cadence.{rep.report_type}', lang=lang)

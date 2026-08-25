@@ -98,28 +98,28 @@ export function disbursementNextStep(d: {
   status?: string;
   cosigners_required?: number;
   verifier_verdict?: string | null;
-}): NextStepInfo | null {
+}, t: (key: string, params?: Record<string, string | number>) => string): NextStepInfo | null {
   switch (d?.status) {
     case 'pending_cosign':
       return {
-        label: `Waiting on ${d.cosigners_required || 1} co-signature(s) before funds can move. A different OB member must cosign.`,
+        label: t('proximate.disbursement.next.pending_cosign', { n: d.cosigners_required || 1 }),
         tone: 'waiting',
       };
     case 'pending_report':
       return {
-        label: 'Funds released — share the report link with the partner and await their SoP-12 report.',
+        label: t('proximate.disbursement.next.pending_report'),
         tone: 'waiting',
       };
     case 'reported':
       return d.verifier_verdict === 'confirmed'
-        ? { label: 'Report verified and independently confirmed. Verify or flag to close it out.', tone: 'action' }
-        : { label: 'Report received — verify/flag it, and assign an independent verifier.', tone: 'action' };
+        ? { label: t('proximate.disbursement.next.reported_confirmed'), tone: 'action' }
+        : { label: t('proximate.disbursement.next.reported'), tone: 'action' };
     case 'verified':
-      return { label: 'Verified. A 90-day outcome attestation obligation is now tracked.', tone: 'done' };
+      return { label: t('proximate.disbursement.next.verified'), tone: 'done' };
     case 'flagged':
       // QA-18 item 6: flagged guidance must read as a warning (amber),
       // never the green action treatment.
-      return { label: 'Flagged — follow-up required. Resolve the issue with the partner, then mark the report verified to resume the normal flow.', tone: 'waiting' };
+      return { label: t('proximate.disbursement.next.flagged'), tone: 'waiting' };
     default:
       return null;
   }
