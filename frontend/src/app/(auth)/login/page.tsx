@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import { tenantKind, isBrandedTenant, isNetworkTenant } from '@/lib/tenant';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
@@ -51,7 +52,15 @@ export default function LoginPage() {
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
   const { t, isRTL } = useTranslation();
   const network = useNetworkStore((s) => s.network);
-  const isNetworkTenant = network?.slug && network.slug !== 'kuja';
+  // Split the two meanings the old `isNetworkTenant` conflated:
+  //   isBranded — any non-hub tenant (gates hub-only affordances: the demo
+  //               trio layout, the "apply to join" CTA). Proximate is branded.
+  //   isNetwork — a GENUINE NEAR-style network only (gates network vocabulary:
+  //               the "Network fund operations" eyebrow + network hero).
+  // Proximate is a fund, so it gets its own eyebrow/hero — never NEAR's.
+  const isBranded = isBrandedTenant(network);
+  const isNetwork = isNetworkTenant(network);
+  const isProximate = tenantKind(network) === 'fund';
   const tenantName = network?.name || 'Kuja';
   const tenantBrand = network?.brand_color_hex || '#C2410C';
   const tenantBrandDark = network?.brand_color_hex || '#7C2D12';
@@ -124,7 +133,7 @@ export default function LoginPage() {
         description: 'Secretariat — community groups, funds, disbursement clock',
       },
     ];
-  } else if (isNetworkTenant) {
+  } else if (isNetwork) {
     demoAccounts = [
       {
         label: `${tenantName} operator`,
@@ -330,7 +339,7 @@ export default function LoginPage() {
                   login backdrop or the tenant name is unreadable. */}
               <div className="kuja-display text-2xl text-white">{tenantName}</div>
               <div className="text-xs text-orange-200 uppercase tracking-widest">
-                {isSax ? t('login.eyebrow_sax') : isNetworkTenant ? t('login.eyebrow_network') : t('login.eyebrow_grant')}
+                {isSax ? t('login.eyebrow_sax') : isProximate ? t('login.eyebrow_proximate') : isNetwork ? t('login.eyebrow_network') : t('login.eyebrow_grant')}
               </div>
             </div>
           </div>
@@ -344,7 +353,17 @@ export default function LoginPage() {
                 {t('login.hero_sax_body', { tenant: tenantName })}
               </p>
             </>
-          ) : isNetworkTenant ? (
+          ) : isProximate ? (
+            <>
+              <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
+                {t('login.hero_proximate_title')}
+                <span className="block text-orange-300">{t('login.hero_proximate_accent')}</span>
+              </h1>
+              <p className="text-orange-100/90 text-base max-w-md leading-relaxed">
+                {t('login.hero_proximate_body', { tenant: tenantName })}
+              </p>
+            </>
+          ) : isNetwork ? (
             <>
               <h1 className="kuja-display text-4xl lg:text-5xl text-white text-balance">
                 {t('login.hero_network_title')}
@@ -480,11 +499,11 @@ export default function LoginPage() {
             {demoMode && (
             <div className="mt-6 pt-6 border-t border-border">
               <p className="kuja-eyebrow text-[10px] mb-3">
-                {isNetworkTenant ? t('login.sign_in_as_role', { tenant: tenantName }) : t('login.try_demo')}
+                {isBranded ? t('login.sign_in_as_role', { tenant: tenantName }) : t('login.try_demo')}
               </p>
               <div
                 className={
-                  isNetworkTenant
+                  isBranded
                     ? 'grid grid-cols-1 sm:grid-cols-2 gap-2'
                     : 'grid grid-cols-1 sm:grid-cols-3 gap-2'
                 }
@@ -523,7 +542,7 @@ export default function LoginPage() {
                 The closed networks (Proximate / Saxansaxo·SCLR / NEAR) run
                 membership by invitation through their own trust process, so
                 their tenants must not even show a join CTA. */}
-            {!isNetworkTenant && (
+            {!isBranded && (
               <div className="mt-5 pt-5 border-t border-border text-center">
                 <p className="text-xs text-muted-foreground mb-2">
                   {t('login.new_to', { tenant: tenantName })}

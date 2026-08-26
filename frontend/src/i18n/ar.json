@@ -5043,5 +5043,13 @@
   "proximate.pdf.retro.s3": "3. النطاق الصادق",
   "proximate.pdf.retro.scope1": "تلخّص هذه المراجعة البيانات المسجّلة في المنصّة فقط.",
   "proximate.pdf.retro.scope2": "تظهر محاور تأملات السيناريو البديل من الشركاء في ملخّص النتائج، وليس في هذا الملف.",
-  "proximate.pdf.retro.scope3": "يتطلب إرسال البريد للمانحين خدمة SMTP — وهي معطّلة حاليًا."
+  "proximate.pdf.retro.scope3": "يتطلب إرسال البريد للمانحين خدمة SMTP — وهي معطّلة حاليًا.",
+  "login.eyebrow_proximate": "منحٌ بقيادة المجتمع",
+  "login.hero_proximate_title": "قراراتٌ يصنعها الأقرب",
+  "login.hero_proximate_accent": "إلى الأزمة.",
+  "login.hero_proximate_body": "{tenant} يدير دوراته على Kuja: ترشيحاتٌ مجتمعية، وتأييدٌ من اللجنة، وموافقةُ هيئة الإشراف، وصرفٌ يُتابَع حتى آخر توقيع — وكل قرارٍ موثَّقٌ في سجلّ تدقيق.",
+  "brand.tagline_network": "صندوق الشبكة",
+  "brand.tagline_fund": "صندوقٌ مجتمعي",
+  "brand.tagline_ops": "استجابةٌ مجتمعية",
+  "brand.tagline_grant": "ذكاء المنح"
 }

@@ -17,6 +17,7 @@
 
 import { ReactNode, useEffect } from 'react';
 import { useNetworkStore } from '@/stores/network-store';
+import { tenantKind } from '@/lib/tenant';
 
 /** Convert '#RRGGBB' to 'H S% L%' string for shadcn-style hsl(var(--x)). */
 function hexToHslComponents(hex: string): string | null {
@@ -202,12 +203,24 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
       root.setAttribute('lang', network.default_language);
     }
 
+    // Tenant hook for scoped styling. Proximate uses this to apply a
+    // "clean layer" (flat surfaces, one accent) without touching any other
+    // tenant — see the [data-tenant="proximate"] block in globals.css.
+    if (network?.slug) {
+      root.setAttribute('data-tenant', network.slug);
+    }
+
     // Update the document.title so the browser tab shows the tenant
     // name — important for visual confirmation during multi-tenant UAT.
     if (network?.name) {
-      const suffix = network.slug === 'kuja'
-        ? ' — Grant intelligence'
-        : ' — Network fund operations';
+      // Tab-title suffix by tenant kind — never assume "not Kuja" means
+      // "network" (that leaked "Network fund operations" into Proximate).
+      const kind = tenantKind(network);
+      const suffix =
+        kind === 'network' ? ' — Network fund'
+          : kind === 'fund' ? ' — Community fund'
+          : kind === 'ops' ? ' — Community response'
+          : ' — Grant intelligence';
       document.title = network.name + suffix;
     }
   }, [network]);

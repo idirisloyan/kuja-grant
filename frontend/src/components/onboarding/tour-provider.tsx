@@ -12,6 +12,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNetworkStore } from '@/stores/network-store';
+import { tenantKind } from '@/lib/tenant';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -155,15 +156,24 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
-  const isNetworkTenant = !!network?.slug && network.slug !== 'kuja';
+  // Only a genuine NEAR-style network gets the network onboarding tour; the
+  // Kuja hub gets the generic tour. Fund/ops/branded tenants (Proximate,
+  // Saxansaxo, …) get NO auto-tour at all — the NEAR "you are part of a
+  // network" wizard must never fire for a community fund. (Previously this was
+  // `slug !== 'kuja'`, which fails open and leaked the NEAR tour into every
+  // non-Kuja tenant.)
+  const kind = tenantKind(network);
+  const isNetworkTenant = kind === 'network';
   const tenantName = network?.name || 'NEAR Network';
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const storageKeyRef = useRef<string | null>(null);
 
-  const tourSet = isNetworkTenant ? nearTours(tenantName) : TOURS;
-  const stepDefs = user ? (tourSet[user.role] ?? tourSet.ngo) : [];
+  const tourSet: Record<string, TourStep[]> | null =
+    kind === 'network' ? nearTours(tenantName) : kind === 'hub' ? TOURS : null;
+  const stepDefs = user && tourSet ? (tourSet[user.role] ?? tourSet.ngo) : [];
+  const hasTour = stepDefs.length > 0;
   // Resolve to displayable strings — NEAR tour ships literal copy, Kuja
   // tour ships i18n keys.
   const steps = useMemo(
@@ -176,7 +186,9 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!user) return;
+    // No auto-tour unless this tenant actually has one (hub or network).
+    // Fund/ops/branded tenants never fire the spotlight.
+    if (!user || !hasTour) return;
     storageKeyRef.current = `kuja_onboarded_${user.role}_${user.id}${isNetworkTenant ? `_${network?.slug ?? 'net'}` : ''}`;
     if (pathname?.startsWith('/dashboard')) {
       try {
@@ -188,7 +200,7 @@ export function OnboardingTourProvider({ children }: { children: ReactNode }) {
         }
       } catch {}
     }
-  }, [user, pathname, isNetworkTenant, network?.slug]);
+  }, [user, pathname, isNetworkTenant, network?.slug, hasTour]);
 
   // Replay via custom event
   useEffect(() => {

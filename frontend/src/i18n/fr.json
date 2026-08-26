@@ -4440,5 +4440,13 @@
   "proximate.disbursements.days_left": "Échéance dans {n} jours",
   "proximate.partners.show_test": "Afficher les partenaires de test ({n})",
   "proximate.partners.hide_test": "Masquer les partenaires de test ({n})",
-  "proximate.partners.test_toggle_hint": "Partenaires de test. Masqués par défaut pour garder le registre lisible — ils ne sont jamais supprimés."
+  "proximate.partners.test_toggle_hint": "Partenaires de test. Masqués par défaut pour garder le registre lisible — ils ne sont jamais supprimés.",
+  "login.eyebrow_proximate": "Financement piloté par la communauté",
+  "login.hero_proximate_title": "Des subventions décidées par",
+  "login.hero_proximate_accent": "les plus proches de la crise.",
+  "login.hero_proximate_body": "{tenant} gère ses cycles sur Kuja : nominations communautaires, validation par le panel, approbation de l’organe de supervision, et décaissements suivis jusqu’à la dernière signature — chaque décision ancrée dans une piste d’audit.",
+  "brand.tagline_network": "Fonds de réseau",
+  "brand.tagline_fund": "Fonds communautaire",
+  "brand.tagline_ops": "Réponse communautaire",
+  "brand.tagline_grant": "Intelligence des subventions"
 }

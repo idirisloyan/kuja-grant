@@ -15,8 +15,11 @@
  * NEAR operator/member).
  */
 
+import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import { tenantKind } from '@/lib/tenant';
+import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { AttentionDonorDashboard } from '@/components/dashboards/attention-donor-dashboard';
 import { AttentionNgoDashboard } from '@/components/dashboards/attention-ngo-dashboard';
 import { AttentionOperatorDashboard } from '@/components/dashboards/attention-operator-dashboard';
@@ -33,7 +36,43 @@ import { OrgMergeTool } from '@/components/dashboards/org-merge-tool';
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
-  const isNearFlavor = !!network?.slug && network.slug !== 'kuja';
+  const kind = tenantKind(network);
+  const isNearFlavor = kind === 'network';
+
+  // Proximate (fund) and Saxansaxo (ops) are NOT flavors of this dashboard —
+  // they have their own home surfaces. The login flow already redirects them,
+  // but if a user lands here directly (a bookmark, a stale link), send them to
+  // their tenant home rather than render a Kuja/NEAR dashboard they must never
+  // see. Defense-in-depth alongside `isNearFlavor` now being network-only.
+  const { persona, isLoading: personaLoading } = useProximatePersona();
+  useEffect(() => {
+    if (kind === 'ops') {
+      window.location.href = '/saxansaxo/admin';
+      return;
+    }
+    if (kind === 'fund') {
+      if (persona === null && personaLoading) return; // still resolving
+      const target =
+        persona === 'donor' ? '/proximate/donor'
+          : persona === 'ob' || persona === 'admin' ? '/proximate/admin'
+          : '/proximate/donor'; // 'none'/unresolved → safe Proximate surface
+      window.location.href = target;
+    }
+  }, [kind, persona, personaLoading]);
+
+  if (kind === 'fund' || kind === 'ops') {
+    // Redirecting away — show a loader, never the Kuja/NEAR dashboard.
+    return (
+      <div className="space-y-4">
+        <div className="kuja-shimmer h-28 rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="kuja-shimmer h-56 rounded-xl" />
+          <div className="kuja-shimmer h-56 rounded-xl" />
+          <div className="kuja-shimmer h-56 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

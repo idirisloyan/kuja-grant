@@ -312,6 +312,40 @@
 [dir="rtl"] .kuja-numeric { direction: ltr; unicode-bidi: embed; display: inline-block; }
 [dir="rtl"] .tabular-nums { direction: ltr; unicode-bidi: embed; display: inline-block; }
 
+/* ================================================================
+   Proximate — "clean layer"   (scoped to [data-tenant="proximate"])
+   ----------------------------------------------------------------
+   Proximate is a community fund, not the marketplace. This borrows the
+   Trust app's discipline WITHOUT changing the warm brand: ONE accent (the
+   clay brand), flat bordered surfaces instead of gradients, and the second
+   "AI purple" quieted to a calm slate so nothing competes with the brand.
+   Fills use low-alpha semantic tokens so they hold up in light AND dark.
+   Set via <html data-tenant="proximate"> in network-provider.tsx; no other
+   tenant is affected.
+   ================================================================ */
+[data-tenant="proximate"] {
+  /* One accent: the loud AI purple becomes a calm slate. */
+  --kuja-spark: 220 16% 48%;
+  --kuja-spark-soft: 220 16% 95%;
+}
+
+/* Flat, tone-coded decision cards — the busy gradient fill becomes a faint
+   theme-adaptive tint. The semantic left rail (and its RTL mirror) stays. */
+[data-tenant="proximate"] .kuja-verdict         { background: hsl(var(--primary) / 0.045); }
+[data-tenant="proximate"] .kuja-verdict-success { background: hsl(var(--kuja-grow) / 0.08); }
+[data-tenant="proximate"] .kuja-verdict-warn    { background: hsl(var(--kuja-sun) / 0.09); }
+[data-tenant="proximate"] .kuja-verdict-danger  { background: hsl(var(--kuja-flag) / 0.08); }
+[data-tenant="proximate"] .kuja-verdict-spark   { background: hsl(var(--kuja-spark) / 0.09); }
+
+/* AI affordances: calm, not loud — flat tint + slate accents. */
+[data-tenant="proximate"] .kuja-ai-pill      { background: hsl(var(--kuja-spark) / 0.10); border-color: hsl(var(--kuja-spark) / 0.28); }
+[data-tenant="proximate"] .kuja-cite:hover   { background: hsl(220 16% 38%); }
+[data-tenant="proximate"] .kuja-chart-caption { background: hsl(var(--kuja-spark) / 0.07); }
+
+/* Chart card + panel surfaces: hairline border, no floaty shadow — the Trust
+   rule that "a 4%-alpha shadow makes the design look undecided". */
+[data-tenant="proximate"] .kuja-chart-card { box-shadow: none; }
+
 /* Multilingual button wrapping — Swahili and Somali action labels can be
    30-40% longer than English equivalents and were breaking single-line
    button heights. Allow wrapping while keeping minimum line height. */

@@ -40,6 +40,7 @@ import { useEffect, useState } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import { tenantKind } from '@/lib/tenant';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona, type ProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { cn } from '@/lib/utils';
@@ -88,9 +89,13 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
-  const isNearFlavor = !!network?.slug && network.slug !== 'kuja';
-  const isProximateFlavor = network?.slug === 'proximate';
-  const isSaxansaxoFlavor = network?.slug === 'saxansaxo';
+  // Classify the tenant explicitly. `isNearFlavor` now means a GENUINE network
+  // only — Proximate (fund) and Saxansaxo (ops) no longer masquerade as one,
+  // so they can't inherit the "Network fund" tagline or the NEAR nav fallback.
+  const kind = tenantKind(network);
+  const isNearFlavor = kind === 'network';
+  const isProximateFlavor = kind === 'fund';
+  const isSaxansaxoFlavor = kind === 'ops';
   const role: UserRole = (user?.role as UserRole) ?? 'ngo';
   // Phase 696 — Proximate donors/OB are seeded with role='ngo' for
   // platform compatibility. The persona endpoint resolves their actual
@@ -144,7 +149,12 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
               {network?.name || 'Kuja'}
             </div>
             <div className="text-[9px] uppercase tracking-[0.14em] text-orange-200/70">
-              {isNearFlavor ? 'Network fund' : 'Grant intelligence'}
+              {t(
+                kind === 'network' ? 'brand.tagline_network'
+                  : kind === 'fund' ? 'brand.tagline_fund'
+                  : kind === 'ops' ? 'brand.tagline_ops'
+                  : 'brand.tagline_grant',
+              )}
             </div>
           </div>
         )}

@@ -4440,5 +4440,13 @@
   "proximate.disbursements.days_left": "Waxay dhacaysaa {n} maalmood",
   "proximate.partners.show_test": "Muuji shurakada tijaabada ({n})",
   "proximate.partners.hide_test": "Qari shurakada tijaabada ({n})",
-  "proximate.partners.test_toggle_hint": "Shuraka tijaabo ah. Si caadi ah waa la qariyay si diiwaanka dhabta ah u sahlanaado — waligood lama tirtiro."
+  "proximate.partners.test_toggle_hint": "Shuraka tijaabo ah. Si caadi ah waa la qariyay si diiwaanka dhabta ah u sahlanaado — waligood lama tirtiro.",
+  "login.eyebrow_proximate": "Deeq-bixin ay hoggaamiso bulshada",
+  "login.hero_proximate_title": "Deeqo ay go’aamiyaan kuwa",
+  "login.hero_proximate_accent": "ugu dhow xaaladda.",
+  "login.hero_proximate_body": "{tenant} wuxuu wareegyadiisa ku maamulaa Kuja: magacaabista bulshada, ansixinta guddiga, oggolaanshaha hay’adda kormeerka, iyo lacag-bixinno la raadraaco ilaa saxeexa ugu dambeeya — go’aan kastana waxaa lagu duubaa diiwaan hubin.",
+  "brand.tagline_network": "Sanduuqa shabakada",
+  "brand.tagline_fund": "Sanduuqa bulshada",
+  "brand.tagline_ops": "Jawaab-celinta bulshada",
+  "brand.tagline_grant": "Aqoonta deeqaha"
 }

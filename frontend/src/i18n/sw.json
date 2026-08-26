@@ -4440,5 +4440,13 @@
   "proximate.disbursements.days_left": "Inatakiwa baada ya siku {n}",
   "proximate.partners.show_test": "Onyesha washirika wa majaribio ({n})",
   "proximate.partners.hide_test": "Ficha washirika wa majaribio ({n})",
-  "proximate.partners.test_toggle_hint": "Washirika wa majaribio. Wamefichwa kwa chaguo-msingi ili daftari halisi libaki wazi — hawafutwi kamwe."
+  "proximate.partners.test_toggle_hint": "Washirika wa majaribio. Wamefichwa kwa chaguo-msingi ili daftari halisi libaki wazi — hawafutwi kamwe.",
+  "login.eyebrow_proximate": "Ufadhili unaoongozwa na jamii",
+  "login.hero_proximate_title": "Ruzuku zinazoamuliwa na wale",
+  "login.hero_proximate_accent": "walio karibu na dharura.",
+  "login.hero_proximate_body": "{tenant} huendesha raundi zake kwenye Kuja: mapendekezo ya jamii, uidhinishaji wa jopo, idhini ya chombo cha usimamizi, na malipo yanayofuatiliwa hadi saini ya mwisho — kila uamuzi umewekwa kwenye kumbukumbu ya ukaguzi.",
+  "brand.tagline_network": "Mfuko wa mtandao",
+  "brand.tagline_fund": "Mfuko wa jamii",
+  "brand.tagline_ops": "Mwitikio wa jamii",
+  "brand.tagline_grant": "Maarifa ya ruzuku"
 }
