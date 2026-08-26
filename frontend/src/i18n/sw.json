@@ -4448,5 +4448,14 @@
   "brand.tagline_network": "Mfuko wa mtandao",
   "brand.tagline_fund": "Mfuko wa jamii",
   "brand.tagline_ops": "Mwitikio wa jamii",
-  "brand.tagline_grant": "Maarifa ya ruzuku"
+  "brand.tagline_grant": "Maarifa ya ruzuku",
+  "login.reset_prompt": "Una tatizo kuingia?",
+  "login.reset_confirm": "Weka upya programu na utoke",
+  "login.reset_running": "Inaweka upya…",
+  "login.reset_note": "Inafuta data iliyohifadhiwa na kukutoa, kisha inapakia ukurasa mpya wa kuingia.",
+  "sw.update_available": "Toleo jipya linapatikana.",
+  "sw.refresh": "Onyesha upya",
+  "proximate.dashboard.no_home_title": "Umeingia.",
+  "proximate.dashboard.no_home_body": "Akaunti hii bado haina nafasi ya kazi ya Proximate. Fungua mfuko ili kuendelea.",
+  "proximate.dashboard.go_to_fund": "Nenda kwenye mfuko"
 }

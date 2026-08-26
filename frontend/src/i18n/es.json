@@ -4448,5 +4448,14 @@
   "brand.tagline_network": "Fondo de red",
   "brand.tagline_fund": "Fondo comunitario",
   "brand.tagline_ops": "Respuesta comunitaria",
-  "brand.tagline_grant": "Inteligencia de subvenciones"
+  "brand.tagline_grant": "Inteligencia de subvenciones",
+  "login.reset_prompt": "¿Problemas para iniciar sesión?",
+  "login.reset_confirm": "Restablecer la app y cerrar sesión",
+  "login.reset_running": "Restableciendo…",
+  "login.reset_note": "Borra los datos en caché y cierra tu sesión, luego recarga un inicio de sesión limpio.",
+  "sw.update_available": "Hay una nueva versión disponible.",
+  "sw.refresh": "Actualizar",
+  "proximate.dashboard.no_home_title": "Sesión iniciada.",
+  "proximate.dashboard.no_home_body": "Esta cuenta aún no tiene un espacio de Proximate. Abre el fondo para continuar.",
+  "proximate.dashboard.go_to_fund": "Ir al fondo"
 }

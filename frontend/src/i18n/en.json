@@ -5074,5 +5074,14 @@
   "brand.tagline_network": "Network fund",
   "brand.tagline_fund": "Community fund",
   "brand.tagline_ops": "Community response",
-  "brand.tagline_grant": "Grant intelligence"
+  "brand.tagline_grant": "Grant intelligence",
+  "login.reset_prompt": "Having trouble signing in?",
+  "login.reset_confirm": "Reset the app & sign out",
+  "login.reset_running": "Resetting…",
+  "login.reset_note": "Clears cached data and signs you out, then reloads a fresh login.",
+  "sw.update_available": "A new version is available.",
+  "sw.refresh": "Refresh",
+  "proximate.dashboard.no_home_title": "You’re signed in.",
+  "proximate.dashboard.no_home_body": "This account doesn’t have a Proximate workspace yet. Open the fund to continue.",
+  "proximate.dashboard.go_to_fund": "Go to the fund"
 }

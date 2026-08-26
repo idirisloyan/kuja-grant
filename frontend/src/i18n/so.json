@@ -4448,5 +4448,14 @@
   "brand.tagline_network": "Sanduuqa shabakada",
   "brand.tagline_fund": "Sanduuqa bulshada",
   "brand.tagline_ops": "Jawaab-celinta bulshada",
-  "brand.tagline_grant": "Aqoonta deeqaha"
+  "brand.tagline_grant": "Aqoonta deeqaha",
+  "login.reset_prompt": "Ma dhibaato kula haysataa gelitaanka?",
+  "login.reset_confirm": "Dib u deji abka oo ka bax",
+  "login.reset_running": "Dib u dejinaya…",
+  "login.reset_note": "Wuxuu tirtiraa xogta la kaydiyay wuuna ka saaraa, ka dibna wuxuu soo rogaa bog gelitaan cusub.",
+  "sw.update_available": "Nooc cusub ayaa la heli karaa.",
+  "sw.refresh": "Cusboonaysii",
+  "proximate.dashboard.no_home_title": "Waad gashay.",
+  "proximate.dashboard.no_home_body": "Akoonkani weli ma laha meel-shaqo Proximate ah. Fur sanduuqa si aad u sii wadato.",
+  "proximate.dashboard.go_to_fund": "Aad sanduuqa"
 }

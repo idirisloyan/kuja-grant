@@ -1,9 +1,10 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
-import { Toaster } from 'sonner';
+import { ReactNode, useEffect, useRef } from 'react';
+import { Toaster, toast } from 'sonner';
 import { PWAInstallBanner } from './shared/pwa-install-banner';
 import { NetworkProvider } from './network-provider';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 // ---------------------------------------------------------------------------
 // AppRegistry — thin client wrapper.
@@ -108,14 +109,37 @@ function installStaleBuildDetector() {
 // kicks in for everyone (not only users who grant push permission).
 // Idempotent: navigator.serviceWorker.register returns the existing
 // registration if /sw.js is already controlling this scope.
-function installServiceWorker() {
+function installServiceWorker(onUpdate: () => void) {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  // Fire `onUpdate` once when a NEW build's service worker has installed while
+  // an old one still controls the page — that's an update the user hasn't
+  // picked up yet. (The stale-build detector auto-reloads on tab focus, but a
+  // PWA kept open and focused can sit on an old build; this surfaces a manual
+  // "Refresh" so the user is never stuck on a stale version.)
+  let prompted = false;
+  const fire = () => { if (!prompted) { prompted = true; onUpdate(); } };
+  const watch = (reg: ServiceWorkerRegistration) => {
+    if (reg.waiting && navigator.serviceWorker.controller) fire();
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) fire();
+      });
+    });
+    // Proactively re-check for a new build when the user returns to the tab.
+    window.addEventListener('focus', () => { reg.update().catch(() => undefined); });
+  };
+
   // Defer to after first paint so it never competes with the initial render.
   const register = () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Silent — SW failure shouldn't block the app. The user just loses
-      // offline shell + caching benefits, not core functionality.
-    });
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => { if (reg) watch(reg); })
+      .catch(() => {
+        // Silent — SW failure shouldn't block the app. The user just loses
+        // offline shell + caching benefits, not core functionality.
+      });
   };
   if (document.readyState === 'complete') {
     register();
@@ -125,10 +149,24 @@ function installServiceWorker() {
 }
 
 export function AppRegistry({ children }: { children: ReactNode }) {
+  // Keep the latest translator in a ref so the SW-update toast (fired from an
+  // async event, possibly much later) speaks the user's CURRENT language.
+  const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
+
   useEffect(() => {
     installRSCConsoleSilencer();
     installStaleBuildDetector();
-    installServiceWorker();
+    installServiceWorker(() => {
+      toast(tRef.current('sw.update_available'), {
+        duration: Infinity,
+        action: {
+          label: tRef.current('sw.refresh'),
+          onClick: () => window.location.reload(),
+        },
+      });
+    });
   }, []);
 
   return (

@@ -4448,5 +4448,14 @@
   "brand.tagline_network": "Fonds de réseau",
   "brand.tagline_fund": "Fonds communautaire",
   "brand.tagline_ops": "Réponse communautaire",
-  "brand.tagline_grant": "Intelligence des subventions"
+  "brand.tagline_grant": "Intelligence des subventions",
+  "login.reset_prompt": "Un problème pour vous connecter ?",
+  "login.reset_confirm": "Réinitialiser l’application et se déconnecter",
+  "login.reset_running": "Réinitialisation…",
+  "login.reset_note": "Efface les données en cache et vous déconnecte, puis recharge une page de connexion propre.",
+  "sw.update_available": "Une nouvelle version est disponible.",
+  "sw.refresh": "Actualiser",
+  "proximate.dashboard.no_home_title": "Vous êtes connecté.",
+  "proximate.dashboard.no_home_body": "Ce compte n’a pas encore d’espace Proximate. Ouvrez le fonds pour continuer.",
+  "proximate.dashboard.go_to_fund": "Aller au fonds"
 }

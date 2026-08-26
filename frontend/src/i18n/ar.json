@@ -5051,5 +5051,14 @@
   "brand.tagline_network": "صندوق الشبكة",
   "brand.tagline_fund": "صندوقٌ مجتمعي",
   "brand.tagline_ops": "استجابةٌ مجتمعية",
-  "brand.tagline_grant": "ذكاء المنح"
+  "brand.tagline_grant": "ذكاء المنح",
+  "login.reset_prompt": "تواجه مشكلة في تسجيل الدخول؟",
+  "login.reset_confirm": "إعادة تعيين التطبيق وتسجيل الخروج",
+  "login.reset_running": "جارٍ إعادة التعيين…",
+  "login.reset_note": "يمسح البيانات المخزّنة مؤقتاً ويسجّل خروجك، ثم يعيد تحميل صفحة دخول جديدة.",
+  "sw.update_available": "يتوفّر إصدار جديد.",
+  "sw.refresh": "تحديث",
+  "proximate.dashboard.no_home_title": "تم تسجيل دخولك.",
+  "proximate.dashboard.no_home_body": "لا يملك هذا الحساب مساحة عمل في Proximate بعد. افتح الصندوق للمتابعة.",
+  "proximate.dashboard.go_to_fund": "اذهب إلى الصندوق"
 }

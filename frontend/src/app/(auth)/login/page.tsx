@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { tenantKind, isBrandedTenant, isNetworkTenant } from '@/lib/tenant';
+import { hardResetApp } from '@/lib/app-reset';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
@@ -65,6 +66,9 @@ export default function LoginPage() {
   const tenantBrand = network?.brand_color_hex || '#C2410C';
   const tenantBrandDark = network?.brand_color_hex || '#7C2D12';
   const [markFailed, setMarkFailed] = useState(false);
+  // Escape hatch: two-click reveal so a stuck user can wipe a wedged client.
+  const [resetArmed, setResetArmed] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     setHydrated(true);
@@ -559,6 +563,35 @@ export default function LoginPage() {
                 </p>
               </div>
             )}
+
+            {/* Escape hatch — always available. Clears a wedged client (stale
+                service worker, poisoned cache, half-valid session) and reloads
+                to a clean login. Two-click so it can't fire by accident. */}
+            <div className="mt-5 pt-4 border-t border-border text-center">
+              {resetArmed ? (
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={resetting}
+                    onClick={() => { setResetting(true); void hardResetApp(); }}
+                    className="text-xs font-semibold text-[hsl(var(--kuja-clay))] hover:underline disabled:opacity-60"
+                  >
+                    {resetting ? t('login.reset_running') : t('login.reset_confirm')}
+                  </button>
+                  <span className="text-[11px] text-muted-foreground max-w-[16rem]">
+                    {t('login.reset_note')}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setResetArmed(true)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  {t('login.reset_prompt')}
+                </button>
+              )}
+            </div>
           </div>
 
           {isDev && (

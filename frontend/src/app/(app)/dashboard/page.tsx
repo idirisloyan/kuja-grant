@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
 import { tenantKind } from '@/lib/tenant';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
+import { useTranslation } from '@/lib/hooks/use-translation';
 import { AttentionDonorDashboard } from '@/components/dashboards/attention-donor-dashboard';
 import { AttentionNgoDashboard } from '@/components/dashboards/attention-ngo-dashboard';
 import { AttentionOperatorDashboard } from '@/components/dashboards/attention-operator-dashboard';
@@ -44,32 +45,48 @@ export default function DashboardPage() {
   // but if a user lands here directly (a bookmark, a stale link), send them to
   // their tenant home rather than render a Kuja/NEAR dashboard they must never
   // see. Defense-in-depth alongside `isNearFlavor` now being network-only.
+  const { t } = useTranslation();
   const { persona, isLoading: personaLoading } = useProximatePersona();
+  // Only send a Proximate user to a home we KNOW they can open. A resolved
+  // 'none' persona has no Proximate workspace, so we must NOT auto-redirect it
+  // (that risks a loop against a page that would bounce them straight back) —
+  // we show a neutral message instead, and still never render the NEAR/Kuja
+  // dashboard.
+  const proximateHome =
+    persona === 'donor' ? '/proximate/donor'
+      : persona === 'ob' || persona === 'admin' ? '/proximate/admin'
+      : null;
   useEffect(() => {
-    if (kind === 'ops') {
-      window.location.href = '/saxansaxo/admin';
-      return;
-    }
-    if (kind === 'fund') {
-      if (persona === null && personaLoading) return; // still resolving
-      const target =
-        persona === 'donor' ? '/proximate/donor'
-          : persona === 'ob' || persona === 'admin' ? '/proximate/admin'
-          : '/proximate/donor'; // 'none'/unresolved → safe Proximate surface
-      window.location.href = target;
-    }
-  }, [kind, persona, personaLoading]);
+    if (kind === 'ops') { window.location.href = '/saxansaxo/admin'; return; }
+    if (kind === 'fund' && proximateHome) { window.location.href = proximateHome; }
+  }, [kind, proximateHome]);
 
-  if (kind === 'fund' || kind === 'ops') {
-    // Redirecting away — show a loader, never the Kuja/NEAR dashboard.
+  const shimmer = (
+    <div className="space-y-4">
+      <div className="kuja-shimmer h-28 rounded-xl" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="kuja-shimmer h-56 rounded-xl" />
+        <div className="kuja-shimmer h-56 rounded-xl" />
+        <div className="kuja-shimmer h-56 rounded-xl" />
+      </div>
+    </div>
+  );
+
+  if (kind === 'ops') return shimmer;
+  if (kind === 'fund') {
+    // Resolving persona, or about to redirect to their real home → loader.
+    if (personaLoading || proximateHome) return shimmer;
+    // Resolved but no Proximate workspace: neutral, NON-looping fallback.
     return (
-      <div className="space-y-4">
-        <div className="kuja-shimmer h-28 rounded-xl" />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="kuja-shimmer h-56 rounded-xl" />
-          <div className="kuja-shimmer h-56 rounded-xl" />
-          <div className="kuja-shimmer h-56 rounded-xl" />
-        </div>
+      <div className="mx-auto max-w-md space-y-3 py-10 text-center">
+        <h1 className="kuja-display text-2xl">{t('proximate.dashboard.no_home_title')}</h1>
+        <p className="text-muted-foreground">{t('proximate.dashboard.no_home_body')}</p>
+        <a
+          href="/proximate/donor"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[hsl(var(--kuja-clay))] hover:underline"
+        >
+          {t('proximate.dashboard.go_to_fund')} →
+        </a>
       </div>
     );
   }
