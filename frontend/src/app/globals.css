@@ -353,7 +353,7 @@
 [data-tenant="proximate"] .kuja-grouplabel { color: #c99c86; }
 [data-tenant="proximate"] .kuja-nav-link.is-active {
   background-image: none;
-  background-color: #c2410c;
+  background-color: #fc5810; /* Proximate's brighter brand orange */
   box-shadow: none;
 }
 
