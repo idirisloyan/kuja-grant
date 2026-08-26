@@ -5083,5 +5083,7 @@
   "sw.refresh": "Refresh",
   "proximate.dashboard.no_home_title": "You’re signed in.",
   "proximate.dashboard.no_home_body": "This account doesn’t have a Proximate workspace yet. Open the fund to continue.",
-  "proximate.dashboard.go_to_fund": "Go to the fund"
+  "proximate.dashboard.go_to_fund": "Go to the fund",
+  "login.language": "Language",
+  "login.session_expired": "Your session ended. Please sign in again."
 }

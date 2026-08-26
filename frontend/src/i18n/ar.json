@@ -5060,5 +5060,7 @@
   "sw.refresh": "تحديث",
   "proximate.dashboard.no_home_title": "تم تسجيل دخولك.",
   "proximate.dashboard.no_home_body": "لا يملك هذا الحساب مساحة عمل في Proximate بعد. افتح الصندوق للمتابعة.",
-  "proximate.dashboard.go_to_fund": "اذهب إلى الصندوق"
+  "proximate.dashboard.go_to_fund": "اذهب إلى الصندوق",
+  "login.language": "اللغة",
+  "login.session_expired": "انتهت جلستك. يُرجى تسجيل الدخول مرة أخرى."
 }

@@ -101,9 +101,13 @@ async function apiFetch<T>(
     }
   }
 
-  // Redirect to login on 401 (except for the session-check endpoint)
+  // Redirect to login on 401 (except for the session-check endpoint).
+  // Leave a marker so /login can explain WHY the user was bounced here
+  // ("your session ended") instead of the app silently flashing back to the
+  // login screen — the confusing symptom reported on the Proximate PWA.
   if (res.status === 401) {
     if (typeof window !== 'undefined' && !path.includes('/auth/me')) {
+      try { sessionStorage.setItem('kuja_session_expired', '1'); } catch { /* ignore */ }
       window.location.href = '/login';
     }
     throw new ApiError(401, 'Unauthorized');

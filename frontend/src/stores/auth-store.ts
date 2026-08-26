@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { api } from '@/lib/api';
 import type { User } from '@/lib/types';
+import { useUIStore } from '@/stores/ui-store';
 
 // Drop the service-worker's cached API responses at every session boundary.
 // The SW stale-while-revalidate cache is keyed by URL, not by session cookie,
@@ -105,6 +106,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setLanguage: async (lang) => {
     await api.put('/auth/language', { language: lang });
+    // Keep the UI-language override in sync so an explicit change here isn't
+    // silently overridden by a langOverride the user set on the login screen.
+    try { useUIStore.getState().setLangOverride(lang); } catch { /* ignore */ }
     set((state) => ({
       user: state.user ? { ...state.user, language: lang } : null,
     }));

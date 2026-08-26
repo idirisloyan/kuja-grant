@@ -23,6 +23,16 @@ interface UIState {
    *  caption auto-fetch, omit non-essential illustrations. Persists. */
   lowBandwidth: boolean;
 
+  /** An explicit UI-language choice that overrides the tenant default and,
+   *  when set, the signed-in user's stored preference. Persists. Lets a user
+   *  read the login / change-password screen in a language they understand
+   *  BEFORE (or without) authenticating — e.g. an English reader on the
+   *  Arabic-default Proximate login. null = follow the normal precedence. */
+  langOverride: string | null;
+
+  /** Set (or clear, with null) the explicit UI-language override + persist. */
+  setLangOverride: (lang: string | null) => void;
+
   /** Toggle the sidebar between expanded and collapsed. */
   toggleSidebar: () => void;
 
@@ -55,6 +65,19 @@ function writeLowBandwidth(value: boolean) {
   try { localStorage.setItem('kuja.lowBandwidth', value ? '1' : '0'); } catch { /* ignore */ }
 }
 
+const LANG_KEY = 'kuja_lang_override';
+function readLangOverride(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(LANG_KEY) || null; } catch { return null; }
+}
+function writeLangOverride(value: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (value) localStorage.setItem(LANG_KEY, value);
+    else localStorage.removeItem(LANG_KEY);
+  } catch { /* ignore */ }
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -64,6 +87,12 @@ export const useUIStore = create<UIState>((set) => ({
   sidebarMobileOpen: false,
   aiPanelOpen: false,
   lowBandwidth: readLowBandwidth(),
+  langOverride: readLangOverride(),
+
+  setLangOverride: (lang) => {
+    writeLangOverride(lang);
+    set({ langOverride: lang });
+  },
 
   toggleSidebar: () =>
     set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),

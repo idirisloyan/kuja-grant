@@ -4457,5 +4457,7 @@
   "sw.refresh": "Cusboonaysii",
   "proximate.dashboard.no_home_title": "Waad gashay.",
   "proximate.dashboard.no_home_body": "Akoonkani weli ma laha meel-shaqo Proximate ah. Fur sanduuqa si aad u sii wadato.",
-  "proximate.dashboard.go_to_fund": "Aad sanduuqa"
+  "proximate.dashboard.go_to_fund": "Aad sanduuqa",
+  "login.language": "Luqadda",
+  "login.session_expired": "Fadhigaagii wuu dhammaaday. Fadlan mar kale gal."
 }

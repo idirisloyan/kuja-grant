@@ -4457,5 +4457,7 @@
   "sw.refresh": "Actualizar",
   "proximate.dashboard.no_home_title": "Sesión iniciada.",
   "proximate.dashboard.no_home_body": "Esta cuenta aún no tiene un espacio de Proximate. Abre el fondo para continuar.",
-  "proximate.dashboard.go_to_fund": "Ir al fondo"
+  "proximate.dashboard.go_to_fund": "Ir al fondo",
+  "login.language": "Idioma",
+  "login.session_expired": "Tu sesión terminó. Inicia sesión de nuevo."
 }

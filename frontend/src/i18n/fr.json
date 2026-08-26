@@ -4457,5 +4457,7 @@
   "sw.refresh": "Actualiser",
   "proximate.dashboard.no_home_title": "Vous êtes connecté.",
   "proximate.dashboard.no_home_body": "Ce compte n’a pas encore d’espace Proximate. Ouvrez le fonds pour continuer.",
-  "proximate.dashboard.go_to_fund": "Aller au fonds"
+  "proximate.dashboard.go_to_fund": "Aller au fonds",
+  "login.language": "Langue",
+  "login.session_expired": "Votre session a expiré. Veuillez vous reconnecter."
 }

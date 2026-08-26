@@ -19,7 +19,8 @@ import { tenantKind, isBrandedTenant, isNetworkTenant } from '@/lib/tenant';
 import { hardResetApp } from '@/lib/app-reset';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
-import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, Lock, Building2, Wallet, Star, Sparkles, ArrowRight, Globe } from 'lucide-react';
+import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { TenantSwitcher } from '@/components/tenant-switcher';
@@ -51,7 +52,8 @@ export default function LoginPage() {
   // so disabling the trigger is the only robust option.
   const [hydrated, setHydrated] = useState(false);
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
-  const { t, isRTL } = useTranslation();
+  const { t, isRTL, lang } = useTranslation();
+  const setLangOverride = useUIStore((s) => s.setLangOverride);
   const network = useNetworkStore((s) => s.network);
   // Split the two meanings the old `isNetworkTenant` conflated:
   //   isBranded — any non-hub tenant (gates hub-only affordances: the demo
@@ -89,6 +91,18 @@ export default function LoginPage() {
     setIsDev(isLocal);
     setDemoMode(isLocal || isInternal || envForced);
   }, []);
+
+  // If the app bounced us here because a request 401'd mid-session (the
+  // "different screen flashes, then back to login" symptom), say so — instead
+  // of leaving the user guessing whether their password was wrong.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('kuja_session_expired')) {
+        sessionStorage.removeItem('kuja_session_expired');
+        toast.error(t('login.session_expired'));
+      }
+    } catch { /* sessionStorage unavailable */ }
+  }, [t]);
 
   // Phase 708 — three tenants now have distinct demo identity sets.
   //   Kuja Marketplace: NGO / Donor / Reviewer (the original trio).
@@ -397,6 +411,29 @@ export default function LoginPage() {
         {/* RIGHT — Login card */}
         <div className="lg:col-span-3">
           <div className="rounded-2xl bg-card/95 backdrop-blur border border-border/40 shadow-2xl p-6 lg:p-8">
+            {/* Language toggle — always available, so a reader can switch the
+                login (and the forced change-password screen) into a language
+                they understand, e.g. English on the Arabic-default Proximate
+                tenant. The choice persists via the UI store's langOverride. */}
+            <div className="mb-4 flex justify-end">
+              <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Globe className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">{t('login.language')}</span>
+                <select
+                  value={lang}
+                  onChange={(e) => setLangOverride(e.target.value)}
+                  aria-label={t('login.language')}
+                  className="bg-transparent text-foreground font-medium rounded-md border border-border px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[hsl(var(--kuja-clay))]"
+                >
+                  <option value="en">English</option>
+                  <option value="ar">العربية</option>
+                  <option value="fr">Français</option>
+                  <option value="es">Español</option>
+                  <option value="sw">Kiswahili</option>
+                  <option value="so">Soomaali</option>
+                </select>
+              </label>
+            </div>
             {/* Phase 708 — Tenant switcher above the heading. Flips
                 branding + demo accounts in place; localStorage carries
                 X-Network-Override on every subsequent API call.

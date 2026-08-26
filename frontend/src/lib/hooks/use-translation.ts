@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
+import { useUIStore } from '@/stores/ui-store';
 import { translate, isRTL } from '@/i18n';
 import { langToLocale } from '@/lib/locale';
 
@@ -17,8 +18,13 @@ import { langToLocale } from '@/lib/locale';
 export function useTranslation() {
   const user = useAuthStore((s) => s.user);
   const network = useNetworkStore((s) => s.network);
+  const langOverride = useUIStore((s) => s.langOverride);
+  // An explicit override (chosen on the login/change-password screen) wins so
+  // a user can read the UI in a language they understand even before signing
+  // in; otherwise fall back to the user's stored preference, then the tenant
+  // default, then English.
   const lang =
-    user?.language || network?.default_language || 'en';
+    langOverride || user?.language || network?.default_language || 'en';
 
   // Apply RTL direction to document root when language changes
   useEffect(() => {

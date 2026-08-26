@@ -4457,5 +4457,7 @@
   "sw.refresh": "Onyesha upya",
   "proximate.dashboard.no_home_title": "Umeingia.",
   "proximate.dashboard.no_home_body": "Akaunti hii bado haina nafasi ya kazi ya Proximate. Fungua mfuko ili kuendelea.",
-  "proximate.dashboard.go_to_fund": "Nenda kwenye mfuko"
+  "proximate.dashboard.go_to_fund": "Nenda kwenye mfuko",
+  "login.language": "Lugha",
+  "login.session_expired": "Kipindi chako kimeisha. Tafadhali ingia tena."
 }
