@@ -134,7 +134,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   const currentWidth = sidebarCollapsed ? collapsedWidth : width;
 
   const body = (
-    <div className="flex h-full flex-col bg-[#1A1410] text-[#F4E8DC]">
+    <div className="kuja-sidebar flex h-full flex-col bg-[#1A1410] text-[#F4E8DC]">
       {/* Brand */}
       <div
         className={cn(
@@ -176,7 +176,7 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
                 />
               )}
               {!sidebarCollapsed && (
-                <div className="px-3 pb-1 text-[9px] uppercase tracking-[0.16em] text-[#8C6450]">
+                <div className="kuja-grouplabel px-3 pb-1 text-[9px] uppercase tracking-[0.16em] text-[#8C6450]">
                   {g.label}
                 </div>
               )}
@@ -338,10 +338,10 @@ function NavGroup({
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={cn(
-                'group flex items-center rounded-md text-sm font-medium transition-colors',
+                'kuja-nav-link group flex items-center rounded-md text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',
                 isActive
-                  ? 'bg-gradient-to-r from-[#C2410C] to-[#9A3412] text-white shadow-md shadow-orange-950/40'
+                  ? 'is-active bg-gradient-to-r from-[#C2410C] to-[#9A3412] text-white shadow-md shadow-orange-950/40'
                   : tone === 'secondary'
                     ? 'text-[#B5816C] hover:bg-white/5 hover:text-[#E8D9CC]'
                     : 'text-[#E8D9CC] hover:bg-white/5 hover:text-white',

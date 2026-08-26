@@ -346,6 +346,17 @@
    rule that "a 4%-alpha shadow makes the design look undecided". */
 [data-tenant="proximate"] .kuja-chart-card { box-shadow: none; }
 
+/* Sidebar: a softer, warm branded panel (not near-black) with a FLAT active
+   state — no gradient, no shadow (Trust's "branded panel, not a float"). The
+   default kuja/near/sax sidebar keeps its dark gradient look untouched. */
+[data-tenant="proximate"] .kuja-sidebar    { background: #3a2214; }
+[data-tenant="proximate"] .kuja-grouplabel { color: #c99c86; }
+[data-tenant="proximate"] .kuja-nav-link.is-active {
+  background-image: none;
+  background-color: #c2410c;
+  box-shadow: none;
+}
+
 /* Multilingual button wrapping — Swahili and Somali action labels can be
    30-40% longer than English equivalents and were breaking single-line
    button heights. Allow wrapping while keeping minimum line height. */
