@@ -192,8 +192,9 @@ export function ProximateMessagesClient() {
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div
-            className="flex items-center gap-1 border-b border-border overflow-x-auto"
+            className="flex items-center gap-1 overflow-x-auto"
             role="tablist"
+            style={{ borderBottom: '1px solid var(--prox-line)' }}
           >
             {TABS.map((x) => (
               <button
@@ -202,15 +203,14 @@ export function ProximateMessagesClient() {
                 role="tab"
                 aria-selected={tab === x.key}
                 onClick={() => setTab(x.key)}
-                className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-                  tab === x.key
-                    ? 'border-[hsl(var(--kuja-clay))] text-foreground font-medium'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className="px-3.5 py-2.5 text-[13.5px] whitespace-nowrap border-b-2 -mb-px transition-colors"
+                style={tab === x.key
+                  ? { borderColor: 'var(--prox-accent)', color: 'var(--prox-ink)', fontWeight: 600 }
+                  : { borderColor: 'transparent', color: 'var(--prox-muted)' }}
               >
                 {x.label}
                 {x.count ? (
-                  <span className="ms-1.5 text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  <span className="ms-1.5 text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)' }}>
                     {x.count}
                   </span>
                 ) : null}

@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Loader2, ShieldAlert, Clock, CheckCircle2, XCircle, Snowflake,
+  Loader2, ShieldAlert, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -41,10 +41,8 @@ interface Grievance {
   intervention_id: number | null;
 }
 
-const CATEGORY_TONE: Record<string, string> = {
-  fraud: 'bg-red-100 text-red-800 border-red-300',
-  safety: 'bg-amber-100 text-amber-800 border-amber-300',
-  other: 'bg-muted text-muted-foreground border-border',
+const CATEGORY_PILL: Record<string, string> = {
+  fraud: 'danger', safety: 'warn', other: 'slate',
 };
 
 function slaLabel(seconds: number): string {
@@ -133,14 +131,10 @@ export function ProximateGrievanceQueueClient() {
       />
       <PageMain>
         <div className="space-y-4 max-w-3xl">
-          <div className="flex gap-3 text-sm">
-            <span className="px-2.5 py-1 rounded border bg-blue-50 text-blue-800 border-blue-200">
-              {newCount} {t('proximate.grievance_queue.new_count')}
-            </span>
+          <div className="flex gap-2 text-sm">
+            <span className="prox-pill acc">{newCount} {t('proximate.grievance_queue.new_count')}</span>
             {breachedCount > 0 && (
-              <span className="px-2.5 py-1 rounded border bg-red-50 text-red-800 border-red-200">
-                {breachedCount} {t('proximate.grievance_queue.breached_count')}
-              </span>
+              <span className="prox-pill danger">{breachedCount} {t('proximate.grievance_queue.breached_count')}</span>
             )}
           </div>
 
@@ -156,39 +150,27 @@ export function ProximateGrievanceQueueClient() {
             </Card>
           ) : (
             (rows || []).map((g) => (
-              <Card key={g.id} className="p-4 space-y-3">
+              <div key={g.id} className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded border ${
-                        CATEGORY_TONE[g.category] || CATEGORY_TONE.other
-                      }`}
-                    >
+                    <span className={`prox-pill ${CATEGORY_PILL[g.category] || 'slate'}`}>
                       {(() => {
                         const k = `proximate.grievance_category.${g.category}`;
                         const v = t(k);
                         return v && v !== k ? v : g.category;
                       })()}
                     </span>
-                    <span className="text-sm font-medium">
+                    <span style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
                       {g.partner_name || t('proximate.grievance_queue.about_fund')}
                     </span>
                     {g.intervention_id && (
-                      <span className="text-xs px-2 py-0.5 rounded border bg-sky-50 text-sky-800 border-sky-200 inline-flex items-center gap-1">
-                        <Snowflake className="w-3 h-3" />
+                      <span className="prox-pill acc">
                         {t('proximate.grievance_queue.auto_intervention')}
                       </span>
                     )}
                   </div>
                   {g.status === 'new' && (
-                    <span
-                      className={`text-xs px-2 py-1 rounded border inline-flex items-center gap-1 ${
-                        g.is_sla_breached
-                          ? 'bg-red-100 text-red-800 border-red-300'
-                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      }`}
-                    >
-                      <Clock className="w-3 h-3" />
+                    <span className={`prox-pill ${g.is_sla_breached ? 'danger' : 'good'}`}>
                       {g.is_sla_breached
                         ? t('proximate.grievance_queue.sla_breached')
                         : `${slaLabel(g.remaining_seconds)} ${t('proximate.grievance_queue.sla_remaining')}`}
@@ -255,7 +237,7 @@ export function ProximateGrievanceQueueClient() {
                     </Button>
                   )}
                 </div>
-              </Card>
+              </div>
             ))
           )}
         </div>
