@@ -23,13 +23,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
+import { toneForProximateStatus } from '@/components/proximate/status-badge';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { useOrigin } from '@/components/proximate/token-page-support';
 import { ProximateAttachmentsPanel } from '@/components/proximate/dd-evidence';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -110,6 +108,12 @@ interface OutcomeAttestation {
   ack_message: string | null;
   ack_message_at: string | null;
 }
+
+// Redesign — map the shared Proximate status tone to a design-system
+// pill tone (own leading dot; good|warn|danger|slate|acc).
+const PILL_TONE: Record<string, string> = {
+  positive: 'good', attention: 'warn', critical: 'danger', active: 'acc', neutral: 'slate',
+};
 
 export function ProximateDisbursementDetailClient() {
   const { t } = useTranslation();
@@ -309,15 +313,15 @@ export function ProximateDisbursementDetailClient() {
     return (
       <PageShell>
         <PageMain>
-          <Card className="p-6 text-center">
-            <p className="text-sm text-red-600">{error || t('proximate.disbursement.load_failed')}</p>
+          <div className="prox-panel text-center" style={{ padding: '24px' }}>
+            <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error || t('proximate.disbursement.load_failed')}</p>
             <Link href="/proximate/disbursements">
               <Button variant="outline" size="sm" className="mt-3">
                 <ArrowLeft className="w-3.5 h-3.5 me-1" />
                 {t('proximate.disbursements.back_to_list')}
               </Button>
             </Link>
-          </Card>
+          </div>
         </PageMain>
       </PageShell>
     );
@@ -382,14 +386,14 @@ export function ProximateDisbursementDetailClient() {
 
         {/* Phase 662 + Phase 668 — pending cosign banner with ladder progress */}
         {data.status === 'pending_cosign' && (
-          <Card className="p-4 border-violet-300 bg-violet-50 dark:bg-violet-950/30 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px', borderColor: 'var(--prox-accent)' }}>
             <div className="flex items-start gap-2">
-              <ShieldCheck className="w-5 h-5 text-violet-700 flex-shrink-0 mt-0.5" />
+              <ShieldCheck className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-accent)' }} />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--prox-ink)' }}>
                   {t('proximate.disbursement.cosign_required_title')}
                 </h3>
-                <p className="text-xs text-violet-800 dark:text-violet-300 mt-1">
+                <p className="text-xs mt-1" style={{ color: 'var(--prox-ink-2)' }}>
                   {t('proximate.disbursement.cosign_progress', {
                     have: data.cosigners_count,
                     need: data.cosigners_required,
@@ -398,19 +402,19 @@ export function ProximateDisbursementDetailClient() {
               </div>
             </div>
             {actionError && (
-              <p className="text-sm text-red-600">{actionError}</p>
+              <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{actionError}</p>
             )}
             {!isOb ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursement.cosign_ob_only')}
               </p>
             ) : user?.id === data.sent_by_user_id ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursement.cosign_self_blocked')}
               </p>
             ) : (data.cosigned_by_user_id === user?.id ||
                  data.cosigners_extra.some((e) => e.user_id === user?.id)) ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursement.cosign_already_signed')}
               </p>
             ) : (
@@ -419,7 +423,7 @@ export function ProximateDisbursementDetailClient() {
                 {t('proximate.disbursement.cosign_now')}
               </Button>
             )}
-          </Card>
+          </div>
         )}
 
         {/* PRX-OUTCOME-002 — one amber remediation card for EVERY flagged
@@ -427,29 +431,30 @@ export function ProximateDisbursementDetailClient() {
             Normal follow-up (outcome link, acknowledgement) is paused
             until the OB re-verdicts the report as verified. */}
         {data.status === 'flagged' && (
-          <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px', borderColor: 'var(--prox-warn)' }}>
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--prox-ink)' }}>
                   {data.flagged_reason === 'route_failure_security'
                     ? t('proximate.disbursement.planb_title')
                     : t('proximate.disbursement.flagged_title')}
                 </h3>
-                <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                <p className="text-xs mt-1" style={{ color: 'var(--prox-ink-2)' }}>
                   {data.flagged_reason === 'route_failure_security'
                     ? t('proximate.disbursement.planb_body')
                     : t('proximate.disbursement.flagged_body')}
                 </p>
                 {data.flagged_reason && data.flagged_reason !== 'route_failure_security' && (
-                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: 'var(--prox-ink-2)' }}>
                     {t('proximate.disbursement.flag_reason')}: {labelForProximateStatus(data.flagged_reason)}
                   </p>
                 )}
                 {data.flagged_reason === 'route_failure_security' && (
                   <Link
                     href={`/proximate/endorse/${data.partner_id}#routes`}
-                    className="inline-flex items-center gap-1 text-xs text-amber-900 dark:text-amber-200 mt-2 hover:underline"
+                    className="inline-flex items-center gap-1 text-xs mt-2 hover:underline"
+                    style={{ color: 'var(--prox-warn)' }}
                   >
                     {t('proximate.disbursement.planb_view_routes')} →
                   </Link>
@@ -461,19 +466,19 @@ export function ProximateDisbursementDetailClient() {
                 {acting ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
                 {t('proximate.disbursement.flagged_resolve')}
               </Button>
-              {actionError && <p className="text-sm text-red-600 mt-2">{actionError}</p>}
+              {actionError && <p className="text-sm mt-2" style={{ color: 'var(--prox-danger)' }}>{actionError}</p>}
             </div>
-          </Card>
+          </div>
         )}
 
         {/* Pending state — surface the partner link */}
         {data.status === 'pending_report' && data.report_token && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <div>
               <h3 className="text-sm font-medium mb-1">
                 {t('proximate.disbursement.awaiting_report')}
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursement.awaiting_hint')}
               </p>
             </div>
@@ -482,7 +487,8 @@ export function ProximateDisbursementDetailClient() {
                 type="text"
                 readOnly
                 value={partnerLink}
-                className="flex-1 min-w-[200px] h-10 px-3 text-xs bg-muted border border-border rounded-md font-mono"
+                className="flex-1 min-w-[200px] h-10 px-3 text-xs border rounded-md prox-mono"
+                style={{ background: 'var(--prox-inset)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
               />
               <Button size="sm" variant="outline" onClick={copyReportUrl}>
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -494,25 +500,26 @@ export function ProximateDisbursementDetailClient() {
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 h-10 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 px-3 h-10 text-xs font-medium rounded-md text-white"
+                style={{ background: 'var(--prox-good)' }}
               >
                 {t('proximate.disbursement.share_via_whatsapp')}
               </a>
             </div>
-          </Card>
+          </div>
         )}
 
         {/* Submitted state — show the report payload */}
         {data.report && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">
                 {t('proximate.disbursement.report_received')}
               </h3>
               {data.report.source && (
-                <Badge variant="outline" className="text-[10px]">
+                <span className="prox-pill slate">
                   {t('proximate.disbursement.via')} {t(`proximate.disbursement.source.${data.report.source}`)}
-                </Badge>
+                </span>
               )}
             </div>
 
@@ -603,12 +610,12 @@ export function ProximateDisbursementDetailClient() {
                 </div>
               )}
             </dl>
-          </Card>
+          </div>
         )}
 
         {/* OB verdict action — only when reported (not yet verified or flagged) */}
         {data.status === 'reported' && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <h3 className="text-sm font-medium">
               {t('proximate.disbursement.your_verdict')}
             </h3>
@@ -617,11 +624,12 @@ export function ProximateDisbursementDetailClient() {
               onChange={(e) => setVerifyNote(e.target.value)}
               rows={3}
               maxLength={2000}
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+              className="w-full px-3 py-2 text-sm border rounded-md"
+              style={{ background: 'var(--prox-surface)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
               placeholder={t('proximate.disbursement.verdict_note_placeholder')}
             />
             {actionError && (
-              <p className="text-sm text-red-600">{actionError}</p>
+              <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{actionError}</p>
             )}
             <div className="flex gap-2 flex-wrap">
               <Button
@@ -638,11 +646,11 @@ export function ProximateDisbursementDetailClient() {
                 onClick={() => verdict('flagged')}
                 disabled={acting}
               >
-                <AlertTriangle className="w-4 h-4 me-1 text-red-600" />
+                <AlertTriangle className="w-4 h-4 me-1" style={{ color: 'var(--prox-danger)' }} />
                 {t('proximate.disbursement.flag')}
               </Button>
             </div>
-          </Card>
+          </div>
         )}
 
         {/* Phase 717 — independent third-party verification (SoP §10). The
@@ -650,30 +658,31 @@ export function ProximateDisbursementDetailClient() {
             previously API-only with no button. */}
         {(data.status === 'reported' || data.status === 'pending_report')
           && data.verifier_verdict !== 'confirmed' && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <div className="flex items-start gap-2">
-              <UserCheck className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <UserCheck className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-muted)' }} />
               <div className="flex-1">
                 <h3 className="text-sm font-medium">{t('proximate.disbursement.verify.title')}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs mt-0.5" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.disbursement.verify.desc')}
                 </p>
               </div>
             </div>
             {data.verifier_user_id && !verifierUrl ? (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
                 {data.verifier_verdict
                   ? t('proximate.disbursement.verify.assigned_verdict', { verdict: data.verifier_verdict })
                   : t('proximate.disbursement.verify.assigned_awaiting')}
               </p>
             ) : verifierUrl ? (
               <div className="space-y-1.5">
-                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                <p className="text-xs" style={{ color: 'var(--prox-good)' }}>
                   {t('proximate.disbursement.verify.share')}
                 </p>
                 <div className="flex gap-2 flex-wrap">
                   <input readOnly value={verifierUrl}
-                    className="flex-1 min-w-[200px] h-9 px-3 text-xs bg-muted border border-border rounded-md font-mono" />
+                    className="flex-1 min-w-[200px] h-9 px-3 text-xs border rounded-md prox-mono"
+                    style={{ background: 'var(--prox-inset)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }} />
                   <Button size="sm" variant="outline" onClick={() => {
                     navigator.clipboard?.writeText(verifierUrl).catch(() => {});
                     setVerifierCopied(true); setTimeout(() => setVerifierCopied(false), 1500);
@@ -688,32 +697,32 @@ export function ProximateDisbursementDetailClient() {
                 {t('proximate.disbursement.verify.assign_btn')}
               </Button>
             )}
-            {actionError && <p className="text-sm text-red-600">{actionError}</p>}
-          </Card>
+            {actionError && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{actionError}</p>}
+          </div>
         )}
 
         {/* Phase 660 — Acknowledge to partner */}
         {(data.status === 'reported' || data.status === 'verified' || data.status === 'flagged') && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <h3 className="text-sm font-medium">
               {t('proximate.disbursement.ack_title')}
             </h3>
             {data.ack_message ? (
-              <div className="text-sm bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+              <div className="text-sm border rounded p-3" style={{ background: 'var(--prox-good-tint)', borderColor: 'var(--prox-good)' }}>
                 <p className="whitespace-pre-wrap">{data.ack_message}</p>
                 {data.ack_message_at && (
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-xs mt-2" style={{ color: 'var(--prox-muted)' }}>
                     {t('proximate.disbursement.ack_sent_at')} {new Date(data.ack_message_at).toLocaleString()}
                   </p>
                 )}
               </div>
             ) : data.status === 'flagged' ? (
-              <p className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-3">
+              <p className="text-xs border rounded p-3" style={{ color: 'var(--prox-ink-2)', background: 'var(--prox-warn-tint)', borderColor: 'var(--prox-warn)' }}>
                 {t('proximate.disbursement.ack_paused')}
               </p>
             ) : (
               <>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.disbursement.ack_hint')}
                 </p>
                 <textarea
@@ -721,7 +730,8 @@ export function ProximateDisbursementDetailClient() {
                   onChange={(e) => setAckText(e.target.value)}
                   rows={3}
                   maxLength={2000}
-                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  className="w-full px-3 py-2 text-sm border rounded-md"
+                  style={{ background: 'var(--prox-surface)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
                   placeholder={t('proximate.disbursement.ack_placeholder')}
                 />
                 <Button size="sm" onClick={sendAck} disabled={ackSending || !ackText.trim()}>
@@ -730,7 +740,7 @@ export function ProximateDisbursementDetailClient() {
                 </Button>
               </>
             )}
-          </Card>
+          </div>
         )}
 
         {/* Payment confirmations — hawala / government payment-app
@@ -747,47 +757,43 @@ export function ProximateDisbursementDetailClient() {
 
         {/* Phase 680 — 90-day outcome attestation */}
         {data.outcome && (
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <div className="flex items-start justify-between gap-2 flex-wrap">
               <div>
                 <h3 className="text-sm font-medium">
                   {t('proximate.outcome.card_title')}
                 </h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                   {data.outcome.due_at
                     ? t('proximate.outcome.due_at_prefix') +
                       ' ' +
                       formatComplianceDate(data.outcome.due_at)
                     : ''}
                   {data.outcome.overdue && (
-                    <span className="ms-2 text-red-600">
+                    <span className="ms-2" style={{ color: 'var(--prox-danger)' }}>
                       {t('proximate.outcome.overdue_badge')}
                     </span>
                   )}
                 </p>
               </div>
-              <span
-                className={`text-xs px-2 py-1 rounded border ${
-                  TONE_CLASSES[toneForProximateStatus(data.outcome.status)]
-                }`}
-              >
+              <span className={`prox-pill ${PILL_TONE[toneForProximateStatus(data.outcome.status)] || 'slate'}`}>
                 {t(`proximate.outcome.status_${data.outcome.status}`)}
               </span>
             </div>
 
             {data.outcome.status === 'pending' && data.status === 'flagged' && (
-              <p className="text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded p-3">
+              <p className="text-xs border rounded p-3" style={{ color: 'var(--prox-ink-2)', background: 'var(--prox-warn-tint)', borderColor: 'var(--prox-warn)' }}>
                 {t('proximate.disbursement.outcome_paused')}
               </p>
             )}
 
             {data.outcome.status === 'pending' && data.outcome.report_token && data.status !== 'flagged' && (
               <div className="text-xs space-y-2">
-                <p className="text-muted-foreground">
+                <p style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.outcome.share_link_hint')}
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  <code className="flex-1 min-w-[200px] truncate bg-muted px-2 py-1 rounded text-xs">
+                  <code className="flex-1 min-w-[200px] truncate px-2 py-1 rounded text-xs prox-mono" style={{ background: 'var(--prox-inset)', color: 'var(--prox-ink)' }}>
                     {`${origin ?? ''}/proximate-outcome?t=${data.outcome.report_token}`}
                   </code>
                   <Button size="sm" variant="outline" onClick={copyOutcomeUrl}>
@@ -801,7 +807,8 @@ export function ProximateDisbursementDetailClient() {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                    className="inline-flex items-center gap-1.5 px-3 h-8 text-xs font-medium rounded-md text-white"
+                    style={{ background: 'var(--prox-good)' }}
                   >
                     {t('proximate.disbursement.share_via_whatsapp')}
                   </a>
@@ -862,7 +869,8 @@ export function ProximateDisbursementDetailClient() {
                   onChange={(e) => setOutcomeVerdictNote(e.target.value)}
                   rows={2}
                   maxLength={2000}
-                  className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                  className="w-full px-3 py-2 text-sm border rounded-md"
+                  style={{ background: 'var(--prox-surface)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
                   placeholder={t('proximate.outcome.verdict_note_placeholder')}
                 />
                 <div className="flex gap-2 flex-wrap">
@@ -884,7 +892,7 @@ export function ProximateDisbursementDetailClient() {
                     onClick={() => setOutcomeVerdict('disputed')}
                     disabled={outcomeActing}
                   >
-                    <AlertTriangle className="w-4 h-4 me-1 text-red-600" />
+                    <AlertTriangle className="w-4 h-4 me-1" style={{ color: 'var(--prox-danger)' }} />
                     {t('proximate.outcome.dispute')}
                   </Button>
                 </div>
@@ -892,7 +900,7 @@ export function ProximateDisbursementDetailClient() {
             )}
 
             {data.outcome.verdict_notes && (
-              <div className="text-xs text-muted-foreground border-t pt-2">
+              <div className="text-xs border-t pt-2" style={{ color: 'var(--prox-muted)' }}>
                 <span className="font-medium">{t('proximate.outcome.verdict_notes')}: </span>
                 {data.outcome.verdict_notes}
               </div>
@@ -904,10 +912,10 @@ export function ProximateDisbursementDetailClient() {
                   {t('proximate.outcome.ack_title')}
                 </h4>
                 {data.outcome.ack_message ? (
-                  <div className="text-sm bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+                  <div className="text-sm border rounded p-3" style={{ background: 'var(--prox-good-tint)', borderColor: 'var(--prox-good)' }}>
                     <p className="whitespace-pre-wrap">{data.outcome.ack_message}</p>
                     {data.outcome.ack_message_at && (
-                      <p className="text-xs text-muted-foreground mt-2">
+                      <p className="text-xs mt-2" style={{ color: 'var(--prox-muted)' }}>
                         {new Date(data.outcome.ack_message_at).toLocaleString()}
                       </p>
                     )}
@@ -919,7 +927,8 @@ export function ProximateDisbursementDetailClient() {
                       onChange={(e) => setOutcomeAckText(e.target.value)}
                       rows={2}
                       maxLength={2000}
-                      className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+                      className="w-full px-3 py-2 text-sm border rounded-md"
+                      style={{ background: 'var(--prox-surface)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
                       placeholder={t('proximate.outcome.ack_placeholder')}
                     />
                     <Button
@@ -937,24 +946,24 @@ export function ProximateDisbursementDetailClient() {
                 )}
               </div>
             )}
-          </Card>
+          </div>
         )}
 
         {/* Audit trail */}
-        <Card className="p-4">
+        <div className="prox-panel" style={{ padding: '16px 18px' }}>
           <h3 className="text-sm font-medium mb-3">
             {t('proximate.disbursement.audit_trail')}
           </h3>
           {data.audit.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.disbursement.no_audit')}
             </p>
           ) : (
             <ul className="space-y-2">
               {data.audit.map((row) => (
-                <li key={row.seq} className="text-xs text-muted-foreground flex gap-3 flex-wrap">
+                <li key={row.seq} className="text-xs flex gap-3 flex-wrap" style={{ color: 'var(--prox-muted)' }}>
                   {row.created_at && (
-                    <span className="font-mono">
+                    <span className="prox-mono">
                       {new Date(row.created_at).toLocaleString()}
                     </span>
                   )}
@@ -962,7 +971,7 @@ export function ProximateDisbursementDetailClient() {
                       code as fallback (so the chain is never silently
                       mis-rendered). Same util as the round detail
                       audit window. Hover shows the action code. */}
-                  <span className="font-medium text-foreground" title={row.action}>
+                  <span className="font-medium" title={row.action} style={{ color: 'var(--prox-ink)' }}>
                     {labelForProximateAction(row.action, t)}
                   </span>
                   {row.actor_email && <span>· {row.actor_email}</span>}
@@ -970,7 +979,7 @@ export function ProximateDisbursementDetailClient() {
               ))}
             </ul>
           )}
-        </Card>
+        </div>
 
         <div>
           <Link href="/proximate/disbursements">

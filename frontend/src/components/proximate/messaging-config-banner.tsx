@@ -16,7 +16,6 @@
 // ============================================================================
 
 import { AlertTriangle, CheckCircle2, HelpCircle, SendHorizontal } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import type { MessagingConfigState } from './messaging-shared';
 
@@ -38,27 +37,29 @@ export function MessagingConfigBanner({
 
   if (state === 'not_configured') {
     return (
-      <Card
+      <div
         role="alert"
-        className="p-5 border-2 border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800"
+        className="prox-panel"
+        style={{ padding: '16px 18px', borderColor: 'var(--prox-warn)' }}
       >
         <div className="flex items-start gap-3">
-          <AlertTriangle className="w-6 h-6 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+          <AlertTriangle className="w-6 h-6 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
           <div className="space-y-2 min-w-0">
-            <p className="font-semibold text-red-900 dark:text-red-200">
+            <p style={{ color: 'var(--prox-ink)', fontWeight: 700 }}>
               {t('proximate.messaging.not_configured_title')}
             </p>
-            <p className="text-sm text-red-900/90 dark:text-red-200/90">
+            <p className="text-sm" style={{ color: 'var(--prox-ink-2)' }}>
               {t('proximate.messaging.not_configured_body')}
             </p>
-            <p className="text-xs text-red-800/80 dark:text-red-300/80">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.messaging.not_configured_hint')}
             </p>
             {unsentCount > 0 && onShowOutbound && (
               <button
                 type="button"
                 onClick={onShowOutbound}
-                className="text-xs font-medium underline text-red-900 dark:text-red-200 hover:no-underline inline-flex items-center gap-1"
+                className="text-xs font-medium underline hover:no-underline inline-flex items-center gap-1"
+                style={{ color: 'var(--prox-warn)' }}
               >
                 <SendHorizontal className="w-3 h-3" />
                 {t('proximate.messaging.unsent_warning_title', { count: unsentCount })}
@@ -66,7 +67,7 @@ export function MessagingConfigBanner({
             )}
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -74,22 +75,23 @@ export function MessagingConfigBanner({
     // We could not reach the stats endpoint. Deliberately NOT rendered as
     // "all good" — an unverified pipeline is not a working one.
     return (
-      <Card
+      <div
         role="alert"
-        className="p-5 border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800"
+        className="prox-panel"
+        style={{ padding: '16px 18px', borderColor: 'var(--prox-warn)' }}
       >
         <div className="flex items-start gap-3">
-          <HelpCircle className="w-6 h-6 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <HelpCircle className="w-6 h-6 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
           <div className="space-y-2 min-w-0">
-            <p className="font-semibold text-amber-900 dark:text-amber-200">
+            <p style={{ color: 'var(--prox-ink)', fontWeight: 700 }}>
               {t('proximate.messaging.config_unknown_title')}
             </p>
-            <p className="text-sm text-amber-900/90 dark:text-amber-200/90">
+            <p className="text-sm" style={{ color: 'var(--prox-ink-2)' }}>
               {t('proximate.messaging.config_unknown_body')}
             </p>
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -97,7 +99,7 @@ export function MessagingConfigBanner({
   // empty inbox as real silence. Kept quiet unless something is stuck.
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm text-emerald-800 dark:text-emerald-300">
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--prox-good)' }}>
         <CheckCircle2 className="w-4 h-4 shrink-0" />
         <span className="font-medium">{t('proximate.messaging.configured_title')}</span>
         {channels && channels.length > 0 && (
@@ -111,31 +113,33 @@ export function MessagingConfigBanner({
       </div>
 
       {unsentCount > 0 && (
-        <Card
+        <div
           role="alert"
-          className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800"
+          className="prox-panel"
+          style={{ padding: '14px 16px', borderColor: 'var(--prox-warn)' }}
         >
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
             <div className="space-y-1 min-w-0">
-              <p className="font-medium text-sm text-amber-900 dark:text-amber-200">
+              <p className="font-medium text-sm" style={{ color: 'var(--prox-ink)' }}>
                 {t('proximate.messaging.unsent_warning_title', { count: unsentCount })}
               </p>
-              <p className="text-xs text-amber-900/90 dark:text-amber-200/90">
+              <p className="text-xs" style={{ color: 'var(--prox-ink-2)' }}>
                 {t('proximate.messaging.unsent_warning_body')}
               </p>
               {onShowOutbound && (
                 <button
                   type="button"
                   onClick={onShowOutbound}
-                  className="text-xs font-medium underline text-amber-900 dark:text-amber-200 hover:no-underline"
+                  className="text-xs font-medium underline hover:no-underline"
+                  style={{ color: 'var(--prox-warn)' }}
                 >
                   {t('proximate.messaging.tab_outbound')}
                 </button>
               )}
             </div>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

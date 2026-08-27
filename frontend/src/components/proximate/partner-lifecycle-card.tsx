@@ -18,9 +18,13 @@ import {
   Loader2, Lock, Check, ChevronRight, Pencil, X,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
+
+const PROX_DISPLAY = {
+  fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif',
+  fontWeight: 700,
+} as const;
 
 interface Field {
   key: string; label: string; value: string | null; filled: boolean;
@@ -80,9 +84,9 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm" style={{ padding: '20px', color: 'var(--prox-muted)' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_record') || 'Loading partner record…'}
-      </Card>
+      </div>
     );
   }
 
@@ -91,8 +95,14 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
       {stages.map((s, i) => {
         const open = openKey === s.key;
         const editing = editKey === s.key;
+        const complete = s.field_count > 0 && s.filled_count === s.field_count;
+        const badgeStyle = s.locked
+          ? { background: 'var(--prox-inset)', color: 'var(--prox-muted)' }
+          : complete
+            ? { background: 'var(--prox-good-tint)', color: 'var(--prox-good)' }
+            : { background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)' };
         return (
-          <Card key={s.key} className={s.locked ? 'p-4 opacity-70' : 'p-4'}>
+          <div key={s.key} className="prox-panel" style={{ padding: '16px', opacity: s.locked ? 0.7 : undefined }}>
             <button
               type="button"
               onClick={() => setOpenKey(open ? null : s.key)}
@@ -100,39 +110,36 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
-                  <span className={`mt-0.5 w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs ${
-                    s.locked
-                      ? 'bg-muted text-muted-foreground'
-                      : s.field_count > 0 && s.filled_count === s.field_count
-                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
-                        : 'bg-[hsl(var(--kuja-clay))]/15 text-foreground'
-                  }`}>
+                  <span
+                    className="mt-0.5 w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs"
+                    style={badgeStyle}
+                  >
                     {s.locked ? <Lock className="w-3 h-3" />
-                      : s.field_count > 0 && s.filled_count === s.field_count
+                      : complete
                         ? <Check className="w-3.5 h-3.5" /> : i + 1}
                   </span>
                   <div className="min-w-0">
-                    <p className="font-medium">{s.label}</p>
-                    <p className="text-xs text-muted-foreground">{s.blurb}</p>
+                    <p style={{ ...PROX_DISPLAY, color: 'var(--prox-ink)' }}>{s.label}</p>
+                    <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>{s.blurb}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {s.field_count > 0 && (
-                    <span className="text-xs text-muted-foreground tabular-nums">
+                    <span className="text-xs prox-num" style={{ color: 'var(--prox-muted)' }}>
                       {s.filled_count}/{s.field_count}
                     </span>
                   )}
-                  <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${
+                  <ChevronRight className={`w-4 h-4 transition-transform ${
                     open ? 'rotate-90' : ''
-                  }`} />
+                  }`} style={{ color: 'var(--prox-muted)' }} />
                 </div>
               </div>
             </button>
 
             {open && (
-              <div className="mt-4 pt-4 border-t border-border space-y-3">
+              <div className="mt-4 pt-4 space-y-3" style={{ borderTop: '1px solid var(--prox-line)' }}>
                 {s.locked && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                     {t('proximate.cycle.stage_locked')
                       || 'Not this partner’s turn yet. The fields are listed so you can see what is coming.'}
                   </p>
@@ -143,8 +150,8 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                     <dl className="grid sm:grid-cols-2 gap-3">
                       {s.fields.map((f) => (
                         <div key={f.key}>
-                          <dt className="text-xs text-muted-foreground">{f.label}</dt>
-                          <dd className={`text-sm ${f.filled ? '' : 'text-muted-foreground'}`}>
+                          <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>{f.label}</dt>
+                          <dd className="text-sm" style={f.filled ? undefined : { color: 'var(--prox-muted)' }}>
                             {f.value || (t('proximate.cycle.not_recorded') || 'Not recorded')}
                           </dd>
                         </div>
@@ -170,11 +177,12 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                     <div className="grid sm:grid-cols-2 gap-3">
                       {s.fields.map((f) => (
                         <label key={f.key} className="block text-sm">
-                          <span className="text-xs text-muted-foreground">{f.label}</span>
+                          <span className="text-xs" style={{ color: 'var(--prox-muted)' }}>{f.label}</span>
                           <input
                             value={draft[f.key] ?? ''}
                             onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-                            className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+                            className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+                            style={{ border: '1px solid var(--prox-line-2)', background: 'var(--prox-surface)' }}
                           />
                         </label>
                       ))}
@@ -195,7 +203,7 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                 {s.derived && <Derived stageKey={s.key} d={s.derived} />}
               </div>
             )}
-          </Card>
+          </div>
         );
       })}
     </div>
@@ -230,10 +238,10 @@ function Derived({ stageKey, d }: { stageKey: string; d: Record<string, unknown>
   }
   if (!rows.length) return null;
   return (
-    <dl className="grid sm:grid-cols-2 gap-3 pt-3 border-t border-border">
+    <dl className="grid sm:grid-cols-2 gap-3 pt-3" style={{ borderTop: '1px solid var(--prox-line)' }}>
       {rows.map(([k, v]) => (
         <div key={k}>
-          <dt className="text-xs text-muted-foreground">{k}</dt>
+          <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>{k}</dt>
           <dd className="text-sm">{v}</dd>
         </div>
       ))}

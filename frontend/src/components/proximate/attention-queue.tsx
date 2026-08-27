@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
 
 export interface AttentionItem {
   kind: string;
@@ -70,11 +69,11 @@ interface QueueResp {
   counts: Record<string, number>;
 }
 
-const SEV_STYLE: Record<string, { dot: string; label: string; text: string }> = {
-  critical: { dot: 'bg-red-500', label: 'Critical', text: 'text-red-700 dark:text-red-400' },
-  high: { dot: 'bg-amber-500', label: 'High', text: 'text-amber-700 dark:text-amber-400' },
-  medium: { dot: 'bg-blue-500', label: 'Medium', text: 'text-blue-700 dark:text-blue-400' },
-  low: { dot: 'bg-muted-foreground/50', label: 'Low', text: 'text-muted-foreground' },
+const SEV_STYLE: Record<string, { color: string; label: string }> = {
+  critical: { color: 'var(--prox-danger)', label: 'Critical' },
+  high: { color: 'var(--prox-warn)', label: 'High' },
+  medium: { color: 'var(--prox-slate)', label: 'Medium' },
+  low: { color: 'var(--prox-muted)', label: 'Low' },
 };
 
 export function AttentionQueue({ limit }: { limit?: number }) {
@@ -110,9 +109,12 @@ export function AttentionQueue({ limit }: { limit?: number }) {
   };
 
   return (
-    <Card className={`p-4 ${critical > 0 ? 'border-red-400/60' : ''}`}>
+    <div
+      className="prox-panel"
+      style={{ padding: '16px 18px', ...(critical > 0 ? { borderColor: 'var(--prox-danger)' } : {}) }}
+    >
       <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className={`w-4 h-4 ${critical > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />
+        <AlertTriangle className="w-4 h-4" style={{ color: critical > 0 ? 'var(--prox-danger)' : 'var(--prox-muted)' }} />
         <p className="text-sm font-semibold">
           {t('proximate.attention.title') || 'Needs your attention'}
         </p>
@@ -130,9 +132,10 @@ export function AttentionQueue({ limit }: { limit?: number }) {
           {sevOrder.filter((s) => (counts[s] ?? 0) > 0).map((s) => (
             <span
               key={s}
-              className={`inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-muted/60 ${SEV_STYLE[s].text}`}
+              className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-muted/60"
+              style={{ color: SEV_STYLE[s].color }}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${SEV_STYLE[s].dot}`} />
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: SEV_STYLE[s].color }} />
               {counts[s]} {sevChipLabel(s)}
             </span>
           ))}
@@ -141,7 +144,7 @@ export function AttentionQueue({ limit }: { limit?: number }) {
 
       {data.items.length === 0 ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--prox-good)' }} />
           {t('proximate.attention.all_clear')
             || 'All clear — nothing needs an action right now.'}
         </div>
@@ -161,14 +164,14 @@ export function AttentionQueue({ limit }: { limit?: number }) {
                   href={it.href}
                   className="flex items-start gap-3 py-2.5 group hover:bg-muted/30 -mx-2 px-2 rounded-md transition-colors"
                 >
-                  <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${sev.dot}`} />
+                  <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ background: sev.color }} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium leading-snug">{title}</p>
                     {subtitle && (
                       <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
                     )}
                   </div>
-                  <span className={`text-[10px] uppercase font-semibold tracking-wide shrink-0 mt-1 ${sev.text}`}>
+                  <span className="text-[10px] uppercase font-semibold tracking-wide shrink-0 mt-1" style={{ color: sev.color }}>
                     {sevLabel}
                   </span>
                   <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-1 group-hover:translate-x-0.5 transition-transform" />
@@ -183,7 +186,8 @@ export function AttentionQueue({ limit }: { limit?: number }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+          style={{ color: 'var(--prox-accent)' }}
         >
           {expanded
             ? (t('proximate.attention.show_fewer') === 'proximate.attention.show_fewer'
@@ -193,6 +197,6 @@ export function AttentionQueue({ limit }: { limit?: number }) {
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
       )}
-    </Card>
+    </div>
   );
 }

@@ -15,7 +15,6 @@ import { Loader2, ArrowLeft, Printer } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 interface ReportPayload {
@@ -121,8 +120,8 @@ export function ProximateRoundReportClient() {
   if (error || !data) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
-        <Card className="p-6 text-center">
-          <p className="text-sm text-red-600">{error || t('proximate.round_report.load_failed')}</p>
+        <div className="prox-panel text-center" style={{ padding: '24px' }}>
+          <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error || t('proximate.round_report.load_failed')}</p>
           {id && (
             <Link href={`/proximate/rounds/${id}`}>
               <Button variant="outline" size="sm" className="mt-3">
@@ -131,7 +130,7 @@ export function ProximateRoundReportClient() {
               </Button>
             </Link>
           )}
-        </Card>
+        </div>
       </div>
     );
   }
@@ -178,19 +177,19 @@ export function ProximateRoundReportClient() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-xs text-muted-foreground">{t('proximate.round_report.envelope_total')}</div>
-            <div className="font-semibold">{fmt(data.envelope.total_usd)}</div>
+            <div className="font-semibold prox-mono">{fmt(data.envelope.total_usd)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">{t('proximate.round_report.envelope_used')}</div>
-            <div className="font-semibold">{fmt(data.envelope.used_usd)}</div>
+            <div className="font-semibold prox-mono">{fmt(data.envelope.used_usd)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">{t('proximate.round_report.envelope_remaining')}</div>
-            <div className="font-semibold">{fmt(data.envelope.remaining_usd)}</div>
+            <div className="font-semibold prox-mono">{fmt(data.envelope.remaining_usd)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">{t('proximate.round_report.partners_served')}</div>
-            <div className="font-semibold">{data.envelope.partners_served}</div>
+            <div className="font-semibold prox-num">{data.envelope.partners_served}</div>
           </div>
         </div>
       </section>
@@ -204,7 +203,7 @@ export function ProximateRoundReportClient() {
               <div className="text-xs text-muted-foreground uppercase tracking-wide">
                 {labelForProximateStatus(s, t)}
               </div>
-              <div className="font-semibold mt-1">
+              <div className="font-semibold mt-1 prox-mono">
                 {data.status_counts[s] || 0} · {fmt(data.status_totals_usd[`${s.replace('_report', '')}_usd`] || 0)}
               </div>
             </div>
@@ -240,7 +239,7 @@ export function ProximateRoundReportClient() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold">{fmt(d.amount_usd)}</div>
+                    <div className="font-semibold prox-mono">{fmt(d.amount_usd)}</div>
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">{labelForProximateStatus(d.status, t)}</div>
                   </div>
                 </div>

@@ -14,7 +14,6 @@
 // ============================================================================
 
 import { BarChart3 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { EmptyState } from './empty-state';
 import {
@@ -57,9 +56,12 @@ export function MessagingStats({
   );
 
   return (
-    <Card className="p-4 space-y-4">
+    <div className="prox-panel space-y-4" style={{ padding: '14px 16px' }}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold">
+        <h2
+          className="text-sm"
+          style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
+        >
           {t('proximate.messaging.stats_title')}
         </h2>
         <span className="text-xs text-muted-foreground">
@@ -132,16 +134,14 @@ export function MessagingStats({
                     {pct(s.response_rate)}
                   </td>
                   <td
-                    className={`py-2 px-2 text-end tabular-nums ${
-                      s.unsent > 0 ? 'text-red-600 dark:text-red-400 font-medium' : ''
-                    }`}
+                    className="py-2 px-2 text-end tabular-nums"
+                    style={s.unsent > 0 ? { color: 'var(--prox-danger)', fontWeight: 500 } : undefined}
                   >
                     {s.unsent}
                   </td>
                   <td
-                    className={`py-2 px-2 text-end tabular-nums ${
-                      s.failed > 0 ? 'text-red-600 dark:text-red-400 font-medium' : ''
-                    }`}
+                    className="py-2 px-2 text-end tabular-nums"
+                    style={s.failed > 0 ? { color: 'var(--prox-danger)', fontWeight: 500 } : undefined}
                   >
                     {s.failed}
                   </td>
@@ -166,16 +166,14 @@ export function MessagingStats({
                   {pct(totals.sent ? totals.responded / totals.sent : null)}
                 </td>
                 <td
-                  className={`py-2 px-2 text-end tabular-nums ${
-                    totals.unsent > 0 ? 'text-red-600 dark:text-red-400' : ''
-                  }`}
+                  className="py-2 px-2 text-end tabular-nums"
+                  style={totals.unsent > 0 ? { color: 'var(--prox-danger)' } : undefined}
                 >
                   {totals.unsent}
                 </td>
                 <td
-                  className={`py-2 px-2 text-end tabular-nums ${
-                    totals.failed > 0 ? 'text-red-600 dark:text-red-400' : ''
-                  }`}
+                  className="py-2 px-2 text-end tabular-nums"
+                  style={totals.failed > 0 ? { color: 'var(--prox-danger)' } : undefined}
                 >
                   {totals.failed}
                 </td>
@@ -187,6 +185,6 @@ export function MessagingStats({
           </table>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

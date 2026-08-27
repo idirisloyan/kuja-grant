@@ -19,9 +19,7 @@ import { useEffect, useState } from 'react';
 import { AlertOctagon, Clock, X, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 interface Intervention {
   id: number;
@@ -144,10 +142,10 @@ export function InterventionPanel({
   if (!loading && openInterventions.length === 0 && !canOpen) return null;
 
   return (
-    <Card className="p-4 border-amber-300 bg-amber-50/40 dark:bg-amber-950/20">
+    <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-warn)' }}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-start gap-2">
-          <AlertOctagon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <AlertOctagon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
           <div>
             <h2 className="text-sm font-medium">{t('proximate.intervention.title')}</h2>
             <p className="text-xs text-muted-foreground">
@@ -176,13 +174,13 @@ export function InterventionPanel({
       </div>
 
       {message && (
-        <p className="text-xs mb-3 text-foreground bg-background border border-border rounded p-2">
+        <p className="text-xs mb-3 border rounded p-2" style={{ color: 'var(--prox-ink)', background: 'var(--prox-surface)', borderColor: 'var(--prox-line)' }}>
           {message}
         </p>
       )}
 
       {openForm && canOpen && (
-        <div className="mb-4 space-y-2 p-3 bg-background border border-border rounded">
+        <div className="mb-4 space-y-2 p-3 border rounded" style={{ background: 'var(--prox-surface-2)', borderColor: 'var(--prox-line)' }}>
           <div>
             <label htmlFor="intervention-kind" className="text-xs font-medium block mb-1">
               {t('proximate.intervention.kind_label')}
@@ -191,7 +189,8 @@ export function InterventionPanel({
               id="intervention-kind"
               value={kind}
               onChange={(e) => setKind(e.target.value as 'warning' | 'freeze' | 'suspend')}
-              className="w-full text-sm rounded border border-border bg-background p-2"
+              className="w-full text-sm rounded border p-2"
+              style={{ borderColor: 'var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
             >
               <option value="warning">{t('proximate.intervention.kind.warning')}</option>
               <option value="freeze">{t('proximate.intervention.kind.freeze')}</option>
@@ -208,7 +207,8 @@ export function InterventionPanel({
               onChange={(e) => setReason(e.target.value)}
               placeholder={t('proximate.intervention.reason_placeholder')}
               rows={3}
-              className="w-full text-sm rounded border border-border bg-background p-2"
+              className="w-full text-sm rounded border p-2"
+              style={{ borderColor: 'var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
             />
           </div>
           <div className="flex gap-2">
@@ -242,22 +242,20 @@ export function InterventionPanel({
             return (
               <li
                 key={iv.id}
-                className={
-                  'border rounded p-3 '
-                  + (isEscalated
-                    ? 'border-destructive bg-destructive/5'
-                    : 'border-border bg-background')
-                }
+                className="border rounded p-3"
+                style={isEscalated
+                  ? { borderColor: 'var(--prox-danger)', background: 'var(--prox-danger-tint)' }
+                  : { borderColor: 'var(--prox-line)', background: 'var(--prox-surface-2)' }}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={isEscalated ? 'destructive' : 'outline'} className="text-[10px]">
+                    <span className={`prox-pill ${isEscalated ? 'danger' : 'slate'}`}>
                       {t(`proximate.intervention.kind.${iv.kind}`)}
-                    </Badge>
+                    </span>
                     {isEscalated && (
-                      <Badge variant="destructive" className="text-[10px]">
+                      <span className="prox-pill danger">
                         {t('proximate.intervention.escalated')}
-                      </Badge>
+                      </span>
                     )}
                     <span className="text-[10px] text-muted-foreground">
                       {iv.sop_clause}
@@ -291,6 +289,6 @@ export function InterventionPanel({
           })}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

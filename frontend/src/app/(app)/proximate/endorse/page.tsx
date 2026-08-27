@@ -16,11 +16,15 @@ import Link from 'next/link';
 import { Users, Loader2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Round lifecycle / partner readiness → design-system pill tone.
+const PROX_DISPLAY = {
+  fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif',
+  fontWeight: 700,
+} as const;
 
 interface TrustFloor {
   endorsements_independent_count: number;
@@ -97,16 +101,17 @@ export default function ProximateInboxPage() {
         )}
 
         {!loading && visible.length === 0 && (
-          <Card className="p-6 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">{t('proximate.inbox.empty')}</p>
+          <div className="prox-panel text-center space-y-3" style={{ padding: '24px' }}>
+            <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>{t('proximate.inbox.empty')}</p>
             <Link
               href="/proximate/endorse/register"
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs hover:underline"
+              style={{ color: 'var(--prox-accent)', fontWeight: 600 }}
             >
               <UserPlus className="w-3.5 h-3.5" />
               {t('proximate.inbox.become_endorser')}
             </Link>
-          </Card>
+          </div>
         )}
 
         {!loading && visible.length > 0 && (
@@ -121,40 +126,37 @@ export default function ProximateInboxPage() {
                     href={`/proximate/endorse/${p.id}`}
                     className="block"
                   >
-                    <Card className="p-4 hover:bg-muted/30 transition-colors">
+                    <div className="prox-panel transition-colors" style={{ padding: '16px' }}>
                       <div className="flex items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium truncate">{displayName}</h3>
+                            <h3 className="truncate" style={{ ...PROX_DISPLAY, color: 'var(--prox-ink)' }}>{displayName}</h3>
                             {isReady && (
-                              <Badge variant="default" className="text-[10px]">
+                              <span className="prox-pill good">
                                 {t('proximate.status.dd_clear')}
-                              </Badge>
+                              </span>
                             )}
                             {p.source === 'self' && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] bg-violet-100 text-violet-800 border-violet-300"
-                              >
+                              <span className="prox-pill acc">
                                 {t('proximate.inbox.self_nominated')}
-                              </Badge>
+                              </span>
                             )}
                           </div>
                           {p.locality && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--prox-muted)' }}>
                               {p.locality}
                             </p>
                           )}
-                          <p className="text-xs mt-2 tabular-nums">
+                          <p className="text-xs mt-2 prox-num">
                             {t('proximate.inbox.progress', {
                               n: floor.endorsements_independent_count,
                               total: floor.endorsements_required,
                             })}
                           </p>
                         </div>
-                        <Chevron className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                        <Chevron className="w-4 h-4 flex-shrink-0 mt-1" style={{ color: 'var(--prox-muted)' }} />
                       </div>
-                    </Card>
+                    </div>
                   </Link>
                 </li>
               );

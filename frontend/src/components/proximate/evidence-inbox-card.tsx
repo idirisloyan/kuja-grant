@@ -18,9 +18,7 @@ import {
   Phone, Mail, MapPin, FileText, History,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 const SOURCES = [
@@ -73,18 +71,21 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm text-muted-foreground" style={{ padding: '16px 18px' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading') || 'Loading…'}
-      </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '16px 18px' }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold flex items-center gap-2">
+            <h3
+              className="flex items-center gap-2"
+              style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
+            >
               <Inbox className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.evidence_title') || 'Evidence'}
             </h3>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -106,19 +107,23 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
             <Stat label={t('proximate.cycle.for_the_panel') || 'For the panel'} v={summary.needs_panel} />
           </div>
         )}
-      </Card>
+      </div>
 
       {items.length === 0 && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
+        <div className="prox-panel text-center text-sm text-muted-foreground" style={{ padding: '22px 18px' }}>
           {t('proximate.cycle.evidence_empty')
             || 'Nothing logged yet. When a partner sends a photo or calls, record it here — that is what the record is made of.'}
-        </Card>
+        </div>
       )}
 
       {items.map((e) => {
         const Src = SOURCES.find((s) => s.key === e.source)?.icon || FileText;
         return (
-          <Card key={e.id} className={`p-4 ${e.is_open_issue ? 'border-amber-300' : ''}`}>
+          <div
+            key={e.id}
+            className="prox-panel"
+            style={{ padding: '14px 16px', ...(e.is_open_issue ? { borderColor: 'var(--prox-warn)' } : {}) }}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 min-w-0">
                 <Src className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -140,10 +145,10 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {e.needs_panel && <Badge variant="outline">panel</Badge>}
+                {e.needs_panel && <span className="prox-pill slate">panel</span>}
                 {e.is_open_issue && (
                   <>
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <AlertTriangle className="w-4 h-4" style={{ color: 'var(--prox-warn)' }} />
                     {canEdit && (
                       <Button size="sm" variant="outline" className="h-7 text-xs"
                               onClick={() => resolve(e.id)}>
@@ -152,10 +157,10 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
                     )}
                   </>
                 )}
-                {e.resolved_at && <Check className="w-4 h-4 text-emerald-600" />}
+                {e.resolved_at && <Check className="w-4 h-4" style={{ color: 'var(--prox-good)' }} />}
               </div>
             </div>
-          </Card>
+          </div>
         );
       })}
 
@@ -174,7 +179,7 @@ function Stat({ label, v, bad }: { label: string; v: number; bad?: boolean }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`font-semibold tabular-nums ${bad ? 'text-amber-700 dark:text-amber-400' : ''}`}>
+      <p className="font-semibold tabular-nums" style={bad ? { color: 'var(--prox-warn)' } : undefined}>
         {v}
       </p>
     </div>
@@ -251,9 +256,9 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+      <div className="prox-panel w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto" style={{ padding: '16px 18px' }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">{t('proximate.cycle.log_title') || 'Log something that arrived'}</h3>
+          <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{t('proximate.cycle.log_title') || 'Log something that arrived'}</h3>
           <button type="button" onClick={onClose} aria-label="Close">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -267,9 +272,12 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
                 key={s.key} type="button" onClick={() => setSource(s.key)}
                 className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
                   source === s.key
-                    ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))]/10'
+                    ? ''
                     : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
+                style={source === s.key
+                  ? { borderColor: 'var(--prox-accent)', background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)' }
+                  : undefined}
               >
                 {t(s.k) || s.label}
               </button>
@@ -334,7 +342,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
           ))}
         </div>
 
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</Button>
           <Button size="sm" onClick={submit} disabled={busy || !summary.trim()}>
@@ -344,7 +352,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
               : (t('proximate.cycle.log_it') || 'Log it')}
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -420,14 +428,14 @@ function TimelineRow(
   const translated = t(key);
   const label = translated === key
     ? (EVENT_LABELS[ev.type] || ev.type) : translated;
-  const dotClass = ev.is_issue
-    ? 'bg-red-500'
+  const dotColor = ev.is_issue
+    ? 'var(--prox-danger)'
     : ev.type === 'awarded' || ev.type === 'dd_cleared'
         || ev.type === 'receipt_confirmed'
-      ? 'bg-emerald-500'
+      ? 'var(--prox-good)'
       : ev.type === 'closeout'
-        ? 'bg-primary'
-        : 'bg-muted-foreground/50';
+        ? 'var(--prox-accent)'
+        : 'var(--prox-muted)';
   const money =
     ev.type === 'awarded'
       ? [
@@ -446,7 +454,7 @@ function TimelineRow(
   return (
     <li className="flex gap-2.5">
       <span className="relative flex flex-col items-center">
-        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
         {!last && <span className="flex-1 w-px bg-border" aria-hidden />}
       </span>
       <div className="pb-3 min-w-0">
@@ -456,19 +464,19 @@ function TimelineRow(
           {ev.actor && <span>· {ev.actor}</span>}
           {money && <span className="tabular-nums">· {money}</span>}
           {ev.on_time === true && (
-            <span className="text-emerald-600 dark:text-emerald-400">
+            <span style={{ color: 'var(--prox-good)' }}>
               · {t('proximate.history.on_time') === 'proximate.history.on_time'
                   ? 'On time' : t('proximate.history.on_time')}
             </span>
           )}
           {ev.on_time === false && (
-            <span className="text-amber-600 dark:text-amber-400">
+            <span style={{ color: 'var(--prox-warn)' }}>
               · {t('proximate.history.late') === 'proximate.history.late'
                   ? 'Late' : t('proximate.history.late')}
             </span>
           )}
           {ev.is_issue && (
-            <span className="text-red-600 dark:text-red-400">
+            <span style={{ color: 'var(--prox-danger)' }}>
               · {t('proximate.history.issue') === 'proximate.history.issue'
                   ? 'Issue' : t('proximate.history.issue')}
             </span>
@@ -507,9 +515,9 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm text-muted-foreground" style={{ padding: '16px 18px' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_history') || 'Loading history…'}
-      </Card>
+      </div>
     );
   }
   if (!data) return null;
@@ -543,8 +551,11 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
   ];
 
   return (
-    <Card className="p-5 space-y-4">
-      <h3 className="font-semibold flex items-center gap-2">
+    <div className="prox-panel space-y-4" style={{ padding: '16px 18px' }}>
+      <h3
+        className="flex items-center gap-2"
+        style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
+      >
         <History className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.history_title') || 'History with the fund'}
       </h3>
 
@@ -567,7 +578,7 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
           {histRounds.map((rd) => (
             <div key={rd.round_id}>
               <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                <p className="text-sm font-semibold">
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
                   {rd.round_title || `#${rd.round_id}`}
                   {rd.region && (
                     <span className="text-xs text-muted-foreground font-normal"> · {rd.region}</span>
@@ -642,6 +653,6 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
       <p className="text-xs text-muted-foreground border-t border-border pt-3">
         {data.note}
       </p>
-    </Card>
+    </div>
   );
 }

@@ -38,13 +38,13 @@ export interface NextStepInfo {
 export function NextStep({ info }: { info: NextStepInfo | null }) {
   if (!info) return null;
   const tone = info.tone || 'action';
-  const styles = {
-    action: 'border-emerald-400/50 bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300',
-    waiting: 'border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300',
-    done: 'border-border bg-muted/40 text-muted-foreground',
+  const toneStyle = {
+    action: { borderColor: 'var(--prox-good)', background: 'var(--prox-good-tint)', color: 'var(--prox-good)' },
+    waiting: { borderColor: 'var(--prox-warn)', background: 'var(--prox-warn-tint)', color: 'var(--prox-warn)' },
+    done: { borderColor: 'var(--prox-line)', background: 'var(--prox-inset)', color: 'var(--prox-muted)' },
   }[tone];
   return (
-    <div className={`rounded-lg border px-3 py-2.5 flex items-center gap-2.5 text-sm ${styles}`}>
+    <div className="rounded-lg border px-3 py-2.5 flex items-center gap-2.5 text-sm" style={toneStyle}>
       {tone === 'done'
         ? <CheckCircle2 className="w-4 h-4 shrink-0" />
         : <ArrowRight className="w-4 h-4 shrink-0" />}
@@ -170,18 +170,18 @@ export function RoundTaskBoard({ round, disbursements }: {
           <div key={s.key} className="flex items-center shrink-0" role="listitem">
             <div className="flex flex-col items-center gap-1 min-w-[64px]">
               {done ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--prox-good)' }} />
               ) : current ? (
-                <Circle className="w-5 h-5 text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
+                <Circle className="w-5 h-5" style={{ color: 'var(--prox-good)', fill: 'var(--prox-good-tint)' }} />
               ) : (
-                <Dot className="w-5 h-5 text-muted-foreground/40" />
+                <Dot className="w-5 h-5" style={{ color: 'var(--prox-line-2)' }} />
               )}
-              <span className={`text-[11px] ${current ? 'font-semibold text-foreground' : done ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
+              <span className="text-[11px]" style={{ color: current ? 'var(--prox-ink)' : 'var(--prox-muted)', fontWeight: current ? 600 : undefined }}>
                 {s.label}
               </span>
             </div>
             {i < ROUND_STEPS.length - 1 && (
-              <div className={`h-0.5 w-5 sm:w-8 ${i < active ? 'bg-emerald-400' : 'bg-border'}`} />
+              <div className="h-0.5 w-5 sm:w-8" style={{ background: i < active ? 'var(--prox-good)' : 'var(--prox-line)' }} />
             )}
           </div>
         );
@@ -230,18 +230,18 @@ export function PartnerJourney({ status, funded, reported, verified }: {
           <div key={s.key} className="flex items-center shrink-0" role="listitem">
             <div className="flex flex-col items-center gap-1 min-w-[64px]">
               {done ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--prox-good)' }} />
               ) : current ? (
-                <Circle className="w-5 h-5 text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
+                <Circle className="w-5 h-5" style={{ color: 'var(--prox-good)', fill: 'var(--prox-good-tint)' }} />
               ) : (
-                <Dot className="w-5 h-5 text-muted-foreground/40" />
+                <Dot className="w-5 h-5" style={{ color: 'var(--prox-line-2)' }} />
               )}
-              <span className={`text-[11px] ${current ? 'font-semibold text-foreground' : done ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
+              <span className="text-[11px]" style={{ color: current ? 'var(--prox-ink)' : 'var(--prox-muted)', fontWeight: current ? 600 : undefined }}>
                 {tx(`proximate.journey.${s.key}`, s.label)}
               </span>
             </div>
             {i < PARTNER_STEPS.length - 1 && (
-              <div className={`h-0.5 w-5 sm:w-8 ${i < active ? 'bg-emerald-400' : 'bg-border'}`} />
+              <div className="h-0.5 w-5 sm:w-8" style={{ background: i < active ? 'var(--prox-good)' : 'var(--prox-line)' }} />
             )}
           </div>
         );
@@ -280,9 +280,7 @@ export function WhyBlocked({ blockers = [], warnings = [] }: {
   const tx = useTx();
   if (blockers.length === 0 && warnings.length === 0) return null;
   const Row = ({ b, tone }: { b: Blocker; tone: 'block' | 'warn' }) => {
-    const styles = tone === 'block'
-      ? 'text-red-700 dark:text-red-400'
-      : 'text-amber-700 dark:text-amber-400';
+    const iconColor = tone === 'block' ? 'var(--prox-danger)' : 'var(--prox-warn)';
     const ctaLabel = b.cta_code
       ? tx(`proximate.why.cta.${b.cta_code}`, 'Fix it')
       : tx('proximate.why.cta.fix', 'Fix it');
@@ -300,8 +298,8 @@ export function WhyBlocked({ blockers = [], warnings = [] }: {
     return (
       <li className="flex items-start gap-2 text-sm">
         {tone === 'block'
-          ? <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />
-          : <Info className={`w-4 h-4 shrink-0 mt-0.5 ${styles}`} />}
+          ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: iconColor }} />
+          : <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: iconColor }} />}
         <span className="flex-1">
           {tx(`proximate.why.msg.${b.code}`, b.message, params)}
           {b.href && (
@@ -318,11 +316,10 @@ export function WhyBlocked({ blockers = [], warnings = [] }: {
   };
   const hard = blockers.length > 0;
   return (
-    <div className={`rounded-lg border px-3 py-2.5 ${hard
-      ? 'border-red-400/50 bg-red-50/60 dark:bg-red-950/20'
-      : 'border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20'}`}>
-      <p className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${hard
-        ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+    <div className="rounded-lg border px-3 py-2.5" style={hard
+      ? { borderColor: 'var(--prox-danger)', background: 'var(--prox-danger-tint)' }
+      : { borderColor: 'var(--prox-warn)', background: 'var(--prox-warn-tint)' }}>
+      <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: hard ? 'var(--prox-danger)' : 'var(--prox-warn)' }}>
         {hard ? tx('proximate.why.title.blocked', "Can't proceed yet")
               : tx('proximate.why.title.warn', 'Before you continue')}
       </p>

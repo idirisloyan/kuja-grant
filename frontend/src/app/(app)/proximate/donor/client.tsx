@@ -16,11 +16,8 @@
 import { useEffect, useState } from 'react';
 import { Loader2, ExternalLink, FileText, AlertTriangle, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES } from '@/components/proximate/status-badge';
 import { computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
 import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
 import { DonorExplainer } from '@/components/proximate/donor-explainer';
@@ -163,14 +160,14 @@ export function ProximateDonorClient() {
   if (error === 'NOT_A_DONOR') {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
-        <Card className="p-6 space-y-3">
+        <div className="prox-panel space-y-3" style={{ padding: '24px' }}>
           <h1 className="text-2xl kuja-display">
             {t('proximate.donor.no_access_title')}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.donor.no_access_body')}
           </p>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -178,9 +175,9 @@ export function ProximateDonorClient() {
   if (error || !data) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
-        <Card className="p-6">
-          <p className="text-sm text-red-600">{error || t('proximate.donor.load_failed')}</p>
-        </Card>
+        <div className="prox-panel" style={{ padding: '24px' }}>
+          <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error || t('proximate.donor.load_failed')}</p>
+        </div>
       </div>
     );
   }
@@ -320,17 +317,17 @@ export function ProximateDonorClient() {
       <DonorGrants grants={grants} />
 
       {portfolio.flagged_count > 0 && (
-        <Card className="p-4 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+        <div className="prox-panel flex items-start gap-3" style={{ padding: '16px 18px', borderColor: 'var(--prox-danger)', background: 'var(--prox-danger-tint)' }}>
+          <AlertTriangle className="w-5 h-5 mt-0.5" style={{ color: 'var(--prox-danger)' }} />
           <div>
             <h3 className="text-sm font-medium">
               {t('proximate.donor.flagged_warning_title')}
             </h3>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {portfolio.flagged_count} {t('proximate.donor.flagged_warning_body')}
             </p>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Partner implementation reports — published by the OB. */}
@@ -340,9 +337,9 @@ export function ProximateDonorClient() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">{t('proximate.donor.rounds_title')}</h2>
         {rounds.length === 0 ? (
-          <Card className="p-6 text-center text-sm text-muted-foreground">
+          <div className="prox-panel text-center text-sm" style={{ padding: '24px', color: 'var(--prox-muted)' }}>
             {t('proximate.donor.no_rounds')}
-          </Card>
+          </div>
         ) : (
           rounds.map((r) => (
             <div key={r.id} className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
@@ -478,9 +475,9 @@ function AssuranceControlsStrip() {
   const { t } = useTranslation();
   const controls = ['audit_anchor', 'verifier_attestation', 'outcome_check'] as const;
   return (
-    <Card className="p-4">
-      <h2 className="text-sm font-medium flex items-center gap-2 mb-2.5">
-        <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
+      <h2 className="kuja-display flex items-center gap-2 mb-2.5" style={{ fontSize: 15, fontWeight: 700 }}>
+        <ShieldCheck className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
         {t('proximate.donor.controls_title')}
       </h2>
       <ul className="grid gap-2 sm:grid-cols-3">
@@ -490,13 +487,13 @@ function AssuranceControlsStrip() {
               {t(`proximate.donor.explain.${c}.title`)}
               <DonorExplainer term={c} />
             </span>
-            <p className="text-muted-foreground mt-0.5">
+            <p className="mt-0.5" style={{ color: 'var(--prox-muted)' }}>
               {t(`proximate.donor.explain.${c}.short`)}
             </p>
           </li>
         ))}
       </ul>
-    </Card>
+    </div>
   );
 }
 
@@ -515,38 +512,42 @@ function DonorGrants({ grants }: { grants: DonorGrant[] | null }) {
     <section className="space-y-3">
       <h2 className="text-lg font-medium">{t('proximate.donor.grants_title')}</h2>
       {grants.map((g) => (
-        <Card key={g.id} className="p-4 space-y-3">
+        <div key={g.id} className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
-              <h3 className="text-base font-medium">{g.title}</h3>
-              <p className="text-xs text-muted-foreground">
-                {g.donor_grant_ref && <span>{g.donor_grant_ref} · </span>}
-                {labelForProximateStatus(g.status, t)}
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="kuja-display" style={{ fontSize: 16, fontWeight: 700 }}>{g.title}</h3>
+                <span className={`prox-pill ${statusPill(g.status)}`}>
+                  {labelForProximateStatus(g.status, t)}
+                </span>
+              </div>
+              {g.donor_grant_ref && (
+                <p className="text-xs mt-0.5" style={{ color: 'var(--prox-muted)' }}>{g.donor_grant_ref}</p>
+              )}
             </div>
             <AssurancePackButton scope="grant" id={g.id} showHint />
           </div>
           <dl className="grid gap-3 sm:grid-cols-3">
             <div>
-              <dt className="text-xs text-muted-foreground">
+              <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.donor.funnel.stage.committed')}
               </dt>
-              <dd className="text-sm">{usd(g.amount_committed_usd)}</dd>
+              <dd className="prox-mono text-sm">{usd(g.amount_committed_usd)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">
+              <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.donor.funnel.stage.allocated')}
               </dt>
-              <dd className="text-sm">{usd(g.amount_allocated_usd)}</dd>
+              <dd className="prox-mono text-sm">{usd(g.amount_allocated_usd)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">
+              <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.donor.grant_remaining')}
               </dt>
-              <dd className="text-sm">{usd(g.amount_remaining_usd)}</dd>
+              <dd className="prox-mono text-sm">{usd(g.amount_remaining_usd)}</dd>
             </div>
           </dl>
-        </Card>
+        </div>
       ))}
     </section>
   );
@@ -580,12 +581,12 @@ function AskBox() {
   }
 
   return (
-    <Card className="p-4 space-y-3">
-      <h3 className="text-sm font-medium flex items-center gap-2">
+    <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
+      <h3 className="kuja-display flex items-center gap-2" style={{ fontSize: 15, fontWeight: 700 }}>
         <MessageCircle className="w-4 h-4" />
         {t('proximate.donor.ask_title')}
       </h3>
-      <p className="text-xs text-muted-foreground">{t('proximate.donor.ask_hint')}</p>
+      <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>{t('proximate.donor.ask_hint')}</p>
       <div className="flex gap-2">
         <input
           value={q}
@@ -595,25 +596,31 @@ function AskBox() {
           }}
           placeholder={t('proximate.donor.ask_placeholder')}
           maxLength={1000}
-          className="flex-1 h-10 px-3 text-sm bg-background border border-border rounded-md"
+          className="flex-1 h-10 px-3 text-sm rounded-md"
+          style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line-2)' }}
           disabled={busy}
         />
-        <Button onClick={ask} disabled={busy || !q.trim()} size="sm">
+        <button
+          onClick={ask}
+          disabled={busy || !q.trim()}
+          className="prox-btn primary disabled:opacity-50"
+          style={{ height: 40, padding: '0 14px' }}
+        >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </Button>
+        </button>
       </div>
-      {err && <p className="text-sm text-red-600">{err}</p>}
+      {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
       {a && (
-        <div className="mt-2 p-3 bg-muted/50 rounded-md text-sm whitespace-pre-wrap">
+        <div className="mt-2 p-3 rounded-md text-sm whitespace-pre-wrap" style={{ background: 'var(--prox-inset)' }}>
           {a}
           {meta?.fallback_used && (
-            <p className="text-xs text-amber-700 mt-2">
+            <p className="text-xs mt-2" style={{ color: 'var(--prox-warn)' }}>
               {t('proximate.donor.ask_fallback_note')}
             </p>
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -645,7 +652,7 @@ function DonorPublishedReports() {
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-medium flex items-center gap-2">
-        <FileText className="w-4 h-4 text-muted-foreground" />
+        <FileText className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
         {t('proximate.donor.partner_reports')}
       </h2>
       {/* QA-18 items 9+10 — donor-grade report cards: partner name as
@@ -654,41 +661,42 @@ function DonorPublishedReports() {
           as secondary. */}
       <div className="grid gap-3 sm:grid-cols-2">
         {reports.map((r) => (
-          <Card
+          <div
             key={r.id}
-            className="p-4 space-y-2.5 hover:shadow-md hover:border-[hsl(var(--kuja-clay))]/40 transition cursor-pointer"
+            className="prox-panel space-y-2.5 transition cursor-pointer hover:bg-[color:var(--prox-surface-2)]"
+            style={{ padding: '16px 18px' }}
             onClick={() => { window.location.href = `/proximate/reports/${r.id}`; }}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-semibold truncate">{r.partner_name}</p>
-              <span className={`text-[10px] px-2 py-0.5 rounded border shrink-0 ${TONE_CLASSES.positive}`}>
+              <p className="kuja-display truncate" style={{ fontSize: 14, fontWeight: 700 }}>{r.partner_name}</p>
+              <span className="prox-pill good shrink-0">
                 {labelForProximateStatus('published', t)}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs truncate" style={{ color: 'var(--prox-muted)' }}>
               {r.round_title}
               {r.published_at &&
                 ` · ${new Date(r.published_at).toLocaleDateString()}`}
             </p>
             <div className="flex items-center gap-2 pt-0.5">
-              <Button size="sm" className="h-7 text-xs" onClick={(e) => {
+              <button className="prox-btn primary" style={{ height: 28, fontSize: 12 }} onClick={(e) => {
                 e.stopPropagation();
                 window.location.href = `/proximate/reports/${r.id}`;
               }}>
                 {t('proximate.donor.view_report')}
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => {
+              </button>
+              <button className="prox-btn ghost" style={{ height: 28, fontSize: 12 }} onClick={(e) => {
                 e.stopPropagation();
                 window.open(
                   `${process.env.NEXT_PUBLIC_API_BASE || ''}/api/proximate/report-packages/${r.id}/pdf`,
                   '_blank',
                 );
               }}>
-                <FileText className="w-3.5 h-3.5 me-1" />
+                <FileText className="w-3.5 h-3.5" />
                 {t('proximate.donor.download_pdf')}
-              </Button>
+              </button>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
     </section>

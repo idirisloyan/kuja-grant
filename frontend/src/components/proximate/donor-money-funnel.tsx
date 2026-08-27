@@ -39,7 +39,6 @@
  */
 
 import { useState } from 'react';
-import { Card } from '@/components/ui/card';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { DonorExplainer, type ExplainerTerm } from '@/components/proximate/donor-explainer';
 
@@ -157,12 +156,12 @@ export function DonorMoneyFunnel({
   );
 
   return (
-    <Card className={`p-4 sm:p-5 space-y-4 ${className}`}>
+    <div className={`prox-panel space-y-4 ${className}`} style={{ padding: '18px 20px' }}>
       <div>
         <h2 className="text-lg kuja-display">
           {t('proximate.donor.funnel.title')}
         </h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="text-xs mt-0.5" style={{ color: 'var(--prox-muted)' }}>
           {t('proximate.donor.funnel.subtitle')}
         </p>
       </div>
@@ -181,24 +180,21 @@ export function DonorMoneyFunnel({
                   {t(`proximate.donor.funnel.stage.${s.key}`)}
                   <DonorExplainer term={s.key} />
                 </span>
-                <span className="text-lg font-medium tabular-nums">
+                <span className="prox-mono text-lg font-medium">
                   {known ? usd(s.value!) : (
-                    <span className="text-base text-muted-foreground font-normal">
+                    <span className="text-base font-normal" style={{ color: 'var(--prox-muted)' }}>
                       {t('proximate.donor.funnel.not_recorded')}
                     </span>
                   )}
                 </span>
               </div>
               <div
-                className="h-2 rounded-full bg-muted overflow-hidden mt-1.5"
+                className="prox-bar mt-1.5"
                 role="presentation"
               >
-                <div
-                  className="h-full rounded-full bg-[hsl(var(--kuja-clay))] transition-all"
-                  style={{ width: `${width}%` }}
-                />
+                <i style={{ width: `${width}%` }} />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                 {!known
                   ? t('proximate.donor.funnel.committed_unknown_note')
                   : share != null
@@ -216,7 +212,7 @@ export function DonorMoneyFunnel({
       </ol>
 
       {flaggedCount > 0 && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 inline-flex items-start gap-1">
+        <p className="text-xs inline-flex items-start gap-1" style={{ color: 'var(--prox-warn)' }}>
           <span>
             {t('proximate.donor.funnel.flagged_note', { count: flaggedCount })}
           </span>
@@ -228,7 +224,8 @@ export function DonorMoneyFunnel({
         type="button"
         onClick={() => setShowDetail((v) => !v)}
         aria-expanded={showDetail}
-        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+        className="text-xs underline underline-offset-2"
+        style={{ color: 'var(--prox-muted)' }}
       >
         {showDetail
           ? t('proximate.donor.funnel.hide_figures')
@@ -237,14 +234,14 @@ export function DonorMoneyFunnel({
       {/* The detail block is what remains of the old stat grid — every
           number it used to show is still reachable, one click down. */}
       {showDetail && (
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <div className="rounded-lg p-3" style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface-2)' }}>
           <dl className="grid gap-2 sm:grid-cols-2 text-xs">
             {stages.map((s) => (
               <div key={s.key} className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">
+                <dt style={{ color: 'var(--prox-muted)' }}>
                   {t(`proximate.donor.funnel.stage.${s.key}`)}
                 </dt>
-                <dd className="tabular-nums">
+                <dd className="prox-mono">
                   {s.value == null
                     ? t('proximate.donor.funnel.not_recorded')
                     : usd(s.value)}
@@ -252,24 +249,24 @@ export function DonorMoneyFunnel({
               </div>
             ))}
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
+              <dt style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.donor.funnel.undisbursed')}
               </dt>
-              <dd className="tabular-nums">
+              <dd className="prox-mono">
                 {usd(Math.max(allocated_usd - disbursed_usd, 0))}
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-muted-foreground">
+              <dt style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.donor.funnel.awaiting_report')}
               </dt>
-              <dd className="tabular-nums">
+              <dd className="prox-mono">
                 {usd(Math.max(disbursed_usd - reported_usd, 0))}
               </dd>
             </div>
           </dl>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

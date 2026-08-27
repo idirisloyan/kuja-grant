@@ -19,8 +19,6 @@ import { useEffect, useState } from 'react';
 import { Loader2, Banknote, Smartphone, Check, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 interface FSP {
@@ -164,17 +162,17 @@ export function DisbursementMethodsPanel({
 
   if (loading) {
     return (
-      <Card className="p-4">
-        <p className="text-xs text-muted-foreground flex items-center gap-2">
+      <div className="prox-panel" style={{ padding: '16px 18px' }}>
+        <p className="text-xs flex items-center gap-2" style={{ color: 'var(--prox-muted)' }}>
           <Loader2 className="w-3 h-3 animate-spin" />
           {t('proximate.disbursement.loading')}
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-medium">
           {t('proximate.disbursement.title')} ({methods.length})
@@ -193,7 +191,7 @@ export function DisbursementMethodsPanel({
       </div>
 
       {methods.length === 0 && !showForm && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
           {t('proximate.disbursement.none')}
         </p>
       )}
@@ -203,20 +201,19 @@ export function DisbursementMethodsPanel({
           {methods.map((m) => (
             <li
               key={m.id}
-              className="text-xs flex items-center gap-2 rounded-md border p-2"
+              className="text-xs flex items-center gap-2"
+              style={{
+                padding: '8px 10px',
+                borderRadius: 10,
+                border: '1px solid var(--prox-line)',
+                background: 'var(--prox-surface-2)',
+              }}
             >
               {kindIcon(m.fsp?.kind)}
-              <span className="font-mono">{m.display}</span>
-              <Badge
-                variant="outline"
-                className={
-                  m.status === 'verified'
-                    ? 'border-emerald-500 text-emerald-700'
-                    : 'border-amber-500 text-amber-700'
-                }
-              >
+              <span className="prox-mono">{m.display}</span>
+              <span className={`prox-pill ${m.status === 'verified' ? 'good' : 'warn'}`}>
                 {m.status}
-              </Badge>
+              </span>
               {isAdmin && m.status !== 'verified' && (
                 <Button
                   size="sm"
@@ -234,7 +231,7 @@ export function DisbursementMethodsPanel({
       )}
 
       {showForm && (
-        <div className="space-y-3 border-t pt-3 mt-1">
+        <div className="space-y-3 pt-3 mt-1" style={{ borderTop: '1px solid var(--prox-line)' }}>
           <div>
             <label className="text-xs text-muted-foreground block mb-1">
               {t('proximate.disbursement.fsp_picker')}
@@ -286,7 +283,7 @@ export function DisbursementMethodsPanel({
             </p>
           )}
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
           <div className="flex gap-2">
             <Button
@@ -320,6 +317,6 @@ export function DisbursementMethodsPanel({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

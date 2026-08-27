@@ -14,7 +14,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle2, Loader2, MessageSquare, Reply, ExternalLink } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { EmptyState } from './empty-state';
@@ -169,12 +168,12 @@ export function MessagingInbox({
         )}
       </div>
 
-      {rowError && <p className="text-sm text-red-600">{rowError}</p>}
+      {rowError && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{rowError}</p>}
 
       {visible.length === 0 ? (
-        <Card className="p-2">
+        <div className="prox-panel" style={{ padding: 8 }}>
           <EmptyState icon={MessageSquare} {...emptyCopy()} />
-        </Card>
+        </div>
       ) : (
         visible.map((m) => {
           const href = subjectHref(m.subject_kind, m.subject_id);
@@ -182,10 +181,13 @@ export function MessagingInbox({
           const note = outcome && outcome.id === m.id ? outcome : null;
 
           return (
-            <Card key={m.id} className="p-4 space-y-3">
+            <div key={m.id} className="prox-panel space-y-3" style={{ padding: '14px 16px' }}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="text-sm font-medium">
+                  <span
+                    className="text-sm"
+                    style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
+                  >
                     {m.recipient_name || m.recipient_phone || '—'}
                   </span>
                   {m.recipient_name && m.recipient_phone && (
@@ -240,11 +242,10 @@ export function MessagingInbox({
 
               {note && (
                 <p
-                  className={`text-xs rounded border px-2 py-1.5 ${
-                    note.ok
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                      : 'bg-red-50 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
-                  }`}
+                  className="text-xs rounded border px-2 py-1.5"
+                  style={note.ok
+                    ? { background: 'var(--prox-good-tint)', color: 'var(--prox-good)', borderColor: 'var(--prox-good)' }
+                    : { background: 'var(--prox-danger-tint)', color: 'var(--prox-danger)', borderColor: 'var(--prox-danger)' }}
                 >
                   {note.text}
                 </p>
@@ -254,7 +255,7 @@ export function MessagingInbox({
                 {replyingId === m.id ? (
                   <div className="flex-1 min-w-full space-y-2">
                     {configState !== 'configured' && (
-                      <p className="text-xs text-amber-800 dark:text-amber-300">
+                      <p className="text-xs" style={{ color: 'var(--prox-warn)' }}>
                         {t('proximate.messaging.reply_undeliverable_warning')}
                       </p>
                     )}
@@ -316,7 +317,7 @@ export function MessagingInbox({
                   <MessageStatusChip status={m.status} label={statusLabel(m.status, t)} />
                 </span>
               </div>
-            </Card>
+            </div>
           );
         })
       )}

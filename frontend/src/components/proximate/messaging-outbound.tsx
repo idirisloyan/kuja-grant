@@ -11,7 +11,6 @@
 
 import Link from 'next/link';
 import { ExternalLink, SendHorizontal } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { EmptyState } from './empty-state';
 import {
@@ -35,7 +34,7 @@ export function MessagingOutbound({
 
   if (rows.length === 0) {
     return (
-      <Card className="p-2">
+      <div className="prox-panel" style={{ padding: 8 }}>
         <EmptyState
           icon={SendHorizontal}
           title={t('proximate.messaging.outbound_empty')}
@@ -45,7 +44,7 @@ export function MessagingOutbound({
               : t('proximate.messaging.outbound_empty_hint')
           }
         />
-      </Card>
+      </div>
     );
   }
 
@@ -59,11 +58,10 @@ export function MessagingOutbound({
         const stuck = m.status === 'unsent' || m.status === 'failed';
 
         return (
-          <Card
+          <div
             key={m.id}
-            className={`p-4 space-y-2 ${
-              stuck ? 'border-red-300 dark:border-red-800' : ''
-            }`}
+            className="prox-panel space-y-2"
+            style={{ padding: '14px 16px', ...(stuck ? { borderColor: 'var(--prox-danger)' } : {}) }}
           >
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -94,7 +92,7 @@ export function MessagingOutbound({
             )}
 
             {m.error && (
-              <p className="text-xs text-red-700 dark:text-red-400">
+              <p className="text-xs" style={{ color: 'var(--prox-danger)' }}>
                 {m.error}
                 {m.attempts > 0 && ` · ${m.attempts} ${t('proximate.messaging.attempts')}`}
               </p>
@@ -120,12 +118,12 @@ export function MessagingOutbound({
                 )
               )}
               {m.responded_at && (
-                <span className="text-emerald-700 dark:text-emerald-400">
+                <span style={{ color: 'var(--prox-good)' }}>
                   {t('proximate.messaging.col_responded')}
                 </span>
               )}
             </div>
-          </Card>
+          </div>
         );
       })}
     </div>

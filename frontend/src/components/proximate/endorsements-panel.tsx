@@ -16,11 +16,9 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, Check, X, Mic, AlertTriangle } from 'lucide-react';
+import { Loader2, Check, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 
 interface EndorsementRow {
   id: number;
@@ -42,9 +40,9 @@ interface Resp {
 
 function YN({ value }: { value: boolean }) {
   return value ? (
-    <Check className="w-3.5 h-3.5 text-emerald-600" aria-label="yes" />
+    <Check className="w-3.5 h-3.5" style={{ color: 'var(--prox-good)' }} aria-label="yes" />
   ) : (
-    <X className="w-3.5 h-3.5 text-destructive" aria-label="no" />
+    <X className="w-3.5 h-3.5" style={{ color: 'var(--prox-danger)' }} aria-label="no" />
   );
 }
 
@@ -66,12 +64,12 @@ export function EndorsementsPanel({ partnerId }: { partnerId: number | string })
 
   if (loading) {
     return (
-      <Card className="p-4">
-        <p className="text-xs text-muted-foreground flex items-center gap-2">
+      <div className="prox-panel" style={{ padding: '16px 18px' }}>
+        <p className="text-xs flex items-center gap-2" style={{ color: 'var(--prox-muted)' }}>
           <Loader2 className="w-3 h-3 animate-spin" />
           {t('proximate.endorsements.loading')}
         </p>
-      </Card>
+      </div>
     );
   }
   if (!rows || rows.length === 0) {
@@ -79,7 +77,7 @@ export function EndorsementsPanel({ partnerId }: { partnerId: number | string })
   }
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <p className="text-sm font-medium mb-3">
         {t('proximate.endorsements.title')} ({rows.length})
       </p>
@@ -91,56 +89,60 @@ export function EndorsementsPanel({ partnerId }: { partnerId: number | string })
           return (
             <li
               key={row.id}
-              className={`text-xs rounded-md border p-3 ${row.coi_check_passed ? '' : 'border-amber-500 bg-amber-50/40'}`}
+              className="text-xs"
+              style={{
+                padding: '12px',
+                borderRadius: 10,
+                border: `1px solid ${row.coi_check_passed ? 'var(--prox-line)' : 'var(--prox-warn)'}`,
+                background: row.coi_check_passed ? 'var(--prox-surface-2)' : 'var(--prox-warn-tint)',
+              }}
             >
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-muted-foreground">
+                <span style={{ color: 'var(--prox-muted)' }}>
                   #{row.id}
                 </span>
-                <span className="text-muted-foreground">
+                <span style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.endorsements.endorser')} #{row.endorser_id}
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">Q1</span>
+                  <span style={{ color: 'var(--prox-muted)' }}>Q1</span>
                   <YN value={row.q1_real} />
-                  <span className="text-muted-foreground ms-2">Q2</span>
+                  <span className="ms-2" style={{ color: 'var(--prox-muted)' }}>Q2</span>
                   <YN value={row.q2_trust} />
-                  <span className="text-muted-foreground ms-2">Q3</span>
+                  <span className="ms-2" style={{ color: 'var(--prox-muted)' }}>Q3</span>
                   <YN value={row.q3_accept_aid} />
                 </div>
                 {!row.coi_check_passed && (
-                  <Badge variant="outline" className="text-amber-700 border-amber-500">
-                    <AlertTriangle className="w-3 h-3 me-1" />
+                  <span className="prox-pill warn">
                     {t('proximate.endorsements.coi_flagged')}
-                  </Badge>
+                  </span>
                 )}
                 {hasTranscript && (
-                  <Badge variant="outline" className="text-muted-foreground">
-                    <Mic className="w-3 h-3 me-1" />
+                  <span className="prox-pill slate">
                     {t('proximate.endorsements.has_transcript')}
-                  </Badge>
+                  </span>
                 )}
-                <span className="text-muted-foreground ms-auto">
+                <span className="ms-auto" style={{ color: 'var(--prox-muted)' }}>
                   {row.created_at ? new Date(row.created_at).toLocaleDateString() : ''}
                 </span>
               </div>
               {hasTranscript && (
-                <dl className="space-y-1.5 text-[11px] pt-1 border-t">
+                <dl className="space-y-1.5 text-[11px] pt-1" style={{ borderTop: '1px solid var(--prox-line)' }}>
                   {row.transcripts?.q1 && (
                     <div>
-                      <dt className="text-muted-foreground inline">Q1 — </dt>
+                      <dt className="inline" style={{ color: 'var(--prox-muted)' }}>Q1 — </dt>
                       <dd className="inline">{row.transcripts.q1}</dd>
                     </div>
                   )}
                   {row.transcripts?.q2 && (
                     <div>
-                      <dt className="text-muted-foreground inline">Q2 — </dt>
+                      <dt className="inline" style={{ color: 'var(--prox-muted)' }}>Q2 — </dt>
                       <dd className="inline">{row.transcripts.q2}</dd>
                     </div>
                   )}
                   {row.transcripts?.q3 && (
                     <div>
-                      <dt className="text-muted-foreground inline">Q3 — </dt>
+                      <dt className="inline" style={{ color: 'var(--prox-muted)' }}>Q3 — </dt>
                       <dd className="inline">{row.transcripts.q3}</dd>
                     </div>
                   )}
@@ -150,6 +152,6 @@ export function EndorsementsPanel({ partnerId }: { partnerId: number | string })
           );
         })}
       </ul>
-    </Card>
+    </div>
   );
 }

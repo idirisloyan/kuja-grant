@@ -33,9 +33,7 @@ import { CycleCloseoutCard } from '@/components/proximate/cycle-closeout-card';
 import {
   ProximateAttachmentsPanel, PanelRosterPanel,
 } from '@/components/proximate/dd-evidence';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -550,7 +548,7 @@ export function ProximateRoundDetailClient() {
               roster.filter((p) => s.keys.includes(p.stage)).length);
             const bottleneck = counts.findIndex((c) => c > 0);
             return (
-              <Card className="p-4">
+              <div className="prox-panel" style={{ padding: '16px 18px' }}>
                 <p className="text-sm font-medium mb-3">
                   {t('proximate.rounds.journey_title') || 'What happens next'}
                 </p>
@@ -611,7 +609,7 @@ export function ProximateRoundDetailClient() {
                     </button>
                   </div>
                 )}
-              </Card>
+              </div>
             );
           })()}
 
@@ -819,8 +817,8 @@ export function ProximateRoundDetailClient() {
               <ul className="space-y-1.5 text-xs">
                 {signatures.map((s) => (
                   <li key={s.id} className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{t('proximate.rounds.signer')} #{s.user_id}</span>
-                    <Badge variant="outline" className="text-[10px]">{t(`proximate.rounds.sig_status.${s.status}`)}</Badge>
+                    <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.rounds.signer')} #{s.user_id}</span>
+                    <span className={`prox-pill ${s.status === 'signed' ? 'good' : s.status === 'rejected' ? 'danger' : 'warn'}`}>{t(`proximate.rounds.sig_status.${s.status}`)}</span>
                     {s.acted_at && (
                       <span className="text-muted-foreground ms-auto">
                         {new Date(s.acted_at).toLocaleDateString()}
@@ -836,18 +834,18 @@ export function ProximateRoundDetailClient() {
 
           {/* Cancellation / closing summary */}
           {round.cancellation_reason && (
-            <Card className="p-4 border-destructive">
-              <p className="text-sm font-medium mb-1 text-destructive">
+            <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-danger)' }}>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--prox-danger)' }}>
                 {t('proximate.rounds.cancellation')}
               </p>
               <p className="text-xs">{round.cancellation_reason}</p>
-            </Card>
+            </div>
           )}
           {round.closing_summary && (
-            <Card className="p-4">
+            <div className="prox-panel" style={{ padding: '16px 18px' }}>
               <p className="text-sm font-medium mb-1">{t('proximate.rounds.closed')}</p>
               <p className="text-xs whitespace-pre-wrap">{round.closing_summary}</p>
-            </Card>
+            </div>
           )}
           </div>
 
@@ -932,7 +930,7 @@ export function ProximateRoundDetailClient() {
               },
             ];
             return (
-              <Card className="p-4">
+              <div className="prox-panel" style={{ padding: '16px 18px' }}>
                 <p className="text-sm font-medium mb-2">
                   {t('proximate.rounds.closing_pack') || 'Closing pack'}
                 </p>
@@ -963,7 +961,7 @@ export function ProximateRoundDetailClient() {
                     </li>
                   ))}
                 </ul>
-              </Card>
+              </div>
             );
           })()}
           </div>
@@ -1015,7 +1013,7 @@ export function ProximateRoundDetailClient() {
             const showRoster = participants.length > 0 || isOperator;
             if (!showRoster) return null;
             return (
-            <Card id="round-roster" className="p-4 scroll-mt-4">
+            <div id="round-roster" className="prox-panel scroll-mt-4" style={{ padding: '16px 18px' }}>
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <Users className="w-4 h-4 text-muted-foreground" />
@@ -1048,19 +1046,19 @@ export function ProximateRoundDetailClient() {
               )}
               <ul className="space-y-1.5">
                 {participants.map((p) => {
-                  const stageStyles: Record<string, string> = {
-                    planned: 'bg-muted text-muted-foreground border-border',
-                    awarded: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-                    endorsement_open: 'bg-amber-100 text-amber-800 border-amber-300',
-                    endorsed: 'bg-blue-100 text-blue-800 border-blue-300',
-                    bank_verified: 'bg-sky-100 text-sky-800 border-sky-300',
-                    disbursed: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                    reported: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                    attested: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                    verified: 'bg-emerald-200 text-emerald-900 border-emerald-400 font-semibold',
-                    withdrawn: 'bg-rose-100 text-rose-800 border-rose-300',
+                  const STAGE_TONE: Record<string, string> = {
+                    planned: 'slate',
+                    awarded: 'acc',
+                    endorsement_open: 'warn',
+                    endorsed: 'acc',
+                    bank_verified: 'acc',
+                    disbursed: 'good',
+                    reported: 'good',
+                    attested: 'good',
+                    verified: 'good',
+                    withdrawn: 'danger',
                   };
-                  const stageCls = stageStyles[p.stage] || stageStyles.planned;
+                  const stageTone = STAGE_TONE[p.stage] || 'slate';
                   const partnerHref = `/proximate/admin?partner=${p.partner_id}`;
                   return (
                     <li
@@ -1081,12 +1079,9 @@ export function ProximateRoundDetailClient() {
                           </span>
                         )}
                       </Link>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] ${stageCls}`}
-                      >
+                      <span className={`prox-pill ${stageTone}`}>
                         {p.stage.replace(/_/g, ' ')}
-                      </Badge>
+                      </span>
                       {/* OB-001 (2026-07-27) — partner history lives on the
                           partner record (its History tab); link it from the
                           roster so the OB can reach it without leaving the
@@ -1123,7 +1118,7 @@ export function ProximateRoundDetailClient() {
                 tokenised link the recipient can open with no login — they
                 endorse, and the round auto-updates.
               </p>
-            </Card>
+            </div>
             );
           })()}
 
@@ -1445,7 +1440,7 @@ export function ProximateRoundDetailClient() {
             const remaining = data?.envelope_remaining ?? (total ? total - used : null);
             const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
             return (
-              <Card className="p-4">
+              <div className="prox-panel" style={{ padding: '16px 18px' }}>
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p className="text-sm font-medium flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-muted-foreground" />
@@ -1471,19 +1466,19 @@ export function ProximateRoundDetailClient() {
                 {total > 0 && (
                   <div className="mb-3">
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground prox-mono">
                         ${used.toLocaleString()} / ${total.toLocaleString()}
                       </span>
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground prox-mono">
                         {remaining !== null
                           ? `$${remaining.toLocaleString()} ${t('proximate.rounds.remaining')}`
                           : ''}
                       </span>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--prox-inset)' }}>
                       <div
-                        className="h-full bg-emerald-600 transition-all"
-                        style={{ width: `${pct}%` }}
+                        className="h-full transition-all"
+                        style={{ width: `${pct}%`, background: 'var(--prox-good)' }}
                       />
                     </div>
                   </div>
@@ -1505,26 +1500,26 @@ export function ProximateRoundDetailClient() {
                               {d.partner_name || `Partner #${d.partner_id}`}
                             </span>
                             {d.amount_usd && (
-                              <span className="text-muted-foreground tabular-nums">
+                              <span className="text-muted-foreground prox-mono">
                                 ${d.amount_usd.toLocaleString()}
                               </span>
                             )}
-                            <Badge variant="outline" className={`text-[10px] ${
-                              d.status === 'verified' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                              : d.status === 'flagged' ? 'bg-red-100 text-red-800 border-red-300'
-                              : d.status === 'reported' ? 'bg-blue-100 text-blue-800 border-blue-300'
-                              : d.overdue ? 'bg-red-100 text-red-800 border-red-300'
-                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                            <span className={`prox-pill ${
+                              d.status === 'verified' ? 'good'
+                              : d.status === 'flagged' ? 'danger'
+                              : d.status === 'reported' ? 'acc'
+                              : d.overdue ? 'danger'
+                              : 'warn'
                             }`}>
                               {d.status}{d.overdue ? ' · late' : ''}
-                            </Badge>
+                            </span>
                           </Link>
                         </li>
                       ))}
                     </ul>
                   )
                 )}
-              </Card>
+              </div>
             );
           })()}
           </div>
@@ -1535,7 +1530,7 @@ export function ProximateRoundDetailClient() {
               Donors get the audit_anchor_seq on the round PDF for
               tamper-evident verification instead. */}
           {isOperator && (
-          <Card className="p-4">
+          <div className="prox-panel" style={{ padding: '16px 18px' }}>
             <p className="text-sm font-medium mb-3">
               {t('proximate.rounds.activity')} ({auditWindow.length})
             </p>
@@ -1591,7 +1586,7 @@ export function ProximateRoundDetailClient() {
                 );
               })()
             )}
-          </Card>
+          </div>
           )}
           </div>
 

@@ -39,10 +39,8 @@ import {
 } from '@/components/proximate/dd-evidence';
 import { PartnerJourney, NextStep } from '@/components/proximate/next-step';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
-import { Card } from '@/components/ui/card';
+import { toneForProximateStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import {
   PageShell, PageHeader, PageMain,
@@ -63,6 +61,17 @@ const PARTNER_TABS = [
   { key: 'evidence', label: 'Evidence', k: 'proximate.cycle.tab_evidence' },
   { key: 'history', label: 'History', k: 'proximate.cycle.tab_history' },
 ];
+
+// Bricolage display font for titles/names.
+const PROX_DISPLAY = {
+  fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif',
+  fontWeight: 700,
+} as const;
+
+// Canonical status→tone (status-badge.tsx) mapped to design-system pill tones.
+const DISB_PILL: Record<string, string> = {
+  positive: 'good', attention: 'warn', critical: 'danger', active: 'acc', neutral: 'slate',
+};
 
 interface PartnerDisbursement {
   id: number;
@@ -370,9 +379,9 @@ export default function ProximateEndorseWizardClient() {
     return (
       <PageShell>
         <PageMain>
-          <Card className="p-6 text-center">
-            <p className="text-sm text-destructive">{error ?? t('proximate.error.not_found')}</p>
-          </Card>
+          <div className="prox-panel text-center" style={{ padding: '24px' }}>
+            <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error ?? t('proximate.error.not_found')}</p>
+          </div>
         </PageMain>
       </PageShell>
     );
@@ -390,17 +399,17 @@ export default function ProximateEndorseWizardClient() {
         <PageHeader title={displayName} />
         <PageMain>
           <div className="space-y-4">
-            <Card className="p-4 border-blue-500 bg-blue-50 dark:bg-blue-950/30">
+            <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-accent)' }}>
               <div className="flex items-start gap-3">
-                <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-accent)' }} />
                 <div>
                   <p className="font-medium text-sm">{t('proximate.result.queued_title')}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                     {t('proximate.result.queued_subtitle')}
                   </p>
                 </div>
               </div>
-            </Card>
+            </div>
             <Button
               onClick={() => router.push('/proximate/endorse')}
               variant="outline"
@@ -424,39 +433,39 @@ export default function ProximateEndorseWizardClient() {
         <PageMain>
           <div className="space-y-4">
             {result.state_change === 'dd_clear' && (
-              <Card className="p-4 border-green-500 bg-green-50 dark:bg-green-950/30">
+              <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-good)' }}>
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-good)' }} />
                   <div>
                     <p className="font-medium text-sm">{t('proximate.result.cleared_title')}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                       {t('proximate.result.cleared_subtitle')}
                     </p>
                   </div>
                 </div>
-              </Card>
+              </div>
             )}
 
             {!result.endorsement.coi_check_passed && (
-              <Card className="p-4 border-amber-500 bg-amber-50 dark:bg-amber-950/30">
+              <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-warn)' }}>
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
                   <div>
                     <p className="font-medium text-sm">
                       {t('proximate.result.coi_flagged_title')}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                       {t('proximate.result.coi_flagged_subtitle', { n: signalCount })}
                     </p>
                   </div>
                 </div>
-              </Card>
+              </div>
             )}
 
             {result.endorsement.coi_check_passed && result.state_change !== 'dd_clear' && (
-              <Card className="p-4 border-blue-500 bg-blue-50 dark:bg-blue-950/30">
+              <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-accent)' }}>
                 <div className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <Check className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-accent)' }} />
                   <div>
                     {/* PRX-ENDORSE-001 — once the trust threshold is met
                         (2/2 independent endorsements), stop telling the user
@@ -466,17 +475,17 @@ export default function ProximateEndorseWizardClient() {
                         ? t('proximate.result.recorded_threshold_title')
                         : t('proximate.result.recorded_title')}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                       {floor.endorsements_ok
                         ? t('proximate.result.recorded_threshold_subtitle')
                         : t('proximate.result.recorded_subtitle')}
                     </p>
                   </div>
                 </div>
-              </Card>
+              </div>
             )}
 
-            <Card className="p-4">
+            <div className="prox-panel" style={{ padding: '16px 18px' }}>
               <h2 className="font-medium text-sm mb-3">{t('proximate.floor.title')}</h2>
               <ul className="space-y-2 text-sm">
                 <FloorRow
@@ -495,7 +504,7 @@ export default function ProximateEndorseWizardClient() {
                   label={t('proximate.floor.reputation', { n: floor.reputation_floor })}
                 />
               </ul>
-            </Card>
+            </div>
 
             <Button
               onClick={() => router.push('/proximate/endorse')}
@@ -579,7 +588,7 @@ export default function ProximateEndorseWizardClient() {
           {/* Phase 717 — partner journey + create-from-here next action.
               The whole trust arc at a glance, and (once cleared) a direct
               path to record a disbursement without hunting for the form. */}
-          <Card className="p-4 space-y-3">
+          <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
             <PartnerJourney status={partner.status} />
             {(() => {
               const s = partner.status;
@@ -629,21 +638,21 @@ export default function ProximateEndorseWizardClient() {
                 }} />
               );
             })()}
-          </Card>
+          </div>
 
           {partner.sanctions_flag && (
-            <Card className="p-4 border-red-400 bg-red-50 dark:bg-red-950/30">
+            <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-danger)' }}>
               <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-700 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--prox-danger)' }} />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--prox-danger)' }}>
                     {t('proximate.partner.sanctions_flag_title')}
                   </h3>
-                  <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: 'var(--prox-danger)' }}>
                     {t('proximate.partner.sanctions_flag_body')}
                   </p>
                   {partner.sanctions_summary?.flagged?.length ? (
-                    <ul className="text-xs text-red-700 dark:text-red-300 mt-2 list-disc ps-5 space-y-0.5">
+                    <ul className="text-xs mt-2 list-disc ps-5 space-y-0.5" style={{ color: 'var(--prox-danger)' }}>
                       {partner.sanctions_summary.flagged.slice(0, 3).map((h, i) => (
                         <li key={i}>
                           {h.list || h.check_type}
@@ -655,7 +664,7 @@ export default function ProximateEndorseWizardClient() {
                   ) : null}
                 </div>
               </div>
-            </Card>
+            </div>
           )}
 
           <InterventionPanel
@@ -665,15 +674,15 @@ export default function ProximateEndorseWizardClient() {
           />
 
           {isOb && partner.status !== 'suspended' && (
-            <Card className="p-4 border-violet-300 bg-violet-50/40 dark:bg-violet-950/20">
-              <h2 className="text-sm font-medium mb-2">
+            <div className="prox-panel" style={{ padding: '16px 18px', borderColor: 'var(--prox-accent)' }}>
+              <h2 className="text-sm font-medium mb-2" style={{ ...PROX_DISPLAY, fontSize: 15, color: 'var(--prox-ink)' }}>
                 {t('proximate.admin.title')}
               </h2>
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="text-xs mb-3" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.admin.subtitle')}
               </p>
               {adminMessage && (
-                <p className="text-xs mb-3 text-foreground bg-background border border-border rounded p-2">
+                <p className="text-xs mb-3 rounded p-2" style={{ color: 'var(--prox-ink)', background: 'var(--prox-surface-2)', border: '1px solid var(--prox-line)' }}>
                   {adminMessage}
                 </p>
               )}
@@ -691,7 +700,7 @@ export default function ProximateEndorseWizardClient() {
                       {t('proximate.admin.bank_verify_button')}
                     </Button>
                     {methodCount === 0 && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                         {t('proximate.admin.bank_verify_needs_method')
                           || 'Add a payment route below before verifying.'}
                       </p>
@@ -705,7 +714,7 @@ export default function ProximateEndorseWizardClient() {
                     size="sm"
                     onClick={() => setSuspendOpen(true)}
                     disabled={adminBusy}
-                    className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                    style={{ color: 'var(--prox-danger)', borderColor: 'var(--prox-danger)' }}
                   >
                     {t('proximate.admin.suspend_button')}
                   </Button>
@@ -715,7 +724,8 @@ export default function ProximateEndorseWizardClient() {
                       value={suspendReason}
                       onChange={(e) => setSuspendReason(e.target.value)}
                       placeholder={t('proximate.admin.suspend_reason_placeholder')}
-                      className="w-full text-sm rounded border border-border bg-background p-2"
+                      className="w-full text-sm rounded p-2"
+                      style={{ border: '1px solid var(--prox-line-2)', background: 'var(--prox-surface)' }}
                       rows={3}
                     />
                     <div className="flex gap-2">
@@ -743,7 +753,7 @@ export default function ProximateEndorseWizardClient() {
                   </div>
                 )}
               </div>
-            </Card>
+            </div>
           )}
           </div>
 
@@ -793,12 +803,12 @@ export default function ProximateEndorseWizardClient() {
             onChanged={refreshMethodCount}
           />
           {isOb && partnerDisbs !== null && (
-            <Card className="p-4">
+            <div className="prox-panel" style={{ padding: '16px 18px' }}>
               <h2 className="text-sm font-medium mb-3">
                 {t('proximate.partner.disbursements_title')}
               </h2>
               {partnerDisbs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.partner.disbursements_empty')}
                 </p>
               ) : (
@@ -809,20 +819,17 @@ export default function ProximateEndorseWizardClient() {
                         href={`/proximate/disbursements/${d.id}`}
                         className="flex items-center gap-2 py-1.5 px-2 -mx-2 rounded-sm hover:bg-muted/30"
                       >
-                        <span className="text-sm font-medium">
+                        <span className="text-sm font-medium prox-mono">
                           {d.amount_usd ? `$${d.amount_usd.toLocaleString()}` : '—'}
                         </span>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(d.status)]}`}
-                        >
+                        <span className={`prox-pill ${DISB_PILL[toneForProximateStatus(d.status)]}`}>
                           {labelForProximateStatus(d.status, t)}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground truncate flex-1">
+                        </span>
+                        <span className="text-xs truncate flex-1" style={{ color: 'var(--prox-muted)' }}>
                           {d.purpose || ''}
                         </span>
                         {d.sent_at && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                             {new Date(d.sent_at).toLocaleDateString()}
                           </span>
                         )}
@@ -831,13 +838,13 @@ export default function ProximateEndorseWizardClient() {
                   ))}
                 </ul>
               )}
-            </Card>
+            </div>
           )}
           </div>
 
           <div className={tabCls('endorsements')}>
-          <Card className="p-4">
-            <p className="text-xs text-muted-foreground mb-4">
+          <div className="prox-panel" style={{ padding: '16px 18px' }}>
+            <p className="text-xs mb-4" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.wizard.instructions')}
             </p>
             <div className="space-y-5">
@@ -884,10 +891,10 @@ export default function ProximateEndorseWizardClient() {
                 language={isRtl ? 'ar' : 'en'}
               />
             </div>
-          </Card>
+          </div>
 
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error}</p>
           )}
 
           <Button
@@ -915,11 +922,11 @@ function FloorRow({ ok, label }: { ok: boolean; label: string }) {
   return (
     <li className="flex items-center gap-2">
       {ok ? (
-        <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+        <Check className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--prox-good)' }} />
       ) : (
-        <X className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        <X className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--prox-muted)' }} />
       )}
-      <span className={ok ? '' : 'text-muted-foreground'}>{label}</span>
+      <span style={ok ? undefined : { color: 'var(--prox-muted)' }}>{label}</span>
     </li>
   );
 }
@@ -937,7 +944,12 @@ function QuestionRow({
   return (
     <div className="space-y-2">
       <div className="flex items-start gap-2">
-        <Badge variant="outline" className="text-[10px] flex-shrink-0 mt-0.5">{num}</Badge>
+        <span
+          className="text-[10px] flex-shrink-0 mt-0.5 inline-flex items-center justify-center"
+          style={{ width: 18, height: 18, borderRadius: 6, border: '1px solid var(--prox-line-2)', color: 'var(--prox-muted)', fontWeight: 600 }}
+        >
+          {num}
+        </span>
         <p className="text-sm font-medium">{text}</p>
       </div>
       <div className="flex gap-2 ps-7">
