@@ -20,8 +20,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
-import { DonorMoneyFunnel, computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
+import { TONE_CLASSES } from '@/components/proximate/status-badge';
+import { computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
 import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
 import { DonorExplainer } from '@/components/proximate/donor-explainer';
 
@@ -103,6 +103,14 @@ function pct(num: number, denom: number) {
 function usd(n: number | null | undefined) {
   if (n == null) return '$0';
   return `$${n.toLocaleString()}`;
+}
+
+// Map a Proximate status to a design-system pill tone.
+function statusPill(s: string): string {
+  if (/clear|verified|complete|closed|active|approved/.test(s)) return 'good';
+  if (/pending|review|report|draft|intake/.test(s)) return 'warn';
+  if (/flag|suspend|reject|block|expired/.test(s)) return 'danger';
+  return 'slate';
 }
 
 export function ProximateDonorClient() {
@@ -208,26 +216,54 @@ export function ProximateDonorClient() {
     ? grants.reduce((sum, g) => sum + (g.amount_committed_usd || 0), 0)
     : null;
   const funnelTotals = computeFunnelTotals(rounds, committedUsd, portfolio.allocated_usd);
+  const mtScale = Math.max(1, funnelTotals.committed_usd || funnelTotals.allocated_usd || funnelTotals.disbursed_usd || 1);
+  const mtStages: Array<{ lab: string; val: number | null; sub: string; good?: boolean }> = [
+    { lab: t('proximate.donor.mt_committed'), val: funnelTotals.committed_usd, sub: t('proximate.donor.mt_committed_sub') },
+    { lab: t('proximate.donor.mt_allocated'), val: funnelTotals.allocated_usd, sub: t('proximate.donor.mt_allocated_sub') },
+    { lab: t('proximate.donor.stat_disbursed'), val: funnelTotals.disbursed_usd, sub: `${portfolio.disbursement_count} ${t('proximate.donor.disbursements')}` },
+    { lab: t('proximate.donor.mt_reported'), val: funnelTotals.reported_usd, sub: t('proximate.donor.mt_reported_sub') },
+    { lab: t('proximate.donor.mt_verified'), val: funnelTotals.verified_usd, sub: t('proximate.donor.mt_verified_sub'), good: true },
+  ];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
       <header>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">
-          {t('proximate.donor.portal_label')}
-        </p>
-        <h1 className="text-2xl kuja-display">{donor.display_name}</h1>
+        <div className="prox-eyebrow">{t('proximate.donor.portal_label')}</div>
+        <h1 className="kuja-display mt-1.5 mb-1" style={{ fontSize: 27, lineHeight: 1.1 }}>{donor.display_name}</h1>
         {donor.contact_email && (
-          <p className="text-sm text-muted-foreground">{donor.contact_email}</p>
+          <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>{donor.contact_email}</p>
         )}
       </header>
 
-      {/* Hero: the money story. Committed → Allocated → Disbursed →
-          Reported → Verified. The stat grid below it keeps every number
-          the grid used to lead with, one level down the hierarchy. */}
-      <DonorMoneyFunnel
-        totals={funnelTotals}
-        flaggedCount={portfolio.flagged_count}
-      />
+      {/* Money trail — the hero. Committed → Allocated → Disbursed → Reported
+          → Verified, every stage anchored to the audit chain. */}
+      <div className="prox-panel">
+        <div className="prox-phead">
+          <h2>{t('proximate.donor.money_trail')}</h2>
+          {portfolio.flagged_count > 0 && (
+            <span className="prox-pill danger">{portfolio.flagged_count} {t('proximate.donor.flagged')}</span>
+          )}
+        </div>
+        <div style={{ padding: '20px 18px 22px' }}>
+          <div className="prox-pipe" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+            {mtStages.map((s, i) => (
+              <div className="prox-stage" key={i}>
+                <span className="lab" style={s.good ? { color: 'var(--prox-good)' } : undefined}>{s.lab}</span>
+                <div className="val prox-num">{s.val == null ? t('proximate.donor.not_recorded') : usd(s.val)}</div>
+                <span className="meta">{s.sub}</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 0, marginTop: 16 }}>
+            {mtStages.map((s, i) => (
+              <div key={i} className={`prox-bar ${s.good ? 'good' : ''}`}
+                style={{ margin: i === 0 ? '0 14px 0 0' : i === mtStages.length - 1 ? '0 0 0 14px' : '0 14px' }}>
+                <i style={{ width: s.val == null ? '0%' : `${Math.max(2, Math.round((s.val / mtScale) * 100))}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* The three controls behind the funnel's last two stages. Donors
           consistently could not say what "verified" was worth without
@@ -239,69 +275,44 @@ export function ProximateDonorClient() {
           partner/payment counts and the outcome-attestation rate live
           nowhere else. */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">
-            {t('proximate.donor.stat_envelope')}
-          </p>
-          <p className="text-2xl font-medium">{usd(portfolio.envelope_usd)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">
-            {t('proximate.donor.stat_disbursed')}
-          </p>
-          <p className="text-2xl font-medium">{usd(portfolio.disbursed_usd)}</p>
+        <div className="prox-stat">
+          <div className="lab">{t('proximate.donor.stat_envelope')}</div>
+          <div className="val prox-num">{usd(portfolio.envelope_usd)}</div>
+        </div>
+        <div className="prox-stat">
+          <div className="lab">{t('proximate.donor.stat_disbursed')}</div>
+          <div className="val prox-num">{usd(portfolio.disbursed_usd)}</div>
           {portfolio.envelope_usd > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {pct(portfolio.disbursed_usd, portfolio.envelope_usd)}%{' '}
-              {t('proximate.donor.of_envelope')}
-            </p>
+            <div className="meta">{pct(portfolio.disbursed_usd, portfolio.envelope_usd)}% {t('proximate.donor.of_envelope')}</div>
           )}
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">
-            {t('proximate.donor.stat_partners_served')}
-          </p>
-          <p className="text-2xl font-medium">{portfolio.partners_served}</p>
-          <p className="text-xs text-muted-foreground">
-            {portfolio.disbursement_count} {t('proximate.donor.disbursements')}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
-            {t('proximate.donor.stat_outcome_data')}
-            <DonorExplainer term="outcome_check" />
-          </p>
+        </div>
+        <div className="prox-stat">
+          <div className="lab">{t('proximate.donor.stat_partners_served')}</div>
+          <div className="val prox-num">{portfolio.partners_served}</div>
+          <div className="meta">{portfolio.disbursement_count} {t('proximate.donor.disbursements')}</div>
+        </div>
+        <div className="prox-stat">
+          <div className="lab">{t('proximate.donor.stat_outcome_data')} <DonorExplainer term="outcome_check" /></div>
           {portfolio.outcome_total === 0 ? (
             <>
-              <p className="text-2xl font-medium text-muted-foreground">—</p>
-              <p className="text-xs text-muted-foreground">
-                {t('proximate.donor.no_outcomes_due')}
-              </p>
+              <div className="val" style={{ fontSize: 22, color: 'var(--prox-muted)' }}>—</div>
+              <div className="meta">{t('proximate.donor.no_outcomes_due')}</div>
+            </>
+          ) : portfolio.outcome_attested === 0 ? (
+            <>
+              <div className="val" style={{ fontSize: 18 }}>{t('proximate.donor.outcomes_pending')}</div>
+              <div className="meta">0/{portfolio.outcome_total} {t('proximate.donor.attested')}</div>
             </>
           ) : (
             <>
-              <p className="text-2xl font-medium">
-                {portfolio.outcome_attested === 0
-                  ? t('proximate.donor.outcomes_pending')
-                  : `${outcomeRate}%`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {portfolio.outcome_attested}/{portfolio.outcome_total}{' '}
-                {t('proximate.donor.attested')}
-              </p>
-              {/* outcome_verified was already in the payload but never
-                  rendered — it is the stronger signal of the two and a
-                  donor asking "who checked?" had no answer on screen. */}
+              <div className="val prox-num">{outcomeRate}%</div>
+              <div className="meta">{portfolio.outcome_attested}/{portfolio.outcome_total} {t('proximate.donor.attested')}</div>
               {portfolio.outcome_verified > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {t('proximate.donor.outcomes_verified_count', {
-                    count: portfolio.outcome_verified,
-                  })}
-                </p>
+                <div className="meta">{t('proximate.donor.outcomes_verified_count', { count: portfolio.outcome_verified })}</div>
               )}
             </>
           )}
-        </Card>
+        </div>
       </section>
 
       {/* Grants — the assurance pack's natural home: one pack covers a
@@ -334,15 +345,12 @@ export function ProximateDonorClient() {
           </Card>
         ) : (
           rounds.map((r) => (
-            <Card key={r.id} className="p-4 space-y-3">
-              {/* QA-18 item 11 — one clear hierarchy: title + status up
-                  top, ONE primary action (the full round report), and
-                  the secondary actions grouped consistently below. */}
+            <div key={r.id} className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-medium">{r.title}</h3>
-                    <span className={`text-[10px] px-2 py-0.5 rounded border ${TONE_CLASSES[toneForProximateStatus(r.status)]}`}>
+                    <h3 className="kuja-display" style={{ fontSize: 16, fontWeight: 700 }}>{r.title}</h3>
+                    <span className={`prox-pill ${statusPill(r.status)}`}>
                       {labelForProximateStatus(r.status, t)}
                     </span>
                   </div>
@@ -353,13 +361,14 @@ export function ProximateDonorClient() {
                     )}
                   </p>
                 </div>
-                <Button
-                  size="sm"
+                <button
+                  className="prox-btn ghost"
+                  style={{ height: 34 }}
                   onClick={() => window.open(`/proximate/rounds/${r.id}/report`, '_self')}
                 >
-                  <ExternalLink className="w-4 h-4 me-1" />
+                  <ExternalLink className="h-4 w-4" />
                   {t('proximate.donor.view_full_report')}
-                </Button>
+                </button>
               </div>
 
               <dl className="grid gap-3 sm:grid-cols-4">
@@ -420,12 +429,9 @@ export function ProximateDonorClient() {
               </dl>
 
               {Object.keys(r.status_counts).length > 0 && (
-                <div className="flex gap-2 flex-wrap text-xs">
+                <div className="flex gap-2 flex-wrap">
                   {Object.entries(r.status_counts).map(([s, n]) => (
-                    <span
-                      key={s}
-                      className={`px-2 py-1 rounded border ${TONE_CLASSES[toneForProximateStatus(s)]}`}
-                    >
+                    <span key={s} className={`prox-pill ${statusPill(s)}`}>
                       {n} {labelForProximateStatus(s, t)}
                     </span>
                   ))}
@@ -438,17 +444,17 @@ export function ProximateDonorClient() {
                     rendered a 503/403 JSON body in a new tab while this
                     page still looked like the download worked. */}
                 <AssurancePackButton scope="round" id={r.id} variant="outline" />
-                <Button
-                  size="sm"
-                  variant="ghost"
+                <button
+                  className="prox-btn ghost"
+                  style={{ height: 32, fontSize: 12.5 }}
                   onClick={() => toggleFollow(r.id)}
                 >
                   {followedIds.includes(r.id)
                     ? t('proximate.donor.following')
                     : t('proximate.donor.follow')}
-                </Button>
+                </button>
               </div>
-            </Card>
+            </div>
           ))
         )}
       </section>

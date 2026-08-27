@@ -4478,5 +4478,16 @@
   "proximate.admin.view_all": "Ver todo",
   "proximate.admin.open_count": "abiertos",
   "proximate.admin.all_clear": "Todo en orden",
-  "proximate.admin.tile_messages": "Mensajes"
+  "proximate.admin.tile_messages": "Mensajes",
+  "proximate.donor.money_trail": "Rastro del dinero",
+  "proximate.donor.mt_committed": "Comprometido",
+  "proximate.donor.mt_committed_sub": "subvenciones firmadas",
+  "proximate.donor.mt_allocated": "Asignado",
+  "proximate.donor.mt_allocated_sub": "a las rondas",
+  "proximate.donor.mt_reported": "Reportado",
+  "proximate.donor.mt_reported_sub": "socios reportaron",
+  "proximate.donor.mt_verified": "Verificado",
+  "proximate.donor.mt_verified_sub": "revisado y aprobado",
+  "proximate.donor.not_recorded": "no registrado",
+  "proximate.donor.flagged": "marcado"
 }

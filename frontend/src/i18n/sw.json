@@ -4478,5 +4478,16 @@
   "proximate.admin.view_all": "Ona yote",
   "proximate.admin.open_count": "wazi",
   "proximate.admin.all_clear": "Kila kitu kiko sawa",
-  "proximate.admin.tile_messages": "Ujumbe"
+  "proximate.admin.tile_messages": "Ujumbe",
+  "proximate.donor.money_trail": "Njia ya fedha",
+  "proximate.donor.mt_committed": "Ilizoahidiwa",
+  "proximate.donor.mt_committed_sub": "ruzuku zilizotiwa saini",
+  "proximate.donor.mt_allocated": "Iliyotengwa",
+  "proximate.donor.mt_allocated_sub": "kwa raundi",
+  "proximate.donor.mt_reported": "Iliyoripotiwa",
+  "proximate.donor.mt_reported_sub": "washirika waliripoti",
+  "proximate.donor.mt_verified": "Iliyothibitishwa",
+  "proximate.donor.mt_verified_sub": "imekaguliwa na kuidhinishwa",
+  "proximate.donor.not_recorded": "haijarekodiwa",
+  "proximate.donor.flagged": "iliyoashiriwa"
 }

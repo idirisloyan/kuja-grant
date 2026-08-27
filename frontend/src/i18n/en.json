@@ -5104,5 +5104,16 @@
   "proximate.admin.view_all": "View all",
   "proximate.admin.open_count": "open",
   "proximate.admin.all_clear": "All clear",
-  "proximate.admin.tile_messages": "Messages"
+  "proximate.admin.tile_messages": "Messages",
+  "proximate.donor.money_trail": "Money trail",
+  "proximate.donor.mt_committed": "Committed",
+  "proximate.donor.mt_committed_sub": "signed grants",
+  "proximate.donor.mt_allocated": "Allocated",
+  "proximate.donor.mt_allocated_sub": "to rounds",
+  "proximate.donor.mt_reported": "Reported",
+  "proximate.donor.mt_reported_sub": "partners reported",
+  "proximate.donor.mt_verified": "Verified",
+  "proximate.donor.mt_verified_sub": "checked & cleared",
+  "proximate.donor.not_recorded": "not recorded",
+  "proximate.donor.flagged": "flagged"
 }

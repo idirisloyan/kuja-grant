@@ -5081,5 +5081,16 @@
   "proximate.admin.view_all": "عرض الكل",
   "proximate.admin.open_count": "مفتوح",
   "proximate.admin.all_clear": "كل شيء على ما يرام",
-  "proximate.admin.tile_messages": "الرسائل"
+  "proximate.admin.tile_messages": "الرسائل",
+  "proximate.donor.money_trail": "مسار الأموال",
+  "proximate.donor.mt_committed": "ملتزَم به",
+  "proximate.donor.mt_committed_sub": "منح موقّعة",
+  "proximate.donor.mt_allocated": "مُخصَّص",
+  "proximate.donor.mt_allocated_sub": "على الدورات",
+  "proximate.donor.mt_reported": "مُبلَّغ عنه",
+  "proximate.donor.mt_reported_sub": "بلّغ الشركاء",
+  "proximate.donor.mt_verified": "مُتحقَّق منه",
+  "proximate.donor.mt_verified_sub": "فُحص واعتُمد",
+  "proximate.donor.not_recorded": "غير مسجّل",
+  "proximate.donor.flagged": "موسوم"
 }
