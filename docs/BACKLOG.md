@@ -20,7 +20,7 @@ History note: before 2026-06-30 this file was the Kuja backlog and the
 NEAR file accumulated everything (including Proximate). Reorganised so
 each file owns exactly one scope.
 
-Updated 2026-07-05.
+Updated 2026-08-27.
 
 ---
 
@@ -74,6 +74,31 @@ Updated 2026-07-05.
       `.github/workflows/regression.yml` (fast API job + full API+Playwright
       browser job). Live browser leg reuses `browser_test.py --base`.
       Old `smoke_test.py` stays as an advisory quick-check.
+
+### Browser regression leg fails locally on Postgres-only SQL (SQLite can't parse it)
+- **last_touched:** 2026-08-27
+- `regression.py --browser` (the Playwright leg) boots the app against the
+  fresh **SQLite** temp DB. ~23 **Kuja-hub** browser tests fail there
+  (donor/NGO/admin dashboards, applications list, benchmarks, `/trust`,
+  scoped chat) — but ALL of them trace to
+  `sqlite3.OperationalError: near "'14 days'": syntax error` and
+  `ValueError: Invalid format string`: Kuja-hub queries use **Postgres-only
+  SQL** (`INTERVAL '14 days'`, Postgres date-format strings) that SQLite
+  rejects → the endpoint 503s → the "missing card" / "no failed API calls"
+  assertions cascade from that. On prod (Postgres) these run fine.
+- **Not a regression, and not Proximate.** Confirmed 2026-08-27: 258/281
+  browser checks pass, **0 Proximate failures**, and the API leg is 121/121.
+  Same trust problem the API leg had before `regression.py` — now on the
+  browser side: it can't tell a real Kuja-hub break from this SQLite noise.
+- [ ] **Fix (Kuja-hub, low urgency — local/CI test reliability only, no prod
+  impact):** make the offending queries dialect-portable — replace raw
+  `INTERVAL '<n> days'` and Postgres `to_char(...)` date SQL with
+  SQLAlchemy-portable equivalents (or branch on `db.engine.dialect.name`).
+  Start by grepping the applications / dashboard / benchmarks query code for
+  `days'` interval literals and `to_char(`.
+- [ ] **Secondary:** refresh the few stale `browser_test.py` selectors (e.g.
+  the language-toggle locator no longer matches the header DOM — the feature
+  works, the test's selector is out of date).
 
 ### Transcription covers audio only — video is stored, never read
 - **last_touched:** 2026-08-01
