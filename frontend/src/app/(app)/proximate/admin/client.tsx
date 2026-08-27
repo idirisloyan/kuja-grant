@@ -110,7 +110,12 @@ export function ProximateAdminClient() {
   }
 
   const pb = data.partners_by_status;
-  const intake = pb.intake ?? 0;
+  // Intake = everything before due diligence. The overview API returns raw
+  // statuses (nominated, endorsements_open, …) and has NO `intake` bucket, so
+  // reading pb.intake silently rendered 0 and dropped every pre-DD partner
+  // from the pipeline. Sum the two pre-DD stages so intake+dd_pending+dd_clear
+  // reconciles to partners_total.
+  const intake = (pb.nominated ?? 0) + (pb.endorsements_open ?? 0);
   const ddPending = pb.dd_pending ?? 0;
   const cleared = pb.dd_clear ?? 0;
   const suspended = pb.suspended ?? 0;
