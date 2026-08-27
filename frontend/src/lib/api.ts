@@ -101,12 +101,16 @@ async function apiFetch<T>(
     }
   }
 
-  // Redirect to login on 401 (except for the session-check endpoint).
-  // Leave a marker so /login can explain WHY the user was bounced here
-  // ("your session ended") instead of the app silently flashing back to the
-  // login screen — the confusing symptom reported on the Proximate PWA.
+  // Redirect to login on 401 — but NOT for the auth endpoints themselves.
+  // /auth/me is the session probe (checkSession handles its own 401), and
+  // /auth/login MUST surface a wrong-password 401 as a visible "Invalid
+  // credentials" toast — redirecting it silently reloaded the login page so a
+  // bad password looked like "nothing happens" (reported on the Proximate PWA).
+  // For any OTHER endpoint, a 401 mid-session leaves a marker so /login can say
+  // "your session ended" rather than flashing back with no explanation.
   if (res.status === 401) {
-    if (typeof window !== 'undefined' && !path.includes('/auth/me')) {
+    const isAuthEndpoint = path.includes('/auth/me') || path.includes('/auth/login');
+    if (typeof window !== 'undefined' && !isAuthEndpoint) {
       try { sessionStorage.setItem('kuja_session_expired', '1'); } catch { /* ignore */ }
       window.location.href = '/login';
     }
