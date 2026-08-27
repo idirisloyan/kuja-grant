@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Fraunces } from 'next/font/google';
+import { Inter, Fraunces, Bricolage_Grotesque, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { AppRegistry } from '@/components/app-registry';
 
@@ -10,6 +10,19 @@ const fraunces = Fraunces({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-serif',
+});
+
+// Proximate's own type system (applied only under [data-tenant="proximate"]):
+// a characterful grotesque for display + big numbers, an institutional body
+// face with Arabic sensibility, and a mono for money figures + audit hashes.
+const bricolage = Bricolage_Grotesque({
+  subsets: ['latin'], weight: ['600', '700', '800'], variable: '--font-prox-display',
+});
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-prox-body',
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'], weight: ['500', '600'], variable: '--font-prox-mono',
 });
 
 export const metadata: Metadata = {
@@ -44,7 +57,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${fraunces.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${fraunces.variable} ${bricolage.variable} ${plexSans.variable} ${plexMono.variable}`}>
       <head>
         {/* QA 2026-07-15 (dark-mode inconsistency): the dark class used to
             be applied only by the header ThemeToggle, so login + public
