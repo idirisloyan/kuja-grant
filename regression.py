@@ -573,7 +573,10 @@ def run_proximate_writes(base):
         post(ob, base, "/api/proximate/disbursements",
              {"partner_id": pid, "amount_usd": 5000, "round_id": rid,
               "purpose": "regression"},
-             override=OV, allow={200, 201, 400, 403, 404, 409})
+             # 422 err.round_not_active is a VALID decision: the harness has a
+             # single OB, so `rid` only ever gets 1/2 signatures and stays
+             # in_review — the R-01 two-signer guard then refuses the release.
+             override=OV, allow={200, 201, 400, 403, 404, 409, 422})
     check("OB POST /proximate/disbursements (create)", disbursement_create)
 
     def disbursement_cosign():
