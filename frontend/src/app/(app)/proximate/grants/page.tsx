@@ -13,15 +13,20 @@ import { FileText, Loader2, Plus, DollarSign } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/proximate/empty-state';
 import { LoadError } from '@/components/proximate/load-error';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Grant status → design-system pill tone (heuristic over free-form status).
+function grantPill(s: string): string {
+  if (/active|current|open|received|allocated/.test(s)) return 'good';
+  if (/pending|draft|review|due|reporting/.test(s)) return 'warn';
+  if (/flag|overdue|breach|suspend/.test(s)) return 'danger';
+  return 'slate';
+}
 
 interface Grant {
   id: number;
@@ -96,167 +101,122 @@ export default function ProximateGrantsListPage() {
             {/* Rollup — compact stat row (Stage 4): summary strip, not
                 oversized cards, matching the partners register. */}
             {grants.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <Card className="p-3">
-                  <div className="flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {t('proximate.grants.committed')}
-                    </p>
-                  </div>
-                  <p className="text-xl font-semibold">{fmtUsd(totalCommitted)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('proximate.grants.across_n', { n: grants.length })}
-                  </p>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {t('proximate.grants.allocated_to_rounds')}
-                    </p>
-                  </div>
-                  <p className="text-xl font-semibold">{fmtUsd(totalAllocated)}</p>
-                  <p className="text-xs text-muted-foreground">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="prox-stat">
+                  <div className="lab"><DollarSign className="w-3.5 h-3.5" /> {t('proximate.grants.committed')}</div>
+                  <div className="val prox-num">{fmtUsd(totalCommitted)}</div>
+                  <div className="meta">{t('proximate.grants.across_n', { n: grants.length })}</div>
+                </div>
+                <div className="prox-stat">
+                  <div className="lab"><DollarSign className="w-3.5 h-3.5" /> {t('proximate.grants.allocated_to_rounds')}</div>
+                  <div className="val prox-num">{fmtUsd(totalAllocated)}</div>
+                  <div className="meta">
                     {totalCommitted
                       ? t('proximate.grants.pct_of_committed', { pct: ((totalAllocated / totalCommitted) * 100).toFixed(0) })
                       : ''}
-                  </p>
-                </Card>
-                <Card className="p-3">
-                  <div className="flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {t('proximate.grants.uncommitted')}
-                    </p>
                   </div>
-                  <p className="text-xl font-semibold">{fmtUsd(totalRemaining)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('proximate.grants.available_future')}
-                  </p>
-                </Card>
+                </div>
+                <div className="prox-stat">
+                  <div className="lab"><DollarSign className="w-3.5 h-3.5" /> {t('proximate.grants.uncommitted')}</div>
+                  <div className="val prox-num">{fmtUsd(totalRemaining)}</div>
+                  <div className="meta">{t('proximate.grants.available_future')}</div>
+                </div>
               </div>
             )}
 
             {/* Grant list */}
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">
-                    {t('proximate.grants.register_n', { n: grants.length })}
-                  </p>
-                </div>
+            <div className="prox-panel overflow-hidden">
+              <div className="prox-phead">
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+                  {t('proximate.grants.register_n', { n: grants.length })}
+                </h2>
                 {isOb && (
                   <Link
                     href="/proximate/admin/grants/new"
-                    className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                    className="prox-btn ghost"
+                    style={{ height: 32, fontSize: 12.5, padding: '0 12px' }}
                   >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3.5 h-3.5" />
                     {t('proximate.grants.upload_agreement')}
                   </Link>
                 )}
               </div>
               {grants.length === 0 && (
-                <EmptyState
-                  compact
-                  icon={FileText}
-                  title={t('proximate.grants.empty_title')}
-                  hint={isOb
-                    ? t('proximate.grants.empty_hint_ob')
-                    : t('proximate.grants.empty_hint_donor')}
-                />
+                <div style={{ padding: '18px' }}>
+                  <EmptyState
+                    compact
+                    icon={FileText}
+                    title={t('proximate.grants.empty_title')}
+                    hint={isOb
+                      ? t('proximate.grants.empty_hint_ob')
+                      : t('proximate.grants.empty_hint_donor')}
+                  />
+                </div>
               )}
-              {grants.length > 0 && (
-                <ul className="space-y-2">
-                  {grants.map((g) => {
-                    const statusCls = TONE_CLASSES[toneForProximateStatus(g.status)];
-                    const pctAllocated =
-                      g.amount_committed_usd
-                        ? Math.min(
-                            100,
-                            (g.amount_allocated_usd / g.amount_committed_usd) * 100,
-                          )
-                        : 0;
-                    return (
-                      <li
-                        key={g.id}
-                        className="border rounded-md p-3 hover:bg-muted/30 transition-colors"
-                      >
-                        <Link
-                          href={`/proximate/admin/grants/${g.id}`}
-                          className="block"
-                        >
-                          <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {g.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {g.donor_name || t('proximate.grants.donor_tbd')}
-                                {g.donor_grant_ref
-                                  ? ` · ${t('proximate.grants.ref')} ${g.donor_grant_ref}`
-                                  : ''}
-                              </p>
-                            </div>
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] ${statusCls}`}
-                            >
-                              {labelForProximateStatus(g.status, t)}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                {t('proximate.grants.committed')}
-                              </p>
-                              <p className="font-mono">{fmtUsd(g.amount_committed_usd)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                {t('proximate.grants.allocated')}
-                              </p>
-                              <p className="font-mono">{fmtUsd(g.amount_allocated_usd)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                {t('proximate.grants.remaining')}
-                              </p>
-                              <p className="font-mono">{fmtUsd(g.amount_remaining_usd)}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                {t('proximate.grants.period')}
-                              </p>
-                              {/* Funding period on the collapsed card (spec);
-                                  reporting cadence lives on the detail page. */}
-                              <p className="font-mono">
-                                {g.start_date
-                                  ? new Date(g.start_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
-                                  : '—'}
-                                {' – '}
-                                {g.end_date
-                                  ? new Date(g.end_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
-                                  : '—'}
-                              </p>
-                            </div>
-                          </div>
-                          {g.amount_committed_usd && (
-                            <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div
-                                className="h-full bg-emerald-500"
-                                style={{ width: `${pctAllocated}%` }}
-                              />
-                            </div>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
+              {grants.map((g, i) => {
+                const pctAllocated =
+                  g.amount_committed_usd
+                    ? Math.min(100, (g.amount_allocated_usd / g.amount_committed_usd) * 100)
+                    : 0;
+                return (
+                  <Link
+                    key={g.id}
+                    href={`/proximate/admin/grants/${g.id}`}
+                    className="block hover:bg-[color:var(--prox-surface-2)] transition-colors"
+                    style={{ padding: '14px 18px', borderTop: i === 0 ? undefined : '1px solid var(--prox-line)' }}
+                  >
+                    <div className="flex items-start justify-between flex-wrap gap-2" style={{ marginBottom: 11 }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+                          {g.title}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: 'var(--prox-muted)' }}>
+                          {g.donor_name || t('proximate.grants.donor_tbd')}
+                          {g.donor_grant_ref
+                            ? ` · ${t('proximate.grants.ref')} ${g.donor_grant_ref}`
+                            : ''}
+                        </p>
+                      </div>
+                      <span className={`prox-pill ${grantPill(g.status)}`}>
+                        {labelForProximateStatus(g.status, t)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <div className="prox-eyebrow">{t('proximate.grants.committed')}</div>
+                        <div className="prox-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{fmtUsd(g.amount_committed_usd)}</div>
+                      </div>
+                      <div>
+                        <div className="prox-eyebrow">{t('proximate.grants.allocated')}</div>
+                        <div className="prox-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{fmtUsd(g.amount_allocated_usd)}</div>
+                      </div>
+                      <div>
+                        <div className="prox-eyebrow">{t('proximate.grants.remaining')}</div>
+                        <div className="prox-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{fmtUsd(g.amount_remaining_usd)}</div>
+                      </div>
+                      <div>
+                        <div className="prox-eyebrow">{t('proximate.grants.period')}</div>
+                        <div className="prox-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
+                          {g.start_date
+                            ? new Date(g.start_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+                            : '—'}
+                          {' – '}
+                          {g.end_date
+                            ? new Date(g.end_date).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
+                    {g.amount_committed_usd && (
+                      <div className="prox-bar" style={{ marginTop: 11 }}>
+                        <i style={{ width: `${pctAllocated}%` }} />
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
       </PageMain>

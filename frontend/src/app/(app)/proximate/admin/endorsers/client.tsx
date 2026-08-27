@@ -20,10 +20,8 @@ import { Loader2, Check, X, Mail, MapPin } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/proximate/empty-state';
-import { TONE_CLASSES } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -134,7 +132,7 @@ export function ProximateEndorserQueueClient() {
           <p className="text-sm text-destructive">{error}</p>
         )}
         {notice && (
-          <div className={`text-xs rounded-md border px-3 py-2 ${TONE_CLASSES.positive}`}>
+          <div className="text-xs rounded-md px-3 py-2" style={{ color: 'var(--prox-good)', background: 'var(--prox-good-tint)', border: '1px solid color-mix(in srgb, var(--prox-good) 25%, transparent)' }}>
             {notice}
           </div>
         )}
@@ -151,20 +149,20 @@ export function ProximateEndorserQueueClient() {
           <ul className="space-y-3">
             {rows.map((e) => (
               <li key={e.id}>
-                <Card className="p-4">
+                <div className="prox-panel" style={{ padding: '16px 18px' }}>
                   <div className="flex items-start gap-4">
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium">
+                        <p style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14.5, fontWeight: 700 }}>
                           {e.user_name || `${t('proximate.endorser_queue.endorser')} #${e.id}`}
                         </p>
-                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.attention}`}>
+                        <span className="prox-pill warn">
                           {t('proximate.endorser_queue.pending_badge')}
-                        </Badge>
+                        </span>
                         {e.sanctions_flag && (
-                          <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.critical}`}>
+                          <span className="prox-pill danger">
                             {t('proximate.partners.sanctions_flag_badge')}
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -292,7 +290,7 @@ export function ProximateEndorserQueueClient() {
                       </div>
                     </div>
                   )}
-                </Card>
+                </div>
               </li>
             ))}
           </ul>
