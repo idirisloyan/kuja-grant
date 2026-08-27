@@ -19,12 +19,15 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Round lifecycle → design-system pill tone.
+const ROUND_PILL: Record<string, string> = {
+  draft: 'slate', in_review: 'warn', active: 'good', closed: 'slate', cancelled: 'danger',
+};
 
 interface Round {
   id: number;
@@ -144,11 +147,10 @@ export default function ProximateRoundsPage() {
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    statusFilter === s
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
-                  }`}
+                  className="text-xs px-3 py-1 rounded-full border transition-colors"
+                  style={statusFilter === s
+                    ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
+                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
                 >
                   {s === 'all'
                     ? `${t('common.all')} (${rounds.length})`
@@ -167,42 +169,37 @@ export default function ProximateRoundsPage() {
           </Card>
         )}
         {visibleRounds.length > 0 && (
-          <ul className="space-y-2">
-            {visibleRounds.map((r) => (
-              <li key={r.id}>
-                <Link href={`/proximate/rounds/${r.id}`} className="block">
-                  <Card className="p-4 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium truncate">{r.title}</h3>
-                          <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(r.status)]}`}>
-                            {labelForProximateStatus(r.status, t)}
-                          </Badge>
-                          {r.status === 'in_review' && (
-                            <span className="text-xs text-muted-foreground">
-                              {r.signed_count}/{r.signers_required} {t('proximate.rounds.signed')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                          <span>{labelForRoundType(r.trigger_type, t)}</span>
-                          {r.donor_name && <span>· {r.donor_name}</span>}
-                          {r.envelope_usd && (
-                            <span>· ${r.envelope_usd.toLocaleString()}</span>
-                          )}
-                          {r.drafted_at && (
-                            <span>· {new Date(r.drafted_at).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
-                    </div>
-                  </Card>
-                </Link>
-              </li>
+          <div className="prox-panel overflow-hidden">
+            {visibleRounds.map((r, i) => (
+              <Link
+                key={r.id}
+                href={`/proximate/rounds/${r.id}`}
+                className="prox-qrow"
+                style={i === 0 ? { borderTop: 0 } : undefined}
+              >
+                <div className="min-w-0">
+                  <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14.5 }}>
+                    {r.title}
+                  </strong>
+                  <small className="block truncate">
+                    {labelForRoundType(r.trigger_type, t)}
+                    {r.donor_name && <> · {r.donor_name}</>}
+                    {r.envelope_usd != null && (
+                      <> · <span className="prox-mono">${r.envelope_usd.toLocaleString()}</span></>
+                    )}
+                    {r.drafted_at && <> · {new Date(r.drafted_at).toLocaleDateString()}</>}
+                    {r.status === 'in_review' && (
+                      <> · {r.signed_count}/{r.signers_required} {t('proximate.rounds.signed')}</>
+                    )}
+                  </small>
+                </div>
+                <span className={`prox-pill ${ROUND_PILL[r.status] || 'slate'}`}>
+                  {labelForProximateStatus(r.status, t)}
+                </span>
+                <ChevronRight className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
       </PageMain>
     </PageShell>

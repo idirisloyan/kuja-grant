@@ -20,13 +20,17 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { LoadError } from '@/components/proximate/load-error';
 import { isTestRecord, splitTestRecords } from '@/lib/test-records';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Disbursement status → design-system pill tone.
+const DISB_PILL: Record<string, string> = {
+  draft: 'slate', pending_cosign: 'warn', disbursed: 'acc', pending_report: 'warn',
+  reported: 'warn', verified: 'good', flagged: 'danger',
+};
 
 interface Disbursement {
   id: number;
@@ -208,11 +212,10 @@ export default function ProximateDisbursementsPage() {
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    statusFilter === s
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
-                  }`}
+                  className="text-xs px-3 py-1 rounded-full border transition-colors"
+                  style={statusFilter === s
+                    ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
+                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
                 >
                   {s === 'all'
                     ? `${t('common.all')} (${countedRows.length})`
@@ -223,11 +226,10 @@ export default function ProximateDisbursementsPage() {
               <button
                 type="button"
                 onClick={() => setShowTest((v) => !v)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                  showTest
-                    ? `bg-slate-700 text-white border-slate-700`
-                    : `bg-muted/50 text-muted-foreground border-dashed border-border hover:bg-muted`
-                }`}
+                className="text-xs px-3 py-1 rounded-full border border-dashed transition-colors"
+                style={showTest
+                  ? { background: 'var(--prox-slate)', color: '#fff', borderColor: 'transparent' }
+                  : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
                 title={t('proximate.disbursements.test_toggle_hint')}
               >
                 {showTest
@@ -238,70 +240,60 @@ export default function ProximateDisbursementsPage() {
           </div>
         )}
         {visibleRows.length > 0 && (
-          <ul className="space-y-2">
-            {visibleRows.map((d) => (
-              <li key={d.id}>
-                <Card className="p-4 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-start gap-3 flex-wrap">
-                    <Link href={`/proximate/disbursements/${d.id}`} className="flex-1 min-w-0 block">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-medium truncate">
-                          {d.partner_name || `Partner #${d.partner_id}`}
-                        </h3>
-                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(d.status)]}`}>
-                          {labelForProximateStatus(d.status, t)}
-                        </Badge>
-                        {d.overdue && (
-                          <Badge variant="outline" className="text-[10px] bg-red-100 text-red-800 border-red-300">
-                            {t('proximate.disbursements.overdue')}
-                          </Badge>
-                        )}
-                        {isTestRecord(d.partner_name) && (
-                          <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-700 border-slate-300">
-                            {t('common.test_record')}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
-                        {d.amount_usd && (
-                          <span>${d.amount_usd.toLocaleString()}</span>
-                        )}
-                        {d.purpose && <span>· {d.purpose}</span>}
-                        {d.sent_at && (
-                          <span>· {formatComplianceDate(d.sent_at)}</span>
-                        )}
-                        {d.report_due_at && d.status === 'pending_report' && (() => {
-                          const age = dueAge(d.report_due_at);
-                          return (
-                            <span className={age?.late ? 'text-red-700 font-medium' : undefined}>
-                              · {t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}
-                              {age ? ` (${age.text})` : ''}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </Link>
-                    {d.report_token && d.status === 'pending_report' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
-                      >
-                        {copied === d.id ? (
-                          <Check className="w-3.5 h-3.5 me-1" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5 me-1" />
-                        )}
-                        {copied === d.id
-                          ? t('proximate.disbursements.copied')
-                          : t('proximate.disbursements.copy_report_link')}
-                      </Button>
+          <div className="prox-panel overflow-hidden">
+            {visibleRows.map((d, i) => (
+              <div key={d.id} className="prox-qrow" style={i === 0 ? { borderTop: 0 } : undefined}>
+                <Link href={`/proximate/disbursements/${d.id}`} className="min-w-0 block">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+                      {d.partner_name || `Partner #${d.partner_id}`}
+                    </strong>
+                    <span className={`prox-pill ${DISB_PILL[d.status] || 'slate'}`}>
+                      {labelForProximateStatus(d.status, t)}
+                    </span>
+                    {d.overdue && (
+                      <span className="prox-pill danger">{t('proximate.disbursements.overdue')}</span>
+                    )}
+                    {isTestRecord(d.partner_name) && (
+                      <span className="prox-pill slate">{t('common.test_record')}</span>
                     )}
                   </div>
-                </Card>
-              </li>
+                  <small className="block" style={{ marginTop: 3 }}>
+                    {d.amount_usd != null && (
+                      <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>${d.amount_usd.toLocaleString()}</span>
+                    )}
+                    {d.purpose && <> · {d.purpose}</>}
+                    {d.sent_at && <> · {formatComplianceDate(d.sent_at)}</>}
+                    {d.report_due_at && d.status === 'pending_report' && (() => {
+                      const age = dueAge(d.report_due_at);
+                      return (
+                        <span style={age?.late ? { color: 'var(--prox-danger)', fontWeight: 600 } : undefined}>
+                          {' · '}{t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}
+                          {age ? ` (${age.text})` : ''}
+                        </span>
+                      );
+                    })()}
+                  </small>
+                </Link>
+                {d.report_token && d.status === 'pending_report' && (
+                  <button
+                    className="prox-btn ghost"
+                    style={{ height: 30, fontSize: 12, padding: '0 11px' }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
+                  >
+                    {copied === d.id ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    {copied === d.id
+                      ? t('proximate.disbursements.copied')
+                      : t('proximate.disbursements.copy_report_link')}
+                  </button>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </PageMain>
     </PageShell>

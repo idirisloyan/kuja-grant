@@ -18,13 +18,17 @@ import {
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
+
+// Partner workflow status → design-system pill tone.
+const PARTNER_PILL: Record<string, string> = {
+  nominated: 'slate', endorsements_open: 'warn', dd_pending: 'warn',
+  dd_clear: 'good', suspended: 'danger',
+};
 
 interface Partner {
   id: number;
@@ -236,71 +240,53 @@ export default function ProximatePartnersPage() {
                 below to that group; the active tile carries a ring so it is
                 obvious which slice you are looking at. Total clears back to
                 everything. */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
                 aria-pressed={statusFilter === 'all'}
                 title={t('proximate.partners.filter_to_total')}
-                className="text-start"
+                className="prox-stat text-start"
+                style={statusFilter === 'all' ? { borderColor: 'var(--prox-accent)', boxShadow: '0 0 0 1px var(--prox-accent)' } : undefined}
               >
-                <Card className={`p-3 transition-colors ${statusFilter === 'all' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.total')}</p>
-                  </div>
-                  <p className="text-xl font-semibold">{counts.all}</p>
-                </Card>
+                <div className="lab"><Users className="w-3.5 h-3.5" /> {t('proximate.partners.total')}</div>
+                <div className="val prox-num">{counts.all}</div>
               </button>
               <button
                 type="button"
                 onClick={() => setStatusFilter('dd_clear')}
                 aria-pressed={statusFilter === 'dd_clear'}
                 title={t('proximate.partners.filter_to_cleared')}
-                className="text-start"
+                className="prox-stat text-start"
+                style={statusFilter === 'dd_clear' ? { borderColor: 'var(--prox-accent)', boxShadow: '0 0 0 1px var(--prox-accent)' } : undefined}
               >
-                <Card className={`p-3 transition-colors ${statusFilter === 'dd_clear' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t('proximate.partners.cleared')}</p>
-                  </div>
-                  <p className="text-xl font-semibold">{counts.dd_clear || 0}</p>
-                </Card>
+                <div className="lab"><ShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--prox-good)' }} /> {t('proximate.partners.cleared')}</div>
+                <div className="val prox-num" style={{ color: 'var(--prox-good)' }}>{counts.dd_clear || 0}</div>
               </button>
               <button
                 type="button"
                 onClick={() => setStatusFilter('in_review')}
                 aria-pressed={statusFilter === 'in_review'}
                 title={t('proximate.partners.filter_to_in_review')}
-                className="text-start"
+                className="prox-stat text-start"
+                style={statusFilter === 'in_review' ? { borderColor: 'var(--prox-accent)', boxShadow: '0 0 0 1px var(--prox-accent)' } : undefined}
               >
-                <Card className={`p-3 transition-colors ${statusFilter === 'in_review' ? 'ring-2 ring-primary' : 'hover:bg-muted/40'}`}>
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {t('proximate.partners.in_review')}
-                  </p>
-                  <p className="text-xl font-semibold">
-                    {(counts.endorsements_open || 0) + (counts.dd_pending || 0)}
-                  </p>
-                </Card>
+                <div className="lab">{t('proximate.partners.in_review')}</div>
+                <div className="val prox-num">{(counts.endorsements_open || 0) + (counts.dd_pending || 0)}</div>
               </button>
               <button
                 type="button"
                 onClick={() => setStatusFilter('sanctions')}
                 aria-pressed={statusFilter === 'sanctions'}
                 title={t('proximate.partners.filter_to_sanctions')}
-                className="text-start"
+                className={`prox-stat text-start${withSanctionsFlag > 0 ? ' alert' : ''}`}
+                style={statusFilter === 'sanctions' ? { borderColor: 'var(--prox-accent)', boxShadow: '0 0 0 1px var(--prox-accent)' } : undefined}
               >
-                <Card className={`p-3 transition-colors ${statusFilter === 'sanctions' ? 'ring-2 ring-primary' : withSanctionsFlag > 0 ? 'border-destructive' : 'hover:bg-muted/40'}`}>
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle
-                      className={`w-3.5 h-3.5 ${withSanctionsFlag > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
-                    />
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      {t('proximate.partners.sanctions_flags')}
-                    </p>
-                  </div>
-                  <p className="text-xl font-semibold">{withSanctionsFlag}</p>
-                </Card>
+                <div className="lab">
+                  <AlertTriangle className="w-3.5 h-3.5" style={{ color: withSanctionsFlag > 0 ? 'var(--prox-danger)' : 'var(--prox-muted)' }} />
+                  {t('proximate.partners.sanctions_flags')}
+                </div>
+                <div className="val prox-num" style={withSanctionsFlag > 0 ? { color: 'var(--prox-danger)' } : undefined}>{withSanctionsFlag}</div>
               </button>
             </div>
 
@@ -365,11 +351,10 @@ export default function ProximatePartnersPage() {
                       key={s}
                       type="button"
                       onClick={() => setStatusFilter(s)}
-                      className={`text-[11px] px-2 py-1 rounded-md border ${
-                        statusFilter === s
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background hover:bg-muted/40'
-                      }`}
+                      className="text-[11px] px-2.5 py-1 rounded-md border transition-colors"
+                      style={statusFilter === s
+                        ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
+                        : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
                     >
                       {s === 'all' ? t('common.all') : labelForProximateStatus(s, t)} ({counts[s] || 0})
                     </button>
@@ -435,89 +420,71 @@ export default function ProximatePartnersPage() {
             )}
 
             {/* Partner list */}
-            <Card className="p-4">
-              {filtered.length === 0 ? (
+            {filtered.length === 0 ? (
+              <Card className="p-4">
                 <p className="text-sm text-muted-foreground italic py-8 text-center">
                   {t('proximate.partners.no_match')}
                 </p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {sorted.slice(0, visibleCount).map((p) => (
-                    <li
-                      key={p.id}
-                      className="border-b border-border/60 pb-1.5 last:border-b-0"
-                    >
-                      {/* QA 2026-07-12 (PRX-FSP-001 reachability): this used
-                          to link to /proximate/admin?partner=N, but the
-                          dashboard never reads that param — the click dropped
-                          the partner context, and the actual partner detail
-                          (Add payment route, bank verify, interventions,
-                          endorsements) at /proximate/endorse/<id> was
-                          unreachable by navigation. Link the real detail. */}
-                      <Link
-                        href={`/proximate/endorse/${p.id}`}
-                        className="flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded-sm px-2 -mx-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {p.name}
-                            {isTestRecord(p.name) && (
-                              <span className="ms-1.5 align-middle text-[9px] px-1.5 py-0.5 rounded border border-slate-300 bg-slate-100 text-slate-700">
-                                {t('common.test_record')}
-                              </span>
-                            )}
-                          </p>
-                          {p.locality && (
-                            <p className="text-[10px] text-muted-foreground">
-                              {p.locality}
-                            </p>
-                          )}
-                        </div>
-                        {/* Collapsed row shows one workflow status + one
-                            secondary signal (sanctions). Trust tier and the
-                            rest live on the partner detail. */}
-                        {p.sanctions_flag && (
-                          <Badge variant="outline" className="text-[10px] border-destructive text-destructive">
-                            {t('proximate.partners.sanctions_flag_badge')}
-                          </Badge>
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${TONE_CLASSES[toneForProximateStatus(p.status)]}`}
-                        >
-                          {labelForProximateStatus(p.status, t)}
-                        </Badge>
-                        {/* The one thing to do next for this partner. Reads as
-                            a step, not just a state — the whole row already
-                            opens the workspace where the action happens. */}
-                        {(() => {
-                          const na = NEXT_ACTION[p.status];
-                          if (!na) return null;
-                          const resolved = t(na.key);
-                          const label = resolved === na.key ? na.en : resolved;
-                          return (
-                            <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0 ms-1">
-                              {label}
-                              <ChevronRight className="w-3 h-3" />
-                            </span>
-                          );
-                        })()}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {sorted.length > visibleCount && (
-                <div className="pt-3 text-center">
-                  <Button
-                    size="sm" variant="outline"
-                    onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              </Card>
+            ) : (
+              <div className="prox-panel overflow-hidden">
+                {sorted.slice(0, visibleCount).map((p, i) => (
+                  /* QA 2026-07-12 (PRX-FSP-001 reachability): link the real
+                     partner detail at /proximate/endorse/<id>, not the
+                     dashboard, which drops the partner context. */
+                  <Link
+                    key={p.id}
+                    href={`/proximate/endorse/${p.id}`}
+                    className="prox-qrow"
+                    style={i === 0 ? { borderTop: 0 } : undefined}
                   >
-                    {t('proximate.partners.show_more')} ({sorted.length - visibleCount})
-                  </Button>
-                </div>
-              )}
-            </Card>
+                    <div className="min-w-0">
+                      <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14 }}>
+                        {p.name}
+                        {isTestRecord(p.name) && (
+                          <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>
+                            {t('common.test_record')}
+                          </span>
+                        )}
+                      </strong>
+                      {p.locality && <small className="block truncate">{p.locality}</small>}
+                    </div>
+                    {/* Collapsed row: one workflow status + sanctions signal. */}
+                    <div className="flex items-center gap-1.5">
+                      {p.sanctions_flag && (
+                        <span className="prox-pill danger">{t('proximate.partners.sanctions_flag_badge')}</span>
+                      )}
+                      <span className={`prox-pill ${PARTNER_PILL[p.status] || 'slate'}`}>
+                        {labelForProximateStatus(p.status, t)}
+                      </span>
+                    </div>
+                    {/* The one thing to do next — reads as a step, not a state. */}
+                    {(() => {
+                      const na = NEXT_ACTION[p.status];
+                      if (!na) return <span />;
+                      const resolved = t(na.key);
+                      const label = resolved === na.key ? na.en : resolved;
+                      return (
+                        <span className="hidden sm:inline-flex items-center gap-0.5 text-[11px] shrink-0" style={{ color: 'var(--prox-muted)' }}>
+                          {label}
+                          <ChevronRight className="w-3 h-3" />
+                        </span>
+                      );
+                    })()}
+                  </Link>
+                ))}
+                {sorted.length > visibleCount && (
+                  <div className="py-3 text-center" style={{ borderTop: '1px solid var(--prox-line)' }}>
+                    <Button
+                      size="sm" variant="outline"
+                      onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    >
+                      {t('proximate.partners.show_more')} ({sorted.length - visibleCount})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </PageMain>
