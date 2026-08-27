@@ -23,7 +23,6 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES, toneForProximateStatus } from '@/components/proximate/status-badge';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
 import { ApprovedActivitiesCard } from '@/components/proximate/approved-activities-card';
@@ -131,6 +130,11 @@ const ROUND_TABS = [
   { key: 'disbursements', label: 'Disbursements', k: 'proximate.cycle.tab_disbursements' },
   { key: 'activity', label: 'Activity', k: 'proximate.cycle.tab_activity' },
 ];
+
+// Round lifecycle → design-system pill tone.
+const ROUND_PILL: Record<string, string> = {
+  draft: 'slate', in_review: 'warn', active: 'good', closed: 'slate', cancelled: 'danger',
+};
 
 export function ProximateRoundDetailClient() {
   const [tab, setTab] = useState('overview');
@@ -397,7 +401,7 @@ export function ProximateRoundDetailClient() {
         <div className="space-y-4">
           {/* Redesign Stage 3b — tab bar. Sections below render in
               their original order; inactive tabs are CSS-hidden. */}
-          <div className="flex items-center gap-1 border-b border-border overflow-x-auto" role="tablist">
+          <div className="flex items-center gap-1 overflow-x-auto" role="tablist" style={{ borderBottom: '1px solid var(--prox-line)' }}>
             {ROUND_TABS
               .filter((x) => isOperator
                 || ['overview', 'partners', 'disbursements'].includes(x.key))
@@ -408,11 +412,10 @@ export function ProximateRoundDetailClient() {
                   role="tab"
                   aria-selected={tab === x.key}
                   onClick={() => setTab(x.key)}
-                  className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-                    tab === x.key
-                      ? 'border-[hsl(var(--kuja-clay))] text-foreground font-medium'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className="px-3.5 py-2.5 text-[13.5px] whitespace-nowrap border-b-2 -mb-px transition-colors"
+                  style={tab === x.key
+                    ? { borderColor: 'var(--prox-accent)', color: 'var(--prox-ink)', fontWeight: 600 }
+                    : { borderColor: 'transparent', color: 'var(--prox-muted)' }}
                 >
                   {('k' in x && x.k) ? (t(x.k as string) || x.label) : x.label}
                 </button>
@@ -458,7 +461,7 @@ export function ProximateRoundDetailClient() {
               return null;
             })();
             return (
-              <Card className={`p-4 ${isCancelled ? 'border-red-300' : 'border-emerald-200'}`}>
+              <div className="prox-panel" style={{ padding: '16px 18px', borderColor: isCancelled ? 'var(--prox-danger)' : undefined }}>
                 {/* Stepper */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                   {stages.map((s, i) => {
@@ -512,7 +515,7 @@ export function ProximateRoundDetailClient() {
                       : ''}
                   </p>
                 )}
-              </Card>
+              </div>
             );
           })()}
 
@@ -613,57 +616,57 @@ export function ProximateRoundDetailClient() {
           })()}
 
           {/* Status + meta */}
-          <Card className="p-4 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className={TONE_CLASSES[toneForProximateStatus(round.status)]}>
+          <div className="prox-panel" style={{ padding: '16px 18px' }}>
+            <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 14 }}>
+              <span className={`prox-pill ${ROUND_PILL[round.status] || 'slate'}`}>
                 {labelForProximateStatus(round.status, t)}
-              </Badge>
+              </span>
               {round.status === 'in_review' && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                   {round.signed_count}/{round.signers_required} {t('proximate.rounds.signed')}
                 </span>
               )}
             </div>
-            <dl className="grid grid-cols-1 sm:grid-cols-3 gap-y-2 gap-x-4 text-xs">
+            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-y-3.5 gap-x-4">
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.trigger')}</dt>
-                <dd className="font-medium">{labelForRoundType(round.trigger_type, t)}</dd>
+                <dt className="prox-eyebrow">{t('proximate.rounds.trigger')}</dt>
+                <dd style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>{labelForRoundType(round.trigger_type, t)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.donor')}</dt>
-                <dd className="font-medium">{round.donor_name || '—'}</dd>
+                <dt className="prox-eyebrow">{t('proximate.rounds.donor')}</dt>
+                <dd style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>{round.donor_name || '—'}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.envelope')}</dt>
-                <dd className="font-medium">
+                <dt className="prox-eyebrow">{t('proximate.rounds.envelope')}</dt>
+                <dd className="prox-mono" style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>
                   {round.envelope_usd ? `$${round.envelope_usd.toLocaleString()}` : '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.region')}</dt>
-                <dd className="font-medium">{round.target_region || round.target_country}</dd>
+                <dt className="prox-eyebrow">{t('proximate.rounds.region')}</dt>
+                <dd style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>{round.target_region || round.target_country}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.duration')}</dt>
-                <dd className="font-medium">
+                <dt className="prox-eyebrow">{t('proximate.rounds.duration')}</dt>
+                <dd style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>
                   {round.expected_duration_days ? `${round.expected_duration_days}d` : '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">{t('proximate.rounds.drafted')}</dt>
-                <dd className="font-medium">
+                <dt className="prox-eyebrow">{t('proximate.rounds.drafted')}</dt>
+                <dd className="prox-mono" style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>
                   {round.drafted_at ? new Date(round.drafted_at).toLocaleDateString() : '—'}
                 </dd>
               </div>
             </dl>
             {round.trigger_summary && (
-              <p className="text-sm border-t pt-2">{round.trigger_summary}</p>
+              <p className="text-sm" style={{ borderTop: '1px solid var(--prox-line)', paddingTop: 11, marginTop: 13 }}>{round.trigger_summary}</p>
             )}
-          </Card>
+          </div>
 
           {/* Actions */}
           {isOperator && (
-            <Card className="p-4 space-y-3">
+            <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
               <p className="text-sm font-medium">{t('proximate.rounds.actions')}</p>
 
               {round.status === 'draft' && (
@@ -799,12 +802,12 @@ export function ProximateRoundDetailClient() {
               )}
 
               {error && <p className="text-xs text-destructive">{error}</p>}
-            </Card>
+            </div>
           )}
 
           {/* Signatures — operator-only; donors don't see committee names */}
           {isOperator && (
-          <Card className="p-4">
+          <div className="prox-panel" style={{ padding: '16px 18px' }}>
             <p className="text-sm font-medium mb-3">
               {t('proximate.rounds.signatures')} ({signatures.length})
             </p>
@@ -828,7 +831,7 @@ export function ProximateRoundDetailClient() {
                 ))}
               </ul>
             )}
-          </Card>
+          </div>
           )}
 
           {/* Cancellation / closing summary */}
