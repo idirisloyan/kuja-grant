@@ -350,34 +350,32 @@ export function ProximateDisbursementDetailClient() {
         }}
       />
       <PageMain>
-        {/* Top-line meta */}
-        <Card className="p-4">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {data.amount_usd && (
-              <span className="font-semibold text-foreground">
-                ${data.amount_usd.toLocaleString()}
-              </span>
+        {/* Top-line meta — the amount is the hero */}
+        <div className="prox-panel" style={{ padding: '18px' }}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="prox-num" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--prox-ink)', lineHeight: 1.05 }}>
+              {data.amount_usd != null ? `$${data.amount_usd.toLocaleString()}` : '—'}
+            </div>
+            {data.overdue && (
+              <span className="prox-pill danger">{t('proximate.disbursements.overdue')}</span>
             )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: 'var(--prox-muted)', marginTop: 10 }}>
             {data.sent_at && (
-              <span>· {t('proximate.disbursement.sent')} {formatComplianceDate(data.sent_at)}</span>
+              <span>{t('proximate.disbursement.sent')} {formatComplianceDate(data.sent_at)}</span>
             )}
             {data.report_due_at && (
               <span>· {t('proximate.disbursement.due')} {formatComplianceDate(data.report_due_at)}</span>
             )}
-            {data.overdue && (
-              <Badge variant="outline" className="text-[10px] bg-red-100 text-red-800 border-red-300">
-                {t('proximate.disbursements.overdue')}
-              </Badge>
-            )}
           </div>
           {data.report_due_at && (
-            <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
+            <p className="text-[11px] mt-2 leading-snug" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.disbursement.report_due_hint') === 'proximate.disbursement.report_due_hint'
                 ? 'Reporting is due at the end of the implementation period — the window follows the contract duration, counted from the day the partner confirmed receipt.'
                 : t('proximate.disbursement.report_due_hint')}
             </p>
           )}
-        </Card>
+        </div>
 
         {/* Phase 717 — one-line "what happens next" guidance. */}
         <NextStep info={disbursementNextStep(data, t)} />

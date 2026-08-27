@@ -556,7 +556,7 @@ export default function ProximateEndorseWizardClient() {
           )}
 
           {isOb && (
-            <div className="flex items-center gap-1 border-b border-border overflow-x-auto" role="tablist">
+            <div className="flex items-center gap-1 overflow-x-auto" role="tablist" style={{ borderBottom: '1px solid var(--prox-line)' }}>
               {PARTNER_TABS.map((x) => (
                 <button
                   key={x.key}
@@ -564,11 +564,10 @@ export default function ProximateEndorseWizardClient() {
                   role="tab"
                   aria-selected={tab === x.key}
                   onClick={() => setTab(x.key)}
-                  className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
-                    tab === x.key
-                      ? 'border-[hsl(var(--kuja-clay))] text-foreground font-medium'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
+                  className="px-3.5 py-2.5 text-[13.5px] whitespace-nowrap border-b-2 -mb-px transition-colors"
+                  style={tab === x.key
+                    ? { borderColor: 'var(--prox-accent)', color: 'var(--prox-ink)', fontWeight: 600 }
+                    : { borderColor: 'transparent', color: 'var(--prox-muted)' }}
                 >
                   {x.k ? t(x.k) : x.label}
                 </button>
