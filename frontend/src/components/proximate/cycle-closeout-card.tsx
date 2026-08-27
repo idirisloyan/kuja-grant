@@ -14,7 +14,6 @@ import {
   Loader2, PackageCheck, AlertTriangle, CircleAlert, Check, Printer,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -56,9 +55,9 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm" style={{ padding: '20px', color: 'var(--prox-muted)' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.building_closeout') || 'Building the closeout pack…'}
-      </Card>
+      </div>
     );
   }
   if (!d) return null;
@@ -68,19 +67,19 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
 
   return (
     <div className="space-y-4">
-      <Card className={`p-5 ${d.ready_to_close ? 'border-emerald-300' : 'border-amber-300'}`}>
+      <div className="prox-panel" style={{ padding: '20px', borderColor: d.ready_to_close ? 'var(--prox-good)' : 'var(--prox-warn)' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
             {d.ready_to_close
-              ? <Check className="w-5 h-5 text-emerald-600 mt-0.5" />
-              : <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
+              ? <Check className="w-5 h-5 mt-0.5" style={{ color: 'var(--prox-good)' }} />
+              : <AlertTriangle className="w-5 h-5 mt-0.5" style={{ color: 'var(--prox-warn)' }} />}
             <div>
-              <h3 className="font-semibold">
+              <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
                 {d.ready_to_close
                   ? (t('proximate.cycle.closeout_ready') || 'Nothing is blocking closeout')
                   : `${d.blocking_count} thing${d.blocking_count === 1 ? '' : 's'} must be finished first`}
               </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-sm mt-0.5" style={{ color: 'var(--prox-muted)' }}>
                 {d.ready_to_close
                   ? (t('proximate.cycle.closeout_ready_sub')
                      || 'Every partner has been paid, confirmed receipt and reported.')
@@ -101,45 +100,45 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
             <Printer className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.download_pdf') || 'Download PDF'}
           </Button>
         </div>
-      </Card>
+      </div>
 
       {blocks.length > 0 && (
-        <Card className="p-5 space-y-2">
+        <div className="prox-panel space-y-2" style={{ padding: '20px' }}>
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <CircleAlert className="w-4 h-4 text-red-600" /> {t('proximate.cycle.must_resolve') || 'Must be resolved'}
+            <CircleAlert className="w-4 h-4" style={{ color: 'var(--prox-danger)' }} /> {t('proximate.cycle.must_resolve') || 'Must be resolved'}
           </h4>
           <ul className="space-y-1.5">
             {blocks.map((o, i) => (
               <li key={i} className="text-sm flex gap-2">
-                <span className="text-red-600">•</span>
+                <span style={{ color: 'var(--prox-danger)' }}>•</span>
                 <span>
                   {o.partner && <strong>{o.partner}: </strong>}{o.what}
                 </span>
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
 
       {warns.length > 0 && (
-        <Card className="p-5 space-y-2">
+        <div className="prox-panel space-y-2" style={{ padding: '20px' }}>
           <h4 className="text-sm font-semibold flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" /> {t('proximate.cycle.worth_noting') || 'Worth noting'}
+            <AlertTriangle className="w-4 h-4" style={{ color: 'var(--prox-warn)' }} /> {t('proximate.cycle.worth_noting') || 'Worth noting'}
           </h4>
           <ul className="space-y-1.5">
             {warns.map((o, i) => (
               <li key={i} className="text-sm flex gap-2">
-                <span className="text-amber-600">•</span>
+                <span style={{ color: 'var(--prox-warn)' }}>•</span>
                 <span>
                   {o.partner && <strong>{o.partner}: </strong>}{o.what}
                 </span>
               </li>
             ))}
           </ul>
-        </Card>
+        </div>
       )}
 
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '20px' }}>
         <h4 className="text-sm font-semibold flex items-center gap-2">
           <PackageCheck className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.cycle_summary') || 'The cycle in summary'}
         </h4>
@@ -150,35 +149,40 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
           <S label={t('proximate.cycle.meetings_recorded') || 'Meetings recorded'} v={String(d.meetings.length)} />
           <S label={t('proximate.cycle.partners_considered') || 'Partners considered'} v={String(d.awards.considered)} />
           <S label={t('proximate.cycle.awarded') || 'Awarded'} v={String(d.awards.awarded)} />
-          <S label={t('proximate.cycle.total_approved') || 'Total approved'} v={usd(d.awards.total_approved_usd)} />
-          <S label={t('proximate.cycle.total_sent') || 'Total sent'} v={usd(d.disbursements.total_sent_usd)} />
+          <S label={t('proximate.cycle.total_approved') || 'Total approved'} v={usd(d.awards.total_approved_usd)} mono />
+          <S label={t('proximate.cycle.total_sent') || 'Total sent'} v={usd(d.disbursements.total_sent_usd)} mono />
           <S label={t('proximate.cycle.receipts_confirmed') || 'Receipts confirmed'}
              v={`${d.disbursements.receipts_confirmed} of ${d.disbursements.count}`} />
         </div>
 
-        <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <S label={t('proximate.cycle.envelope') || 'Donor envelope'} v={usd(d.money.envelope_usd)} />
-          <S label={t('proximate.cycle.admin_overhead') || 'Administration'} v={usd(d.money.admin_overhead_usd)} />
-          <S label={t('proximate.cycle.disbursable') || 'Available for partners'} v={usd(d.money.disbursable_usd)} />
-          <S label={t('proximate.cycle.unspent') || 'Unspent'} v={usd(d.money.uncommitted_usd)} />
+        <div className="pt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm" style={{ borderTop: '1px solid var(--prox-line)' }}>
+          <S label={t('proximate.cycle.envelope') || 'Donor envelope'} v={usd(d.money.envelope_usd)} mono />
+          <S label={t('proximate.cycle.admin_overhead') || 'Administration'} v={usd(d.money.admin_overhead_usd)} mono />
+          <S label={t('proximate.cycle.disbursable') || 'Available for partners'} v={usd(d.money.disbursable_usd)} mono />
+          <S label={t('proximate.cycle.unspent') || 'Unspent'} v={usd(d.money.uncommitted_usd)} mono />
         </div>
 
         {d.panel.localities.length > 0 && (
-          <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+          <p className="text-xs pt-2" style={{ color: 'var(--prox-muted)', borderTop: '1px solid var(--prox-line)' }}>
             {(t('proximate.cycle.panel_drawn_from') || 'Panel drawn from: {x}.')
               .replace('{x}', d.panel.localities.join(', '))}
           </p>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
 
-function S({ label, v }: { label: string; v: string }) {
+function S({ label, v, mono = false }: { label: string; v: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold tabular-nums">{v}</p>
+      <div className="prox-eyebrow">{label}</div>
+      <p
+        className={mono ? 'prox-mono' : 'prox-num'}
+        style={{ fontFamily: mono ? undefined : 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 15, fontWeight: 700, marginTop: 3 }}
+      >
+        {v}
+      </p>
     </div>
   );
 }

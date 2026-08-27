@@ -15,8 +15,6 @@ import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
 interface Disb {
@@ -41,13 +39,22 @@ interface Trace {
 const money = (n: number | null | undefined) =>
   n == null ? '—' : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-const STATUS_TONE: Record<string, string> = {
-  verified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  flagged: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-  reported: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-  pending_report: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  pending_cosign: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+// Disbursement status → design-system pill tone.
+const STATUS_PILL: Record<string, string> = {
+  verified: 'good',
+  flagged: 'danger',
+  reported: 'acc',
+  pending_report: 'warn',
+  pending_cosign: 'warn',
 };
+
+// Heuristic tone for free-form statuses without an explicit mapping.
+function pillTone(s: string): string {
+  if (/active|open|current|verified|approved|complete|closed|confirmed/.test(s)) return 'good';
+  if (/pending|review|report|draft|cosign|due/.test(s)) return 'warn';
+  if (/flag|suspend|reject|block|overdue|breach/.test(s)) return 'danger';
+  return 'slate';
+}
 
 export default function TraceabilityPage() {
   const { t } = useTranslation();
@@ -82,26 +89,26 @@ export default function TraceabilityPage() {
         {data && (
           <div className="space-y-4">
             {/* Grant header */}
-            <Card className="p-4">
-              <p className="text-lg font-semibold">{data.grant.title}</p>
+            <div className="prox-panel" style={{ padding: '16px 18px' }}>
+              <p style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 18, letterSpacing: '-.01em' }}>{data.grant.title}</p>
               {data.grant.donor_name_cache && (
-                <p className="text-sm text-muted-foreground">{data.grant.donor_name_cache}</p>
+                <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>{data.grant.donor_name_cache}</p>
               )}
-              <div className="flex flex-wrap gap-4 mt-3 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.grants.committed')}</p>
-                  <p className="font-semibold">{money(data.committed_usd)}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-3">
+                <div className="prox-stat">
+                  <div className="lab">{t('proximate.grants.committed')}</div>
+                  <div className="val prox-num">{money(data.committed_usd)}</div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.grants.allocated_to_rounds')}</p>
-                  <p className="font-semibold">{money(data.allocated_usd)}</p>
+                <div className="prox-stat">
+                  <div className="lab">{t('proximate.grants.allocated_to_rounds')}</div>
+                  <div className="val prox-num">{money(data.allocated_usd)}</div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{t('proximate.cycle.tab_disbursements')}</p>
-                  <p className="font-semibold">{data.disbursement_count}</p>
+                <div className="prox-stat">
+                  <div className="lab">{t('proximate.cycle.tab_disbursements')}</div>
+                  <div className="val prox-num">{data.disbursement_count}</div>
                 </div>
               </div>
-            </Card>
+            </div>
 
             {data.chain.length === 0 && (
               <p className="text-sm text-muted-foreground">
@@ -111,20 +118,20 @@ export default function TraceabilityPage() {
 
             {/* Per-round → disbursements chain */}
             {data.chain.map((row) => (
-              <Card key={row.round.id} className="p-4">
+              <div key={row.round.id} className="prox-panel" style={{ padding: '16px 18px' }}>
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
                   <div className="flex items-center gap-2">
-                    <Link2 className="w-4 h-4 text-muted-foreground" />
-                    <Link href={`/proximate/rounds/${row.round.id}`} className="font-medium hover:underline">
+                    <Link2 className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+                    <Link href={`/proximate/rounds/${row.round.id}`} className="hover:underline" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--prox-ink)' }}>
                       {row.round.title}
                     </Link>
                     {row.round.status && (
-                      <Badge variant="outline" className="text-xs">{labelForProximateStatus(row.round.status, t)}</Badge>
+                      <span className={`prox-pill ${pillTone(row.round.status)}`}>{labelForProximateStatus(row.round.status, t)}</span>
                     )}
                   </div>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">{t('proximate.traceability.allocation')}: </span>
-                    <span className="font-semibold">{money(row.round.allocation_usd)}</span>
+                    <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.traceability.allocation')}: </span>
+                    <span className="prox-mono" style={{ fontWeight: 700 }}>{money(row.round.allocation_usd)}</span>
                   </p>
                 </div>
 
@@ -151,25 +158,25 @@ export default function TraceabilityPage() {
                                 {d.partner_name}
                               </Link>
                             </td>
-                            <td className="py-2 pe-3 tabular-nums">{money(d.amount_usd)}</td>
+                            <td className="py-2 pe-3 prox-mono">{money(d.amount_usd)}</td>
                             <td className="py-2 pe-3">
-                              <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${STATUS_TONE[d.status] || 'bg-muted text-muted-foreground'}`}>
+                              <span className={`prox-pill ${STATUS_PILL[d.status] || pillTone(d.status)}`}>
                                 {labelForProximateStatus(d.status, t)}
                               </span>
                             </td>
                             <td className="py-2 pe-3">
                               {d.report_submitted
-                                ? <FileText className="w-4 h-4 text-emerald-600" />
+                                ? <FileText className="w-4 h-4" style={{ color: 'var(--prox-good)' }} />
                                 : <span className="text-muted-foreground text-xs">—</span>}
                             </td>
                             <td className="py-2 pe-3">
                               {d.verifier_verdict === 'confirmed'
-                                ? <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                ? <ShieldCheck className="w-4 h-4" style={{ color: 'var(--prox-good)' }} />
                                 : <span className="text-muted-foreground text-xs">{d.verifier_verdict || '—'}</span>}
                             </td>
                             <td className="py-2">
                               {d.audit_anchor ? (
-                                <span className="font-mono text-xs text-muted-foreground" title={d.audit_anchor.payload_hash}>
+                                <span className="prox-mono text-xs" style={{ color: 'var(--prox-muted)' }} title={d.audit_anchor.payload_hash}>
                                   #{d.audit_anchor.seq} · {d.audit_anchor.payload_hash?.slice(0, 10)}…
                                 </span>
                               ) : (
@@ -182,7 +189,7 @@ export default function TraceabilityPage() {
                     </table>
                   </div>
                 )}
-              </Card>
+              </div>
             ))}
 
             <p className="text-xs text-muted-foreground">

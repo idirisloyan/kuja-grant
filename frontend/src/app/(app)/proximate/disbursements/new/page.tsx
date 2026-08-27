@@ -17,7 +17,6 @@ import { api } from '@/lib/api';
 import { formatComplianceDate } from '@/lib/format-date';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
@@ -276,11 +275,11 @@ export default function ProximateDisbursementNewPage() {
     return (
       <PageShell>
         <PageMain>
-          <Card className="p-6 max-w-md mx-auto text-center space-y-3">
-            <p className="text-sm font-medium">
+          <div className="prox-panel max-w-md mx-auto text-center space-y-3" style={{ padding: '24px' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--prox-ink)' }}>
               {t('proximate.disbursements.ob_only_title') || 'This page is for the Oversight Body.'}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.disbursements.ob_only_body')
                 || 'Recording disbursements is handled by the Adeso secretariat.'}
             </p>
@@ -289,7 +288,7 @@ export default function ProximateDisbursementNewPage() {
                 {t('proximate.disbursements.back_to_list') || 'Back to disbursements'}
               </Button>
             </Link>
-          </Card>
+          </div>
         </PageMain>
       </PageShell>
     );
@@ -306,23 +305,23 @@ export default function ProximateDisbursementNewPage() {
           subtitle={t('proximate.disbursements.recorded_subtitle')}
         />
         <PageMain>
-          <Card className="p-6 space-y-4">
+          <div className="prox-panel space-y-4" style={{ padding: '24px' }}>
             <div>
-              <p className="text-sm text-muted-foreground">
-                {result.partner_name} — ${result.amount_usd?.toLocaleString()}
+              <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>
+                {result.partner_name} — <span className="prox-mono" style={{ color: 'var(--prox-ink)', fontWeight: 600 }}>${result.amount_usd?.toLocaleString()}</span>
               </p>
               {result.report_due_at && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs mt-1" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.disbursements.due')}{' '}
                   {formatComplianceDate(result.report_due_at)}
                 </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="prox-eyebrow block mb-1.5">
                 {t('proximate.disbursements.share_link_label')}
               </label>
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="text-xs mb-2" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursements.share_link_hint')}
               </p>
               <div className="flex gap-2">
@@ -330,7 +329,8 @@ export default function ProximateDisbursementNewPage() {
                   type="text"
                   readOnly
                   value={url}
-                  className="flex-1 h-10 px-3 text-xs bg-muted border border-border rounded-md font-mono"
+                  className="prox-mono flex-1 h-10 px-3 text-xs rounded-md"
+                  style={{ background: 'var(--prox-inset)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
                 />
                 <Button size="sm" variant="outline" onClick={copyReportUrl}>
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -347,7 +347,7 @@ export default function ProximateDisbursementNewPage() {
                 {t('proximate.disbursements.record_another')}
               </Button>
             </div>
-          </Card>
+          </div>
         </PageMain>
       </PageShell>
     );
@@ -360,15 +360,16 @@ export default function ProximateDisbursementNewPage() {
         subtitle={t('proximate.disbursements.new_subtitle')}
       />
       <PageMain>
-        <Card className="p-6 space-y-4">
+        <div className="prox-panel space-y-4" style={{ padding: '24px' }}>
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="prox-eyebrow block mb-1.5">
               {t('proximate.disbursements.field_partner')} *
             </label>
             <select
               value={partnerId}
               onChange={(e) => setPartnerId(e.target.value)}
-              className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+              className="w-full h-10 px-3 text-sm rounded-md"
+              style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
             >
               <option value="">— {t('proximate.disbursements.select_partner')} —</option>
               {visiblePartners.map((p) => (
@@ -382,7 +383,7 @@ export default function ProximateDisbursementNewPage() {
             {/* OB-012 — when scoped to a round, say so, so the OB knows the
                 list is the round's awarded partners, not every cleared org. */}
             {roundScoped && visiblePartners.length > 0 && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {tf('proximate.disbursements.awarded_scope_note',
                     'Showing only partners awarded in the selected round.')}
               </p>
@@ -393,7 +394,7 @@ export default function ProximateDisbursementNewPage() {
                 gate, not a bug. Count = awarded − (awarded ∩ cleared). */}
             {roundScoped
               && (awardedIds?.length ?? 0) > visiblePartners.length && (
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+              <p className="mt-1 text-xs" style={{ color: 'var(--prox-warn)' }}>
                 {tf('proximate.disbursements.awarded_not_ready_note',
                     'Some partners awarded in this round are not listed here yet — '
                     + 'awarded by the panel but not cleared for disbursement '
@@ -402,23 +403,24 @@ export default function ProximateDisbursementNewPage() {
               </p>
             )}
             {visiblePartners.length === 0 && roundScoped && (
-              <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
-                <p className="text-xs text-amber-800 dark:text-amber-300">
+              <div className="mt-2 rounded-md px-3 py-2.5" style={{ border: '1px solid color-mix(in srgb, var(--prox-warn) 40%, transparent)', background: 'var(--prox-warn-tint)' }}>
+                <p className="text-xs" style={{ color: 'var(--prox-warn)' }}>
                   {tf('proximate.disbursements.no_awarded_cleared_partners',
                       'No partner in this round is both awarded by the panel and cleared for disbursement yet. Record the panel award and complete the partner’s clearance first.')}
                 </p>
               </div>
             )}
             {visiblePartners.length === 0 && !roundScoped && (
-              <div className="mt-2 rounded-md border border-amber-400/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2.5">
-                <p className="text-xs text-amber-800 dark:text-amber-300">
+              <div className="mt-2 rounded-md px-3 py-2.5" style={{ border: '1px solid color-mix(in srgb, var(--prox-warn) 40%, transparent)', background: 'var(--prox-warn-tint)' }}>
+                <p className="text-xs" style={{ color: 'var(--prox-warn)' }}>
                   {t('proximate.disbursements.no_eligible_partners')}
                 </p>
                 {/* Phase 717 — actionable empty state: nominate → endorse
                     is the only way to get a fundable partner, so link it. */}
                 <Link
                   href="/proximate/admin/partners/new"
-                  className="mt-1.5 inline-flex text-xs font-semibold text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:no-underline"
+                  className="mt-1.5 inline-flex text-xs font-semibold underline underline-offset-2 hover:no-underline"
+                  style={{ color: 'var(--prox-warn)' }}
                 >
                   {tf('proximate.disbursements.nominate_cta', 'Nominate a partner')} →
                 </Link>
@@ -431,8 +433,8 @@ export default function ProximateDisbursementNewPage() {
               as "no checklist". Say so explicitly so the checklist's absence is
               a prompt, not a gap. */}
           {!partnerId && visiblePartners.length > 0 && (
-            <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">
+            <div className="rounded-md px-3 py-2.5" style={{ border: '1px dashed var(--prox-line)', background: 'var(--prox-inset)' }}>
+              <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                 {tf('proximate.disbursements.select_to_see_readiness',
                     'Select a partner to see the disbursement readiness checklist.')}
               </p>
@@ -449,8 +451,8 @@ export default function ProximateDisbursementNewPage() {
               so money never moves against an incomplete gate. Round-scoped
               items (award, contract) appear when a round is selected. */}
           {preflight && preflight.checklist.length > 0 && (
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5">
-              <p className="text-xs font-semibold mb-1.5">
+            <div className="rounded-md px-3 py-2.5" style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-inset)' }}>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--prox-ink)' }}>
                 {tf('proximate.disbursements.readiness_title', 'Disbursement readiness')}
               </p>
               <ul className="space-y-1">
@@ -469,13 +471,14 @@ export default function ProximateDisbursementNewPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="prox-eyebrow block mb-1.5">
               {t('proximate.disbursements.field_round')}
             </label>
             <select
               value={roundId}
               onChange={(e) => setRoundId(e.target.value)}
-              className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+              className="w-full h-10 px-3 text-sm rounded-md"
+              style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
             >
               <option value="">— {t('proximate.disbursements.no_round')} —</option>
               {rounds.map((r) => (
@@ -489,14 +492,15 @@ export default function ProximateDisbursementNewPage() {
               required pick when there are several. */}
           {methods.length > 0 && (
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="prox-eyebrow block mb-1.5">
                 {t('proximate.disbursements.field_method') || 'Payment route'}
                 {methods.length > 1 ? ' *' : ''}
               </label>
               <select
                 value={methodId}
                 onChange={(e) => setMethodId(e.target.value)}
-                className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                className="w-full h-10 px-3 text-sm rounded-md"
+                style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
               >
                 {methods.length > 1 && (
                   <option value="">— {t('proximate.disbursements.select_method') || 'Select the payment route'} —</option>
@@ -512,7 +516,7 @@ export default function ProximateDisbursementNewPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="prox-eyebrow block mb-1.5">
                 {t('proximate.disbursements.field_amount')} *
               </label>
               <input
@@ -521,15 +525,16 @@ export default function ProximateDisbursementNewPage() {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                className="w-full h-10 px-3 text-sm rounded-md"
+                style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="prox-eyebrow block mb-1.5">
                 {t('proximate.disbursements.field_window')}
               </label>
-              <p className="text-xs text-muted-foreground mb-2 leading-snug">
+              <p className="text-xs mb-2 leading-snug" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursements.window_default_note') === 'proximate.disbursements.window_default_note'
                   ? 'Reporting follows the contract’s implementation period, counted from the day the partner confirms receipt. Leave this off unless a specific override is needed.'
                   : t('proximate.disbursements.window_default_note')}
@@ -553,7 +558,8 @@ export default function ProximateDisbursementNewPage() {
                     value={windowDays}
                     onChange={(e) => setWindowDays(e.target.value)}
                     placeholder="45"
-                    className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                    className="w-full h-10 px-3 text-sm rounded-md"
+                    style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
                   />
                   <input
                     type="text"
@@ -562,7 +568,8 @@ export default function ProximateDisbursementNewPage() {
                     placeholder={t('proximate.disbursements.window_override_reason_ph') === 'proximate.disbursements.window_override_reason_ph'
                       ? 'Reason for the override'
                       : t('proximate.disbursements.window_override_reason_ph')}
-                    className="w-full h-10 px-3 text-sm bg-background border border-border rounded-md"
+                    className="w-full h-10 px-3 text-sm rounded-md"
+                    style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
                   />
                 </div>
               )}
@@ -570,7 +577,7 @@ export default function ProximateDisbursementNewPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <label className="prox-eyebrow block mb-1.5">
               {t('proximate.disbursements.field_purpose')}
             </label>
             <textarea
@@ -578,7 +585,8 @@ export default function ProximateDisbursementNewPage() {
               onChange={(e) => setPurpose(e.target.value)}
               rows={3}
               maxLength={500}
-              className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md"
+              className="w-full px-3 py-2 text-sm rounded-md"
+              style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
               placeholder={t('proximate.disbursements.field_purpose_placeholder')}
             />
           </div>
@@ -593,34 +601,40 @@ export default function ProximateDisbursementNewPage() {
             />
             <span className="text-xs">
               <strong>{t('proximate.disbursements.isf_label')}</strong>
-              <span className="block text-muted-foreground mt-0.5">
+              <span className="block mt-0.5" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.disbursements.isf_hint')}
               </span>
             </span>
           </label>
 
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <div className="text-sm rounded-md px-3 py-2" style={{ color: 'var(--prox-danger)', background: 'var(--prox-danger-tint)', border: '1px solid color-mix(in srgb, var(--prox-danger) 30%, transparent)' }}>
               {error}
             </div>
           )}
 
           <div className="flex gap-2">
-            <Button onClick={submit} disabled={submitting}>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting}
+              className="prox-btn primary"
+              style={{ opacity: submitting ? 0.6 : 1 }}
+            >
               {submitting ? (
                 <Loader2 className="w-4 h-4 me-2 animate-spin" />
               ) : (
                 <Send className="w-4 h-4 me-2" />
               )}
               {t('proximate.disbursements.record')}
-            </Button>
+            </button>
             <Link href="/proximate/disbursements">
               <Button variant="outline" disabled={submitting}>
                 {t('proximate.disbursements.cancel')}
               </Button>
             </Link>
           </div>
-        </Card>
+        </div>
       </PageMain>
     </PageShell>
   );

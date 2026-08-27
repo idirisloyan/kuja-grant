@@ -20,10 +20,6 @@ import {
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { TONE_CLASSES } from '@/components/proximate/status-badge';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -208,49 +204,49 @@ export default function CrisisSelectorPage() {
         {/* What is this page? UAT 2026-06-30: "Crisis selector is poor.
             Not clear what it is or how it works." Answer the three
             questions before showing any data. */}
-        <Card className="p-4 bg-muted/30">
-          <p className="text-sm font-medium mb-1">
+        <div className="prox-panel" style={{ padding: '16px 18px', background: 'var(--prox-surface-2)' }}>
+          <p className="text-sm mb-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
             {t('proximate.crisis_selector.explainer_title')}
           </p>
-          <p className="text-xs text-muted-foreground mb-3">
+          <p className="text-xs mb-3" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.crisis_selector.explainer_body')}
           </p>
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
-              <Radio className="w-3 h-3 text-amber-600" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)' }}>
+              <Radio className="w-3 h-3" style={{ color: 'var(--prox-warn)' }} />
               {t('proximate.crisis_selector.step_signal')}
             </span>
-            <ArrowRight className="w-3 h-3 text-muted-foreground rtl:rotate-180" />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
-              <ClipboardCheck className="w-3 h-3 text-sky-600" />
+            <ArrowRight className="w-3 h-3 rtl:rotate-180" style={{ color: 'var(--prox-muted)' }} />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)' }}>
+              <ClipboardCheck className="w-3 h-3" style={{ color: 'var(--prox-accent)' }} />
               {t('proximate.crisis_selector.step_review')}
             </span>
-            <ArrowRight className="w-3 h-3 text-muted-foreground rtl:rotate-180" />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background">
-              <Rocket className="w-3 h-3 text-emerald-600" />
+            <ArrowRight className="w-3 h-3 rtl:rotate-180" style={{ color: 'var(--prox-muted)' }} />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line)' }}>
+              <Rocket className="w-3 h-3" style={{ color: 'var(--prox-good)' }} />
               {t('proximate.crisis_selector.step_round')}
             </span>
           </div>
-        </Card>
+        </div>
 
         {data?.fallback_used && (
-          <Card className="p-3 bg-amber-50 dark:bg-amber-950/30 border-amber-200">
-            <p className="text-xs text-amber-800 dark:text-amber-300">
+          <div className="prox-panel" style={{ padding: '12px 14px', borderColor: 'var(--prox-warn)', background: 'var(--prox-warn-tint)' }}>
+            <p className="text-xs" style={{ color: 'var(--prox-warn)' }}>
               {t('proximate.crisis_selector.fallback_note')}
             </p>
-          </Card>
+          </div>
         )}
 
         {/* Phase 674 — manual crisis signal entry */}
-        <Card className="p-4 space-y-3">
+        <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
           {!showSignalForm ? (
-            <Button size="sm" variant="outline" onClick={() => setShowSignalForm(true)}>
-              <Plus className="w-3.5 h-3.5 me-1" />
+            <button type="button" className="prox-btn ghost" style={{ height: 34, fontSize: 12.5 }} onClick={() => setShowSignalForm(true)}>
+              <Plus className="w-3.5 h-3.5" />
               {t('proximate.crisis_signal.log_signal')}
-            </Button>
+            </button>
           ) : (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium">{t('proximate.crisis_signal.heading')}</h3>
+              <h3 className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{t('proximate.crisis_signal.heading')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                 <input
                   type="text"
@@ -276,33 +272,33 @@ export default function CrisisSelectorPage() {
                 placeholder={t('proximate.crisis_signal.description_placeholder')}
               />
               {signalError && (
-                <p className="text-xs text-red-600">{signalError}</p>
+                <p className="text-xs" style={{ color: 'var(--prox-danger)' }}>{signalError}</p>
               )}
               <div className="flex gap-2">
-                <Button size="sm" onClick={logSignal} disabled={signalSaving}>
-                  {signalSaving ? <Loader2 className="w-3.5 h-3.5 me-1 animate-spin" /> : null}
+                <button type="button" className="prox-btn primary" style={{ height: 36, fontSize: 12.5 }} onClick={logSignal} disabled={signalSaving}>
+                  {signalSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                   {t('proximate.crisis_signal.log')}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setShowSignalForm(false)}>
+                </button>
+                <button type="button" className="prox-btn ghost" style={{ height: 36, fontSize: 12.5 }} onClick={() => setShowSignalForm(false)}>
                   {t('proximate.crisis_signal.cancel')}
-                </Button>
+                </button>
               </div>
             </div>
           )}
-        </Card>
+        </div>
 
         {/* Phase 706 — pending crisis signals (raw OB-logged
             observations). Reviewer flagged the signal entry felt
             dead — submit succeeded but nothing showed up. Now it's
             right here above the curated rows. */}
         {signals.length > 0 && (
-          <Card className="p-4 space-y-2">
+          <div className="prox-panel space-y-2" style={{ padding: '16px 18px' }}>
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-sm font-medium">
+              <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
                 {t('proximate.crisis_signal.pending_heading')
                   || 'Pending signals'} ({signals.length})
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="prox-eyebrow">
                 {t('proximate.crisis_signal.pending_subline')
                   || 'OB-logged. Triage to publish.'}
               </p>
@@ -310,19 +306,19 @@ export default function CrisisSelectorPage() {
             <ul className="space-y-1.5">
               {signals.slice(0, 8).map((sig) => (
                 <li key={sig.id} className="text-xs flex items-start gap-2">
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] mt-0.5 ${
+                  <span
+                    className={`prox-pill ${
                       sig.status === 'pending'
-                        ? TONE_CLASSES.attention
+                        ? 'warn'
                         : sig.status === 'triaged'
-                          ? TONE_CLASSES.positive
-                          : TONE_CLASSES.neutral
+                          ? 'good'
+                          : 'slate'
                     }`}
+                    style={{ marginTop: 2 }}
                   >
                     {labelForProximateStatus(sig.status, t)}
-                  </Badge>
-                  <span className="font-mono text-muted-foreground">
+                  </span>
+                  <span className="prox-mono" style={{ color: 'var(--prox-muted)' }}>
                     {sig.country}
                   </span>
                   {sig.event_type && (
@@ -340,7 +336,8 @@ export default function CrisisSelectorPage() {
                     href={`/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
                       `${sig.country} — ${(sig.event_type || 'emergency response')}`,
                     )}&summary=${encodeURIComponent(sig.description.slice(0, 500))}&region=${encodeURIComponent(sig.country)}`}
-                    className="text-[10px] text-emerald-700 hover:underline whitespace-nowrap inline-flex items-center gap-0.5"
+                    className="text-[10px] hover:underline whitespace-nowrap inline-flex items-center gap-0.5"
+                    style={{ color: 'var(--prox-accent)', fontWeight: 600 }}
                   >
                     <Rocket className="w-3 h-3" />
                     {t('proximate.crisis_signal.start_round')}
@@ -353,7 +350,7 @@ export default function CrisisSelectorPage() {
                 +{signals.length - 8} {t('proximate.crisis_signal.more') || 'more'}
               </p>
             )}
-          </Card>
+          </div>
         )}
 
         {loading && (
@@ -363,14 +360,14 @@ export default function CrisisSelectorPage() {
           </p>
         )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
         {!loading && data && data.rows.length === 0 && (
-          <Card className="p-6 text-center">
+          <div className="prox-panel text-center" style={{ padding: '24px' }}>
             <p className="text-sm text-muted-foreground">
               {t('proximate.crisis_selector.empty')}
             </p>
-          </Card>
+          </div>
         )}
 
         {(data?.rows.length ?? 0) > 0 && Object.keys(bandCounts).length > 1 && (
@@ -380,11 +377,10 @@ export default function CrisisSelectorPage() {
                 key={b}
                 type="button"
                 onClick={() => setBandFilter(b)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                  bandFilter === b
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
-                }`}
+                className="text-xs px-2.5 py-1 rounded-full transition-colors"
+                style={bandFilter === b
+                  ? { background: 'var(--prox-accent)', color: '#fff', border: '1px solid var(--prox-accent)' }
+                  : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', border: '1px solid var(--prox-line)' }}
               >
                 {b === 'all'
                   ? `All (${data?.rows.length ?? 0})`
@@ -397,29 +393,26 @@ export default function CrisisSelectorPage() {
         <ul className="space-y-3">
           {visibleRows.map((row) => (
             <li key={row.id}>
-              <Card className="p-4 space-y-3">
+              <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium">
+                      <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15 }}>
                         {row.country}{row.region && ` · ${row.region}`}
                       </h3>
                       {row.attention_band && (
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] ${
-                            row.attention_band === 'critical'
-                              ? TONE_CLASSES.critical
-                              : TONE_CLASSES.attention
+                        <span
+                          className={`prox-pill ${
+                            row.attention_band === 'critical' ? 'danger' : 'warn'
                           }`}
                         >
                           {labelForProximateStatus(row.attention_band, t)}
-                        </Badge>
+                        </span>
                       )}
                       {row.flagged_for_ob && (
-                        <Badge variant="outline" className={`text-[10px] ${TONE_CLASSES.critical}`}>
+                        <span className="prox-pill danger">
                           {t('proximate.crisis_selector.flagged')}
-                        </Badge>
+                        </span>
                       )}
                       {row.report_period_start && (
                         <span className="text-[10px] text-muted-foreground">
@@ -437,23 +430,24 @@ export default function CrisisSelectorPage() {
                     )}
                   </div>
                   <div className="text-right">
-                    <div className="font-mono font-semibold">
+                    <div className="prox-mono" style={{ fontSize: 20, fontWeight: 700, color: 'var(--prox-ink)' }}>
                       {row.composite_score ?? '—'}
                     </div>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div className="prox-eyebrow">
                       {t('proximate.crisis_selector.urgency')}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border">
+                <div className="flex items-center gap-2 flex-wrap pt-2" style={{ borderTop: '1px solid var(--prox-line)' }}>
                   <Link
                     href={`/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
                       row.event_title || `${row.country} emergency response`,
                     )}&summary=${encodeURIComponent(
                       (row.narrative || row.event_title || '').slice(0, 500),
                     )}&region=${encodeURIComponent(row.region || row.country || '')}`}
-                    className="text-xs inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-emerald-600 text-white font-medium hover:bg-emerald-700"
+                    className="prox-btn primary"
+                    style={{ height: 30, fontSize: 12, padding: '0 12px' }}
                   >
                     <Rocket className="w-3 h-3" />
                     {t('proximate.crisis_selector.start_round')}
@@ -462,35 +456,35 @@ export default function CrisisSelectorPage() {
                     {t('proximate.crisis_selector.draft_brief_as')}:
                   </span>
                   {(data?.scenario_types || []).map((s) => (
-                    <Button
+                    <button
                       key={s}
-                      size="sm"
-                      variant="outline"
+                      type="button"
+                      className="prox-btn ghost"
+                      style={{ height: 30, fontSize: 12, padding: '0 11px' }}
                       onClick={() => draftBrief(row.id, s)}
                       disabled={briefing}
-                      className="text-xs"
                     >
                       {briefing && briefForRow === row.id && briefScenario === s
-                        ? <Loader2 className="w-3 h-3 me-1 animate-spin" />
-                        : <Sparkles className="w-3 h-3 me-1" />
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Sparkles className="w-3 h-3" />
                       }
                       {t(`proximate.crisis_selector.scenario_${s}`)}
-                    </Button>
+                    </button>
                   ))}
                 </div>
 
                 {briefForRow === row.id && briefText && (
-                  <Card className="p-3 bg-muted/30 border-dashed">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  <div className="prox-panel" style={{ padding: '12px 13px', background: 'var(--prox-inset)', borderStyle: 'dashed' }}>
+                    <p className="prox-eyebrow mb-1">
                       {t('proximate.crisis_selector.brief_label')} · {briefScenario}
                     </p>
                     <pre className="whitespace-pre-wrap text-xs font-sans">{briefText}</pre>
-                  </Card>
+                  </div>
                 )}
                 {briefForRow === row.id && briefError && (
-                  <p className="text-xs text-red-600">{briefError}</p>
+                  <p className="text-xs" style={{ color: 'var(--prox-danger)' }}>{briefError}</p>
                 )}
-              </Card>
+              </div>
             </li>
           ))}
         </ul>

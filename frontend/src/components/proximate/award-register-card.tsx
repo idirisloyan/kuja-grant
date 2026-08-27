@@ -26,9 +26,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Contract {
@@ -87,6 +85,18 @@ const CONTRACT_STATUSES = [
   'drafting', 'sent', 'partner_signed', 'adeso_signed', 'completed', 'void',
 ];
 
+// Panel decision → design-system pill tone.
+const DECISION_PILL: Record<string, string> = {
+  awarded: 'good', not_awarded: 'slate', pending: 'warn',
+  clarification: 'warn', deferred: 'slate',
+};
+
+// Contract lifecycle → pill tone.
+const CONTRACT_PILL: Record<string, string> = {
+  drafting: 'slate', sent: 'warn', partner_signed: 'acc',
+  adeso_signed: 'acc', completed: 'good', void: 'danger',
+};
+
 function usd(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
   return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -113,9 +123,9 @@ export function AwardRegisterCard({ roundId, canEdit }: { roundId: number; canEd
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm" style={{ padding: '20px', color: 'var(--prox-muted)' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading') || 'Loading…'}
-      </Card>
+      </div>
     );
   }
 
@@ -125,45 +135,46 @@ export function AwardRegisterCard({ roundId, canEdit }: { roundId: number; canEd
 
   return (
     <div className="space-y-4">
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '20px' }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold flex items-center gap-2">
-              <Gavel className="w-4 h-4 text-muted-foreground" /> {t('proximate.cycle.award_register') || 'Award register'}
+            <h3 className="flex items-center gap-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
+              <Gavel className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} /> {t('proximate.cycle.award_register') || 'Award register'}
             </h3>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-sm mt-0.5" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.cycle.award_blurb')
                 || 'Generated from the panel’s decisions. Nothing to keep in step by hand.'}
             </p>
           </div>
           {canEdit && (
-            <Button size="sm" onClick={() => setAdding(true)}>
+            <button type="button" className="prox-btn primary" style={{ height: 34 }} onClick={() => setAdding(true)}>
               <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.add_partner') || 'Add partner'}
-            </Button>
+            </button>
           )}
         </div>
 
         {money && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.disbursable') || 'Available for partners'}</p>
-              <p className="font-semibold tabular-nums">{usd(money.disbursable_usd)}</p>
+              <div className="prox-eyebrow">{t('proximate.cycle.disbursable') || 'Available for partners'}</div>
+              <p className="prox-mono" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>{usd(money.disbursable_usd)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.awarded') || 'Awarded'}</p>
-              <p className="font-semibold tabular-nums">{usd(money.awarded_usd)}</p>
+              <div className="prox-eyebrow">{t('proximate.cycle.awarded') || 'Awarded'}</div>
+              <p className="prox-mono" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>{usd(money.awarded_usd)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.remaining') || 'Remaining'}</p>
-              <p className={`font-semibold tabular-nums ${
-                money.uncommitted_usd < 0 ? 'text-red-600 dark:text-red-400' : ''
-              }`}>
+              <div className="prox-eyebrow">{t('proximate.cycle.remaining') || 'Remaining'}</div>
+              <p
+                className="prox-mono"
+                style={{ fontSize: 15, fontWeight: 700, marginTop: 3, color: money.uncommitted_usd < 0 ? 'var(--prox-danger)' : undefined }}
+              >
                 {usd(money.uncommitted_usd)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.decisions_recorded') || 'Decisions recorded'}</p>
-              <p className="font-semibold tabular-nums">
+              <div className="prox-eyebrow">{t('proximate.cycle.decisions_recorded') || 'Decisions recorded'}</div>
+              <p className="prox-num" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>
                 {awards.filter((a) => a.decision !== 'pending').length}/{awards.length}
               </p>
             </div>
@@ -171,22 +182,22 @@ export function AwardRegisterCard({ roundId, canEdit }: { roundId: number; canEd
         )}
 
         {unattributable.length > 0 && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3">
-            <p className="text-xs text-amber-900 dark:text-amber-200 flex items-start gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <div className="prox-panel" style={{ padding: '12px', borderColor: 'var(--prox-warn)', background: 'var(--prox-warn-tint)' }}>
+            <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--prox-ink)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
               {(t('proximate.cycle.unattributable_warn')
                 || '{n} award(s) recorded by the secretariat with nothing behind them. Link the meeting, attach the minutes, or record a panel confirmation — otherwise the panel cannot be shown to have made the decision.')
                 .replace('{n}', String(unattributable.length))}
             </p>
           </div>
         )}
-      </Card>
+      </div>
 
       {awards.length === 0 && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
+        <div className="prox-panel text-center text-sm" style={{ padding: '24px', color: 'var(--prox-muted)' }}>
           {t('proximate.cycle.awards_empty')
             || 'No awards yet. Add the shortlisted partners, then record what the panel decided for each.'}
-        </Card>
+        </div>
       )}
 
       {awards.map((a) => (
@@ -270,41 +281,36 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
     setBusy(false);
   }
 
-  const tone = a.decision === 'awarded'
-    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
-    : a.decision === 'not_awarded'
-      ? 'bg-muted text-muted-foreground'
-      : a.decision === 'pending'
-        ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
-        : 'bg-muted text-muted-foreground';
-
   return (
-    <Card className={`p-4 transition-colors ${open ? 'ring-1 ring-[hsl(var(--kuja-clay))] border-[hsl(var(--kuja-clay))]' : ''}`}>
+    <div
+      className="prox-panel transition-colors"
+      style={{ padding: '16px', ...(open ? { borderColor: 'var(--prox-accent)', boxShadow: '0 0 0 1px var(--prox-accent)' } : {}) }}
+    >
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium truncate">
+            <p className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
               {a.partner_name || `Partner #${a.partner_id}`}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('proximate.cycle.requested') || 'Requested'} {usd(a.requested_amount_usd)}
+            <p className="text-xs mt-0.5" style={{ color: 'var(--prox-muted)' }}>
+              {t('proximate.cycle.requested') || 'Requested'} <span className="prox-mono">{usd(a.requested_amount_usd)}</span>
               {a.approved_amount_usd
-                ? ` · ${t('proximate.cycle.approved') || 'Approved'} ${usd(a.approved_amount_usd)}`
+                ? <> · {t('proximate.cycle.approved') || 'Approved'} <span className="prox-mono">{usd(a.approved_amount_usd)}</span></>
                 : ''}
             </p>
             {/* OB-010 — the decision UI opens INLINE (no modal); prompt for it
                 on undecided rows so the OB knows where to record the decision. */}
             {canEdit && a.decision === 'pending' && !open && (
-              <p className="text-[11px] font-medium text-[hsl(var(--kuja-clay))] mt-1">
+              <p className="text-[11px] font-medium mt-1" style={{ color: 'var(--prox-accent)' }}>
                 {t('proximate.cycle.record_decision_hint') || 'Tap to record the panel decision'}
               </p>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {!a.decision_is_attributable && a.decision === 'awarded' && (
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <AlertTriangle className="w-4 h-4" style={{ color: 'var(--prox-warn)' }} />
             )}
-            <span className={`text-xs rounded-full px-2 py-0.5 ${tone}`}>
+            <span className={`prox-pill ${DECISION_PILL[a.decision] || 'slate'}`}>
               {(() => { const d = DECISIONS.find((x) => x.key === a.decision);
                 if (d) return t(d.k) || d.label;
                 return a.decision === 'pending'
@@ -357,16 +363,17 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
                     || 'Recording on the panel’s behalf is allowed — meetings happen on bad lines. Link the meeting or attach the minutes so the decision can be traced back to the panel.'}
                 </p>
               )}
-              {err && <p className="text-sm text-red-600">{err}</p>}
+              {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
               <div className="flex flex-wrap gap-2">
                 {DECISIONS.map((d) => (
-                  <Button
-                    key={d.key} size="sm"
-                    variant={d.key === 'awarded' ? 'default' : 'outline'}
+                  <button
+                    key={d.key} type="button"
+                    className={`prox-btn ${d.key === 'awarded' ? 'primary' : 'ghost'}`}
+                    style={{ height: 34 }}
                     disabled={busy} onClick={() => decide(d.key)}
                   >
                     {t(d.k) || d.label}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
@@ -374,8 +381,8 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
 
           {a.panel_comments && (
             <div className="text-sm">
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.panel_comments') || 'Panel comments'}</p>
-              <p>{a.panel_comments}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.panel_comments') || 'Panel comments'}</p>
+              <p style={{ marginTop: 3 }}>{a.panel_comments}</p>
             </div>
           )}
 
@@ -398,18 +405,19 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline">{a.contract.status}</Badge>
+                    <span className={`prox-pill ${CONTRACT_PILL[a.contract.status] || 'slate'}`}>{a.contract.status}</span>
                     {a.contract.pandadoc_url && (
                       <a
                         href={a.contract.pandadoc_url}
                         target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-[hsl(var(--kuja-clay))] inline-flex items-center gap-1"
+                        className="text-xs inline-flex items-center gap-1"
+                        style={{ color: 'var(--prox-accent)' }}
                       >
                         {t('proximate.cycle.open_pandadoc') || 'Open in PandaDoc'} <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                     {a.contract.partner_signed_name && (
-                      <span className="text-[11px] text-emerald-700">
+                      <span className="text-[11px]" style={{ color: 'var(--prox-good)' }}>
                         Partner signed: {a.contract.partner_signed_name}
                       </span>
                     )}
@@ -460,7 +468,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -502,9 +510,9 @@ function AddAwardDialog({ roundId, onClose, onAdded }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-5 space-y-3">
+      <div className="prox-panel w-full max-w-md space-y-3" style={{ padding: '20px' }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">{t('proximate.cycle.add_to_register') || 'Add a partner to the register'}</h3>
+          <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{t('proximate.cycle.add_to_register') || 'Add a partner to the register'}</h3>
           <button type="button" onClick={onClose} aria-label={t('proximate.award.close')}>
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -528,14 +536,14 @@ function AddAwardDialog({ roundId, onClose, onAdded }: {
             className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
           />
         </label>
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</Button>
-          <Button size="sm" onClick={submit} disabled={busy || !partnerId}>
+          <button type="button" className="prox-btn primary" style={{ height: 34 }} onClick={submit} disabled={busy || !partnerId}>
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (t('proximate.cycle.add') || 'Add')}
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

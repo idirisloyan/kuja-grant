@@ -19,9 +19,6 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -63,11 +60,12 @@ interface PkgView {
   error?: string;
 }
 
-const STATUS_TONE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground border-border',
-  submitted: 'bg-amber-100 text-amber-800 border-amber-300',
-  changes_requested: 'bg-rose-100 text-rose-800 border-rose-300',
-  published: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+// Package status → design-system pill tone.
+const STATUS_PILL: Record<string, string> = {
+  draft: 'slate',
+  submitted: 'warn',
+  changes_requested: 'danger',
+  published: 'good',
 };
 
 export function ProximateReportPackageClient() {
@@ -167,10 +165,10 @@ export function ProximateReportPackageClient() {
       type="button" onClick={() => flagItem(it)}
       title={it.change_request
         ? t('proximate.reports.fix_requested', { msg: it.change_request }) : t('proximate.reports.request_fix')}
-      className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] ${
-        it.change_request
-          ? 'bg-amber-50 text-amber-800 border-amber-300'
-          : 'bg-muted text-muted-foreground border-border'}`}
+      className="shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px]"
+      style={it.change_request
+        ? { background: 'var(--prox-warn-tint)', color: 'var(--prox-warn)', border: '1px solid color-mix(in srgb, var(--prox-warn) 30%, transparent)' }
+        : { background: 'var(--prox-inset)', color: 'var(--prox-muted)', border: '1px solid var(--prox-line)' }}
     >
       <Flag className="w-3 h-3" />
       {it.change_request ? t('proximate.rpkg.flagged') : t('proximate.rpkg.flag')}
@@ -181,45 +179,44 @@ export function ProximateReportPackageClient() {
     <div className="max-w-3xl mx-auto space-y-4 p-4 md:p-6">
       <div className="flex items-center gap-3 flex-wrap">
         <Link href={`/proximate/rounds/${data.round?.id}`}
-              className="text-muted-foreground hover:text-foreground">
+              className="hover:opacity-70" style={{ color: 'var(--prox-muted)' }}>
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-semibold truncate">
+          <h1 className="text-lg truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
             {data.partner?.name} — {t('proximate.rpkg.impl_report')}
           </h1>
-          <p className="text-xs text-muted-foreground">{data.round?.title}</p>
+          <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>{data.round?.title}</p>
         </div>
-        <Badge variant="outline"
-               className={`text-[10px] ${STATUS_TONE[pkg.status] || ''}`}>
+        <span className={`prox-pill ${STATUS_PILL[pkg.status] || 'slate'}`}>
           {labelForProximateStatus(pkg.status, t) || pkg.status.replace(/_/g, ' ')}
-        </Badge>
+        </span>
         <a href={`/api/proximate/report-packages/${pkg.id}/pdf`}
-           className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted">
+           className="prox-btn ghost" style={{ height: 32, fontSize: 12, padding: '0 12px' }}>
           <FileDown className="w-3 h-3" /> PDF
         </a>
       </div>
 
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-xs" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
       {/* Narrative */}
-      <Card className="p-4 space-y-3">
+      <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold flex-1">{t('proximate.reports.narrative')}</h2>
+          <h2 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15 }}>{t('proximate.reports.narrative')}</h2>
           {narrative?.source === 'ai' && (
-            <Badge variant="outline" className="text-[10px] bg-violet-100 text-violet-800 border-violet-300">
+            <span className="prox-pill acc">
               {t('proximate.reports.ai_draft')}
-            </Badge>
+            </span>
           )}
           {isOperator && (
-            <Button size="sm" variant="outline" disabled={busy === 'compile'}
+            <button type="button" className="prox-btn ghost" style={{ height: 32, fontSize: 12.5, padding: '0 12px' }} disabled={busy === 'compile'}
               onClick={() => act('compile', () =>
                 api.post(`/api/proximate/report-packages/${pkg.id}/compile`, {}))}>
               {busy === 'compile'
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
-                : <Sparkles className="w-3.5 h-3.5 me-1" />}
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
               {narrative ? t('proximate.reports.recompile') : t('proximate.reports.compile_ai')}
-            </Button>
+            </button>
           )}
         </div>
         {isOperator && pkg.status !== 'published' ? (
@@ -259,13 +256,13 @@ export function ProximateReportPackageClient() {
                 />
               </div>
             ))}
-            <Button size="sm" variant="outline" disabled={busy === 'save'}
+            <button type="button" className="prox-btn ghost" style={{ height: 34, fontSize: 12.5 }} disabled={busy === 'save'}
               onClick={() => act('save', () =>
                 api.patch(`/api/proximate/report-packages/${pkg.id}`,
                           { narrative }))}>
-              {busy === 'save' && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
+              {busy === 'save' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {t('proximate.rpkg.save_narrative')}
-            </Button>
+            </button>
           </div>
         ) : (
           <div className="space-y-3 text-sm">
@@ -285,13 +282,13 @@ export function ProximateReportPackageClient() {
             )}
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Financials */}
       {blocks.length > 0 && (
-        <Card className="p-4 space-y-2">
+        <div className="prox-panel space-y-2" style={{ padding: '16px 18px' }}>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-semibold flex-1">
+            <h2 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15 }}>
               {t('proximate.rpkg.financials')}
             </h2>
             {isOperator && (
@@ -305,13 +302,13 @@ export function ProximateReportPackageClient() {
                   onChange={(e) => setRateInput(e.target.value)}
                   className="w-20 rounded-md border bg-background px-1.5 py-1 text-xs"
                 />
-                <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]"
+                <button type="button" className="prox-btn ghost" style={{ height: 26, fontSize: 10.5, padding: '0 9px' }}
                   disabled={busy === 'rate'}
                   onClick={() => act('rate', () =>
                     api.patch(`/api/proximate/report-packages/${pkg.id}`,
                               { exchange_rate: rateInput ? Number(rateInput) : null }))}>
                   {busy === 'rate' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Set rate'}
-                </Button>
+                </button>
               </div>
             )}
             {!isOperator && pkg.exchange_rate ? (
@@ -336,16 +333,16 @@ export function ProximateReportPackageClient() {
                 {Object.entries(block.spend || {}).map(([label, amount]) => (
                   <div key={label} className="flex items-center gap-2 text-xs">
                     <span className="flex-1 min-w-0 truncate">{label}</span>
-                    <span className="tabular-nums">
+                    <span className="prox-mono" style={{ fontSize: 12 }}>
                       {Number(amount).toLocaleString()} {pkg.spend_currency}
                     </span>
                     {pkg.exchange_rate ? (
-                      <span className="text-muted-foreground tabular-nums">
+                      <span className="prox-mono" style={{ fontSize: 12, color: 'var(--prox-muted)' }}>
                         ≈ {Math.round(Number(amount) / pkg.exchange_rate).toLocaleString()} USD
                       </span>
                     ) : null}
                     {approvedLines.has(label) && (
-                      <span className="text-muted-foreground tabular-nums">
+                      <span className="prox-mono" style={{ fontSize: 12, color: 'var(--prox-muted)' }}>
                         / approved {Number(approvedLines.get(label)).toLocaleString()} USD
                       </span>
                     )}
@@ -354,13 +351,13 @@ export function ProximateReportPackageClient() {
               </div>
             );
           })}
-        </Card>
+        </div>
       )}
 
       {/* Media — the safeguarding gate */}
-      <Card className="p-4 space-y-3">
+      <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold flex-1">
+          <h2 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15 }}>
             {t('proximate.rpkg.evidence', { n: items.length })}
           </h2>
           {isOperator ? (
@@ -391,10 +388,10 @@ export function ProximateReportPackageClient() {
                       onClick={() => act(`vis${it.id}`, () =>
                         api.patch(`/api/proximate/report-packages/${pkg.id}/items/${it.id}`,
                                   { donor_visible: !it.donor_visible }))}
-                      className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded border text-[9px] ${
-                        it.donor_visible
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-muted text-muted-foreground border-border'}`}
+                      className="shrink-0 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px]"
+                      style={it.donor_visible
+                        ? { background: 'var(--prox-good-tint)', color: 'var(--prox-good)', border: '1px solid color-mix(in srgb, var(--prox-good) 30%, transparent)' }
+                        : { background: 'var(--prox-inset)', color: 'var(--prox-muted)', border: '1px solid var(--prox-line)' }}
                     >
                       {it.donor_visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                       {it.donor_visible ? t('proximate.rpkg.donor') : t('proximate.rpkg.internal')}
@@ -403,7 +400,7 @@ export function ProximateReportPackageClient() {
                   {flagButton(it)}
                 </figcaption>
                 {it.change_request && isOperator && (
-                  <p className="px-1.5 pb-1.5 text-[9px] text-amber-700">
+                  <p className="px-1.5 pb-1.5 text-[9px]" style={{ color: 'var(--prox-warn)' }}>
                     {t('proximate.rpkg.fix_requested', { msg: it.change_request })}
                   </p>
                 )}
@@ -424,10 +421,10 @@ export function ProximateReportPackageClient() {
                   onClick={() => act(`vis${it.id}`, () =>
                     api.patch(`/api/proximate/report-packages/${pkg.id}/items/${it.id}`,
                               { donor_visible: !it.donor_visible }))}
-                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[9px] ${
-                    it.donor_visible
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                      : 'bg-muted text-muted-foreground border-border'}`}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px]"
+                  style={it.donor_visible
+                    ? { background: 'var(--prox-good-tint)', color: 'var(--prox-good)', border: '1px solid color-mix(in srgb, var(--prox-good) 30%, transparent)' }
+                    : { background: 'var(--prox-inset)', color: 'var(--prox-muted)', border: '1px solid var(--prox-line)' }}
                 >
                   {it.donor_visible ? t('proximate.rpkg.donor_visible') : t('proximate.rpkg.internal')}
                 </button>
@@ -435,7 +432,7 @@ export function ProximateReportPackageClient() {
               {flagButton(it)}
             </div>
             {it.change_request && isOperator && (
-              <p className="text-[10px] text-amber-700">
+              <p className="text-[10px]" style={{ color: 'var(--prox-warn)' }}>
                 {t('proximate.rpkg.fix_requested', { msg: it.change_request })}
               </p>
             )}
@@ -465,7 +462,7 @@ export function ProximateReportPackageClient() {
           <div key={it.id} className="flex items-center gap-2 text-xs rounded-md border px-2.5 py-2">
             <span className="uppercase text-[9px] text-muted-foreground w-12">{it.kind}</span>
             <a href={`/api/proximate/report-items/${it.id}/file`}
-               className="flex-1 min-w-0 truncate text-primary hover:underline">
+               className="flex-1 min-w-0 truncate hover:underline" style={{ color: 'var(--prox-accent)' }}>
               {it.caption || it.filename}
             </a>
             {isOperator && (
@@ -474,10 +471,10 @@ export function ProximateReportPackageClient() {
                 onClick={() => act(`vis${it.id}`, () =>
                   api.patch(`/api/proximate/report-packages/${pkg.id}/items/${it.id}`,
                             { donor_visible: !it.donor_visible }))}
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[9px] ${
-                  it.donor_visible
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                    : 'bg-muted text-muted-foreground border-border'}`}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px]"
+                style={it.donor_visible
+                  ? { background: 'var(--prox-good-tint)', color: 'var(--prox-good)', border: '1px solid color-mix(in srgb, var(--prox-good) 30%, transparent)' }
+                  : { background: 'var(--prox-inset)', color: 'var(--prox-muted)', border: '1px solid var(--prox-line)' }}
               >
                 {it.donor_visible ? t('proximate.rpkg.donor_visible') : t('proximate.rpkg.internal')}
               </button>
@@ -488,38 +485,38 @@ export function ProximateReportPackageClient() {
         {items.length === 0 && (
           <p className="text-xs text-muted-foreground italic">{t('proximate.rpkg.no_evidence')}</p>
         )}
-      </Card>
+      </div>
 
       {/* OB decision */}
       {isOperator && pkg.status !== 'published' && (
-        <Card className="p-4 space-y-2">
-          <h2 className="text-sm font-semibold">{t('proximate.rpkg.decision')}</h2>
+        <div className="prox-panel space-y-2" style={{ padding: '16px 18px' }}>
+          <h2 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15 }}>{t('proximate.rpkg.decision')}</h2>
           <textarea
             value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
             placeholder={t('proximate.reports.notes_ph')}
             className="w-full text-xs rounded-md border bg-background p-2"
           />
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" disabled={!!busy || !notes.trim()}
+            <button type="button" className="prox-btn ghost" style={{ height: 36, fontSize: 12.5 }} disabled={!!busy || !notes.trim()}
               onClick={() => act('changes', () =>
                 api.post(`/api/proximate/report-packages/${pkg.id}/review`,
                          { action: 'request_changes', notes }))}>
-              <Undo2 className="w-3.5 h-3.5 me-1" /> {t('proximate.rpkg.request_changes')}
-            </Button>
-            <Button size="sm" disabled={!!busy}
+              <Undo2 className="w-3.5 h-3.5" /> {t('proximate.rpkg.request_changes')}
+            </button>
+            <button type="button" className="prox-btn primary" style={{ height: 36, fontSize: 12.5 }} disabled={!!busy}
               onClick={() => act('publish', () =>
                 api.post(`/api/proximate/report-packages/${pkg.id}/review`,
                          { action: 'publish' }))}>
               {busy === 'publish'
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />
-                : <Send className="w-3.5 h-3.5 me-1" />}
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Send className="w-3.5 h-3.5" />}
               {t('proximate.rpkg.publish')}
-            </Button>
+            </button>
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-[10px]" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.rpkg.publish_hint')}
           </p>
-        </Card>
+        </div>
       )}
     </div>
   );

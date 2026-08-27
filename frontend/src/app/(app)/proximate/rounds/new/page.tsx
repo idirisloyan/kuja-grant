@@ -13,8 +13,6 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -124,9 +122,9 @@ export default function NewProximateRoundPage() {
         subtitle={t('proximate.rounds.new_subtitle')}
       />
       <PageMain>
-        <Card className="p-4 space-y-4 max-w-2xl">
+        <div className="prox-panel space-y-4 max-w-2xl" style={{ padding: '18px' }}>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">
+            <label className="prox-eyebrow block mb-1">
               {t('proximate.rounds.field_title')} *
             </label>
             <input
@@ -139,7 +137,7 @@ export default function NewProximateRoundPage() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">
+            <label className="prox-eyebrow block mb-1">
               {t('proximate.rounds.field_title_ar')}
             </label>
             <input
@@ -152,7 +150,7 @@ export default function NewProximateRoundPage() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">
+            <label className="prox-eyebrow block mb-1">
               {t('proximate.rounds.field_trigger')} *
             </label>
             <select
@@ -167,7 +165,7 @@ export default function NewProximateRoundPage() {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">
+            <label className="prox-eyebrow block mb-1">
               {t('proximate.rounds.field_trigger_summary')}
             </label>
             <textarea
@@ -180,7 +178,7 @@ export default function NewProximateRoundPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.rounds.field_donor')}
               </label>
               {/* Phase 711b — donor picker fed from
@@ -209,7 +207,7 @@ export default function NewProximateRoundPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.rounds.field_envelope')}
               </label>
               <input
@@ -224,7 +222,7 @@ export default function NewProximateRoundPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.rounds.field_duration')}
               </label>
               <input
@@ -236,7 +234,7 @@ export default function NewProximateRoundPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.rounds.field_region')}
               </label>
               <input
@@ -249,25 +247,26 @@ export default function NewProximateRoundPage() {
             </div>
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
           <div className="flex gap-2 pt-2">
-            <Button onClick={submit} disabled={submitting}>
+            <button type="button" className="prox-btn primary" onClick={submit} disabled={submitting}>
               {submitting && <Loader2 className="w-4 h-4 animate-spin me-2" />}
               {t('proximate.rounds.create')}
-            </Button>
-            <Button
-              variant="ghost"
+            </button>
+            <button
+              type="button"
+              className="prox-btn ghost"
               onClick={() => router.push('/proximate/rounds')}
             >
               {t('proximate.rounds.cancel')}
-            </Button>
+            </button>
           </div>
 
-          <p className="text-xs text-muted-foreground border-t pt-3">
+          <p className="text-xs pt-3" style={{ color: 'var(--prox-muted)', borderTop: '1px solid var(--prox-line)' }}>
             {t('proximate.rounds.next_step_hint')}
           </p>
-        </Card>
+        </div>
       </PageMain>
     </PageShell>
   );

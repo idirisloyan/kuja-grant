@@ -17,8 +17,6 @@ import {
   CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -210,21 +208,22 @@ export default function ProximateGrantWizardPage() {
         <div className="max-w-3xl space-y-4">
           <Link
             href="/proximate/grants"
-            className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:underline"
+            className="text-xs inline-flex items-center gap-1 hover:underline"
+            style={{ color: 'var(--prox-muted)' }}
           >
             <ArrowLeft className="w-3 h-3" /> {t('proximate.gw.back')}
           </Link>
 
           {error && (
-            <Card className="p-3 border-rose-300 bg-rose-50">
-              <p className="text-sm text-rose-800 flex items-start gap-2">
+            <div className="prox-panel" style={{ padding: '12px', border: '1px solid color-mix(in srgb, var(--prox-danger) 40%, transparent)', background: 'var(--prox-danger-tint)' }}>
+              <p className="text-sm flex items-start gap-2" style={{ color: 'var(--prox-danger)' }}>
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
               </p>
-            </Card>
+            </div>
           )}
 
           {step === 'upload' && (
-            <Card className="p-6">
+            <div className="prox-panel" style={{ padding: '24px' }}>
               <div
                 className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/30 transition-colors"
                 onClick={() => fileRef.current?.click()}
@@ -239,7 +238,7 @@ export default function ProximateGrantWizardPage() {
                 {file ? (
                   <p className="text-sm font-medium flex items-center justify-center gap-2">
                     <FileText className="w-4 h-4" /> {file.name}
-                    <span className="text-xs text-muted-foreground">
+                    <span className="prox-mono text-xs" style={{ color: 'var(--prox-muted)' }}>
                       ({(file.size / (1024 * 1024)).toFixed(1)} MB)
                     </span>
                   </p>
@@ -264,77 +263,70 @@ export default function ProximateGrantWizardPage() {
               <button
                 onClick={runExtraction}
                 disabled={!file}
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="prox-btn primary mt-4 w-full justify-center disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4" />
                 {t('proximate.gw.extract_btn')}
               </button>
-            </Card>
+            </div>
           )}
 
           {step === 'extracting' && (
-            <Card className="p-10 text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-600 mb-4" />
-              <p className="text-sm font-medium">{EXTRACT_STAGES[stageIdx]}</p>
-              <p className="text-xs text-muted-foreground mt-2">
+            <div className="prox-panel text-center" style={{ padding: '40px' }}>
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: 'var(--prox-accent)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--prox-ink)' }}>{EXTRACT_STAGES[stageIdx]}</p>
+              <p className="text-xs mt-2" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.gw.extract_wait')}
               </p>
-            </Card>
+            </div>
           )}
 
           {(step === 'review' || step === 'saving') && ex && (
             <div className="space-y-4">
               {/* Confidence + not-an-agreement warning */}
-              <Card className="p-4 flex items-center justify-between flex-wrap gap-2">
+              <div className="prox-panel flex items-center justify-between flex-wrap gap-2" style={{ padding: '16px' }}>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600" />
-                  <p className="text-sm font-medium">{t('proximate.gw.extract_complete')}</p>
+                  <Sparkles className="w-4 h-4" style={{ color: 'var(--prox-accent)' }} />
+                  <p className="text-sm font-medium" style={{ color: 'var(--prox-ink)' }}>{t('proximate.gw.extract_complete')}</p>
                   {confidencePct !== null && (
-                    <Badge
-                      variant="outline"
-                      className={
-                        confidencePct >= 80
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                          : 'bg-amber-50 text-amber-800 border-amber-300'
-                      }
-                    >
+                    <span className={`prox-pill ${confidencePct >= 80 ? 'good' : 'warn'}`}>
                       {t('proximate.gw.confidence', { pct: confidencePct })}
-                    </Badge>
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.gw.review_every_field')}
                 </p>
-              </Card>
+              </div>
               {ex.not_an_agreement_reason && (
-                <Card className="p-3 border-amber-300 bg-amber-50">
-                  <p className="text-sm text-amber-800">
+                <div className="prox-panel" style={{ padding: '12px', border: '1px solid color-mix(in srgb, var(--prox-warn) 40%, transparent)', background: 'var(--prox-warn-tint)' }}>
+                  <p className="text-sm" style={{ color: 'var(--prox-warn)' }}>
                     {t('proximate.gw.not_agreement')}{' '}
                     {ex.not_an_agreement_reason}
                   </p>
-                </Card>
+                </div>
               )}
 
               {/* Basics */}
-              <Card className="p-4 space-y-3">
-                <p className="text-sm font-semibold">{t('proximate.gw.basics')}</p>
+              <div className="prox-panel space-y-3" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, color: 'var(--prox-ink)' }}>{t('proximate.gw.basics')}</p>
                 <div className="grid md:grid-cols-2 gap-3">
                   <label className="block md:col-span-2">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.grant_title')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.grant_title')}</span>
                     <input
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="prox-eyebrow">
                       {t('proximate.gw.donor_extracted', { donor: ex.donor || '—' })}
                     </span>
                     <select
                       value={donorId}
                       onChange={(e) => setDonorId(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     >
                       <option value="">{t('proximate.gw.not_in_registry')}</option>
                       {donors.map((d) => (
@@ -343,15 +335,15 @@ export default function ProximateGrantWizardPage() {
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.donor_ref')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.donor_ref')}</span>
                     <input
                       value={ref}
                       onChange={(e) => setRef(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="prox-eyebrow">
                       {ex.total_amount
                         ? t('proximate.gw.committed_extracted', { amount: ex.total_amount })
                         : t('proximate.gw.committed')}
@@ -360,42 +352,42 @@ export default function ProximateGrantWizardPage() {
                       type="number"
                       value={amountUsd}
                       onChange={(e) => setAmountUsd(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="prox-mono mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.currency')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.currency')}</span>
                     <input
                       value={currency}
                       maxLength={3}
                       onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.start_date')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.start_date')}</span>
                     <input
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.end_date')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.end_date')}</span>
                     <input
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.reporting_cadence')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.reporting_cadence')}</span>
                     <select
                       value={cadence}
                       onChange={(e) => setCadence(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     >
                       {CADENCES.map((c) => (
                         <option key={c} value={c}>{cadenceLabel(c)}</option>
@@ -403,11 +395,11 @@ export default function ProximateGrantWizardPage() {
                     </select>
                   </label>
                 </div>
-              </Card>
+              </div>
 
               {/* Deliverables */}
-              <Card className="p-4 space-y-2">
-                <p className="text-sm font-semibold">
+              <div className="prox-panel space-y-2" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, color: 'var(--prox-ink)' }}>
                   {t('proximate.gw.deliverables', { n: ex.key_deliverables.length })}
                 </p>
                 {ex.key_deliverables.map((d, i) => (
@@ -419,7 +411,7 @@ export default function ProximateGrantWizardPage() {
                         next[i] = { ...next[i], title: e.target.value };
                         patchEx({ key_deliverables: next });
                       }}
-                      className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="flex-1 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                       placeholder={t('proximate.gw.deliverable_ph')}
                     />
                     <input
@@ -433,7 +425,7 @@ export default function ProximateGrantWizardPage() {
                         };
                         patchEx({ key_deliverables: next });
                       }}
-                      className="w-24 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="w-24 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                       placeholder={t('proximate.gw.target_ph')}
                     />
                     <input
@@ -443,7 +435,7 @@ export default function ProximateGrantWizardPage() {
                         next[i] = { ...next[i], unit: e.target.value };
                         patchEx({ key_deliverables: next });
                       }}
-                      className="w-28 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="w-28 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                       placeholder={t('proximate.gw.unit_ph')}
                     />
                     <button
@@ -452,7 +444,7 @@ export default function ProximateGrantWizardPage() {
                           key_deliverables: ex.key_deliverables.filter((_, j) => j !== i),
                         })
                       }
-                      className="p-1.5 text-muted-foreground hover:text-rose-600"
+                      className="p-1.5 text-[color:var(--prox-muted)] hover:text-[color:var(--prox-danger)]"
                       aria-label={t('proximate.gw.remove_deliverable')}
                     >
                       <X className="w-4 h-4" />
@@ -468,15 +460,16 @@ export default function ProximateGrantWizardPage() {
                       ],
                     })
                   }
-                  className="text-xs inline-flex items-center gap-1 text-emerald-700 hover:underline"
+                  className="text-xs inline-flex items-center gap-1 hover:underline"
+                  style={{ color: 'var(--prox-accent)' }}
                 >
                   <Plus className="w-3 h-3" /> {t('proximate.gw.add_deliverable')}
                 </button>
-              </Card>
+              </div>
 
               {/* Reporting requirements */}
-              <Card className="p-4 space-y-2">
-                <p className="text-sm font-semibold">
+              <div className="prox-panel space-y-2" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, color: 'var(--prox-ink)' }}>
                   {t('proximate.gw.reporting_reqs', { n: ex.reporting_requirements.length })}
                 </p>
                 {ex.reporting_requirements.map((r, i) => (
@@ -488,7 +481,7 @@ export default function ProximateGrantWizardPage() {
                         next[i] = { ...next[i], type: e.target.value };
                         patchEx({ reporting_requirements: next });
                       }}
-                      className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="flex-1 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                       placeholder={t('proximate.gw.report_type_ph')}
                     />
                     <select
@@ -498,7 +491,7 @@ export default function ProximateGrantWizardPage() {
                         next[i] = { ...next[i], cadence: e.target.value };
                         patchEx({ reporting_requirements: next });
                       }}
-                      className="w-32 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="w-32 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     >
                       {CADENCES.map((c) => (
                         <option key={c} value={c}>{cadenceLabel(c)}</option>
@@ -516,7 +509,7 @@ export default function ProximateGrantWizardPage() {
                         };
                         patchEx({ reporting_requirements: next });
                       }}
-                      className="w-24 border rounded-md px-2 py-1.5 text-sm bg-background"
+                      className="w-24 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                       placeholder={t('proximate.gw.due_days_ph')}
                       title={t('proximate.gw.due_days_tip')}
                     />
@@ -527,7 +520,7 @@ export default function ProximateGrantWizardPage() {
                             ex.reporting_requirements.filter((_, j) => j !== i),
                         })
                       }
-                      className="p-1.5 text-muted-foreground hover:text-rose-600"
+                      className="p-1.5 text-[color:var(--prox-muted)] hover:text-[color:var(--prox-danger)]"
                       aria-label={t('proximate.gw.remove_requirement')}
                     >
                       <X className="w-4 h-4" />
@@ -543,69 +536,70 @@ export default function ProximateGrantWizardPage() {
                       ],
                     })
                   }
-                  className="text-xs inline-flex items-center gap-1 text-emerald-700 hover:underline"
+                  className="text-xs inline-flex items-center gap-1 hover:underline"
+                  style={{ color: 'var(--prox-accent)' }}
                 >
                   <Plus className="w-3 h-3" /> {t('proximate.gw.add_requirement')}
                 </button>
-              </Card>
+              </div>
 
               {/* Restrictions */}
-              <Card className="p-4 space-y-3">
-                <p className="text-sm font-semibold">{t('proximate.gw.restrictions')}</p>
+              <div className="prox-panel space-y-3" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, color: 'var(--prox-ink)' }}>{t('proximate.gw.restrictions')}</p>
                 <label className="block">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="prox-eyebrow">
                     {t('proximate.gw.verbatim')}
                   </span>
                   <textarea
                     value={ex.restrictions_verbatim}
                     onChange={(e) => patchEx({ restrictions_verbatim: e.target.value })}
                     rows={3}
-                    className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                    className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                   />
                 </label>
                 <div className="grid md:grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="prox-eyebrow">
                       {t('proximate.gw.geographies')}
                     </span>
                     <input
                       value={geos}
                       onChange={(e) => setGeos(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block">
-                    <span className="text-xs text-muted-foreground">
+                    <span className="prox-eyebrow">
                       {t('proximate.gw.sectors')}
                     </span>
                     <input
                       value={sectors}
                       onChange={(e) => setSectors(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                   <label className="block md:col-span-2">
-                    <span className="text-xs text-muted-foreground">{t('proximate.gw.purpose')}</span>
+                    <span className="prox-eyebrow">{t('proximate.gw.purpose')}</span>
                     <input
                       value={purpose}
                       onChange={(e) => setPurpose(e.target.value)}
-                      className="mt-1 w-full border rounded-md px-3 py-2 text-sm bg-background"
+                      className="mt-1 w-full rounded-md px-3 py-2 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                     />
                   </label>
                 </div>
-              </Card>
+              </div>
 
               {/* Compliance flags */}
-              <Card className="p-4 space-y-2">
-                <p className="text-sm font-semibold">
+              <div className="prox-panel space-y-2" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, color: 'var(--prox-ink)' }}>
                   {t('proximate.gw.compliance_flags', { n: ex.compliance_flags.length })}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {ex.compliance_flags.map((f, i) => (
-                    <Badge
+                    <span
                       key={i}
-                      variant="outline"
-                      className="bg-sky-50 text-sky-800 border-sky-300 gap-1"
+                      className="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2.5 py-1"
+                      style={{ background: 'var(--prox-slate-tint)', color: 'var(--prox-slate)' }}
                     >
                       {f}
                       <button
@@ -619,7 +613,7 @@ export default function ProximateGrantWizardPage() {
                       >
                         <X className="w-3 h-3" />
                       </button>
-                    </Badge>
+                    </span>
                   ))}
                 </div>
                 <div className="flex gap-2">
@@ -627,7 +621,7 @@ export default function ProximateGrantWizardPage() {
                     value={newFlag}
                     onChange={(e) => setNewFlag(e.target.value)}
                     placeholder={t('proximate.gw.flag_ph')}
-                    className="flex-1 border rounded-md px-2 py-1.5 text-sm bg-background"
+                    className="flex-1 rounded-md px-2 py-1.5 text-sm border border-[color:var(--prox-line)] bg-[color:var(--prox-surface)] text-[color:var(--prox-ink)]"
                   />
                   <button
                     onClick={() => {
@@ -641,14 +635,14 @@ export default function ProximateGrantWizardPage() {
                     {t('proximate.gw.add')}
                   </button>
                 </div>
-              </Card>
+              </div>
 
               {/* Accept */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={acceptAndCreate}
                   disabled={step === 'saving'}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                  className="prox-btn primary disabled:opacity-50"
                 >
                   {step === 'saving'
                     ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -658,7 +652,8 @@ export default function ProximateGrantWizardPage() {
                 <button
                   onClick={() => { setStep('upload'); setEx(null); setFile(null); }}
                   disabled={step === 'saving'}
-                  className="text-sm text-muted-foreground hover:underline"
+                  className="text-sm hover:underline"
+                  style={{ color: 'var(--prox-muted)' }}
                 >
                   {t('proximate.gw.start_over')}
                 </button>

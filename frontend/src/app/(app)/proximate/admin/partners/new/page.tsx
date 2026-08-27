@@ -13,13 +13,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, UserPlus } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 import { COUNTRIES, statesFor, geolocateState, type GeolocateOutcome } from '@/lib/geography';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 const input = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
-const label = 'block text-sm font-medium mb-1';
+const label = 'prox-eyebrow block mb-1';
 const select = input;
 
 export default function NominatePartnerPage() {
@@ -120,11 +119,11 @@ export default function NominatePartnerPage() {
         <Link href="/proximate/admin" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="w-4 h-4" /> {t('proximate.nom.back')}
         </Link>
-        <Card className="p-5 max-w-xl">
+        <div className="prox-panel max-w-xl" style={{ padding: '20px' }}>
           <form onSubmit={submit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={label}>{t('proximate.nom.org_name')}<span className="text-destructive"> *</span></label>
+                <label className={label}>{t('proximate.nom.org_name')}<span style={{ color: 'var(--prox-danger)' }}> *</span></label>
                 <input className={input} value={form.name} onChange={set('name')} required />
               </div>
               <div>
@@ -167,10 +166,13 @@ export default function NominatePartnerPage() {
                   </p>
                 )}
                 {geoNote && (
-                  <p className={`text-[11px] mt-1 ${
-                    geoNote.tone === 'ok' ? 'text-emerald-700'
-                      : geoNote.tone === 'check' ? 'text-amber-700' : 'text-muted-foreground'
-                  }`}>
+                  <p
+                    className="text-[11px] mt-1"
+                    style={{
+                      color: geoNote.tone === 'ok' ? 'var(--prox-good)'
+                        : geoNote.tone === 'check' ? 'var(--prox-warn)' : 'var(--prox-muted)',
+                    }}
+                  >
                     {geoNote.text}
                   </p>
                 )}
@@ -192,10 +194,10 @@ export default function NominatePartnerPage() {
               </div>
             </div>
 
-            <div className="pt-2 border-t">
+            <div className="pt-2" style={{ borderTop: '1px solid var(--prox-line)' }}>
               {!showBank ? (
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
                     {t('proximate.nom.bank_deferred')}
                   </p>
                   <button
@@ -208,7 +210,7 @@ export default function NominatePartnerPage() {
                 </div>
               ) : (
               <>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              <p className="prox-eyebrow mb-2">
                 {t('proximate.nom.bank_section')}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -229,14 +231,13 @@ export default function NominatePartnerPage() {
               )}
             </div>
 
-            {msg && <p className={`text-sm ${msg.ok ? 'text-emerald-600' : 'text-destructive'}`}>{msg.text}</p>}
-            <button type="submit" disabled={busy}
-              className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-60">
+            {msg && <p className="text-sm" style={{ color: msg.ok ? 'var(--prox-good)' : 'var(--prox-danger)' }}>{msg.text}</p>}
+            <button type="submit" disabled={busy} className="prox-btn primary disabled:opacity-60">
               <UserPlus className="w-4 h-4" />
               {busy ? t('proximate.nom.submitting') : t('proximate.nom.submit')}
             </button>
           </form>
-        </Card>
+        </div>
       </PageMain>
     </PageShell>
   );

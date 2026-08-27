@@ -21,8 +21,6 @@ import {
   FileText, Paperclip, Upload, Download, Globe2, Users2, Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -69,12 +67,12 @@ const PIF_SECTIONS: Array<[string, Array<[string, string]>]> = [
 export function PifCard({ pif, source }: { pif: Record<string, string> | null; source?: string }) {
   if (!pif || Object.keys(pif).length === 0) return null;
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-3">
-        <FileText className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold">Partner Information Form</h3>
+        <FileText className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+        <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>Partner Information Form</h3>
         {source && (
-          <Badge variant="outline" className="text-[10px]">{source}</Badge>
+          <span className="prox-pill slate">{source}</span>
         )}
       </div>
       <div className="grid md:grid-cols-2 gap-x-6 gap-y-4">
@@ -83,13 +81,13 @@ export function PifCard({ pif, source }: { pif: Record<string, string> | null; s
           if (!rows.length) return null;
           return (
             <div key={section}>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+              <p className="prox-eyebrow mb-1.5">
                 {section}
               </p>
               <dl className="space-y-1">
                 {rows.map(([k, label]) => (
                   <div key={k} className="flex gap-2 text-xs">
-                    <dt className="text-muted-foreground shrink-0 w-36">{label}</dt>
+                    <dt className="shrink-0 w-36" style={{ color: 'var(--prox-muted)' }}>{label}</dt>
                     <dd className="font-medium break-words min-w-0">{pif[k]}</dd>
                   </div>
                 ))}
@@ -98,7 +96,7 @@ export function PifCard({ pif, source }: { pif: Record<string, string> | null; s
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -184,16 +182,17 @@ export function ProximateAttachmentsPanel({
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Paperclip className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">
+        <Paperclip className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+        <h3 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>
           {title ?? t('proximate.attachments.title')}
         </h3>
         <select
           value={uploadKind}
           onChange={(e) => setUploadKind(e.target.value)}
-          className="text-xs rounded-md border bg-background p-1.5"
+          className="text-xs rounded-md p-1.5"
+          style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
         >
           {Object.keys(KIND_LABELS).map((k) => (
             <option key={k} value={k}>{kindLabel(k, t)}</option>
@@ -214,21 +213,22 @@ export function ProximateAttachmentsPanel({
         />
       </div>
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">
+        <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
           {emptyText ?? t('proximate.attachments.empty')}
         </p>
       ) : (
         <ul className="space-y-1">
-          {rows.map((a) => (
-            <li key={a.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/50 last:border-b-0">
-              <Badge variant="outline" className="text-[10px] shrink-0">
+          {rows.map((a, i) => (
+            <li key={a.id} className="flex items-center gap-2 text-xs py-1.5" style={i < rows.length - 1 ? { borderBottom: '1px solid var(--prox-line)' } : undefined}>
+              <span className="text-[10px] shrink-0 rounded-full px-2 py-0.5" style={{ border: '1px solid var(--prox-line)', color: 'var(--prox-muted)', background: 'var(--prox-surface)' }}>
                 {kindLabel(a.kind, t)}
-              </Badge>
+              </span>
               <span className="flex-1 truncate font-medium">{a.filename}</span>
-              <span className="text-muted-foreground shrink-0">{fmtBytes(a.file_size)}</span>
+              <span className="prox-num shrink-0" style={{ color: 'var(--prox-muted)' }}>{fmtBytes(a.file_size)}</span>
               <a
                 href={`/api/proximate/attachments/${a.id}/download`}
-                className="text-primary hover:underline shrink-0 inline-flex items-center gap-1"
+                className="hover:underline shrink-0 inline-flex items-center gap-1"
+                style={{ color: 'var(--prox-accent-deep)' }}
               >
                 <Download className="w-3 h-3" /> {t('common.download')}
               </a>
@@ -236,7 +236,7 @@ export function ProximateAttachmentsPanel({
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -256,11 +256,9 @@ interface MediaVerification {
   reviewed_at: string | null;
 }
 
-const VERDICT_STYLES: Record<string, string> = {
-  positive: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  negative: 'bg-rose-100 text-rose-800 border-rose-300',
-  no_footprint: 'bg-muted text-muted-foreground border-border',
-  inconclusive: 'bg-amber-100 text-amber-800 border-amber-300',
+// Media-verification verdict → design-system pill tone.
+const VERDICT_PILL: Record<string, string> = {
+  positive: 'good', negative: 'danger', no_footprint: 'slate', inconclusive: 'warn',
 };
 
 export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
@@ -316,19 +314,19 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-2">
-        <Globe2 className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">{t('proximate.mediaverif.title')}</h3>
+        <Globe2 className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+        <h3 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>{t('proximate.mediaverif.title')}</h3>
         {latest && (
-          <Badge variant="outline" className={`text-[10px] ${VERDICT_STYLES[latest.overall_verdict] || ''}`}>
+          <span className={`prox-pill ${VERDICT_PILL[latest.overall_verdict] || 'slate'}`}>
             {t(`proximate.mediaverif.verdict.${latest.overall_verdict}`)}
-          </Badge>
+          </span>
         )}
         {latest?.source === 'ai_web_search' && (
-          <Badge variant="outline" className="text-[10px] bg-violet-100 text-violet-800 border-violet-300">
+          <span className="prox-pill acc">
             {t('proximate.mediaverif.ai_draft')}
-          </Badge>
+          </span>
         )}
         <Button size="sm" variant="outline" disabled={aiBusy} onClick={runAiCheck}>
           {aiBusy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
@@ -338,45 +336,48 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
           {latest ? t('proximate.mediaverif.reverify') : t('proximate.mediaverif.record_check')}
         </Button>
       </div>
-      {aiError && <p className="text-xs text-rose-600 mb-2">{aiError}</p>}
+      {aiError && <p className="text-xs mb-2" style={{ color: 'var(--prox-danger)' }}>{aiError}</p>}
       {latest ? (
         <div className="text-xs space-y-1">
           {latest.links.map((u) => (
             <p key={u} className="truncate">
-              <a href={u} target="_blank" rel="noreferrer" className="text-primary hover:underline">{u}</a>
+              <a href={u} target="_blank" rel="noreferrer" className="hover:underline" style={{ color: 'var(--prox-accent-deep)' }}>{u}</a>
             </p>
           ))}
           {latest.interaction_summary && (
-            <p className="text-muted-foreground">{latest.interaction_summary}</p>
+            <p style={{ color: 'var(--prox-muted)' }}>{latest.interaction_summary}</p>
           )}
           {latest.reviewed_at && (
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[10px]" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.mediaverif.checked')} {new Date(latest.reviewed_at).toLocaleDateString()}
             </p>
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground italic">
+        <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>
           {t('proximate.mediaverif.none_yet')}
         </p>
       )}
       {formOpen && (
-        <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
+        <div className="mt-3 space-y-2 pt-3" style={{ borderTop: '1px solid var(--prox-line)' }}>
           <input
             type="url" placeholder={t('proximate.mediaverif.link_ph')}
             value={link} onChange={(e) => setLink(e.target.value)}
-            className="w-full text-xs rounded-md border bg-background p-2"
+            className="w-full text-xs rounded-md p-2"
+            style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
           />
           <textarea
             placeholder={t('proximate.mediaverif.summary_ph')}
             value={summary} onChange={(e) => setSummary(e.target.value)}
             rows={2}
-            className="w-full text-xs rounded-md border bg-background p-2"
+            className="w-full text-xs rounded-md p-2"
+            style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
           />
           <div className="flex items-center gap-2">
             <select
               value={verdict} onChange={(e) => setVerdict(e.target.value)}
-              className="text-xs rounded-md border bg-background p-1.5"
+              className="text-xs rounded-md p-1.5"
+              style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
             >
               <option value="positive">{t('proximate.mediaverif.verdict.positive')}</option>
               <option value="no_footprint">{t('proximate.mediaverif.verdict.no_footprint')}</option>
@@ -390,7 +391,7 @@ export function MediaVerificationPanel({ partnerId }: { partnerId: number }) {
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -407,13 +408,6 @@ interface PanelCandidate {
   location: string | null;
   status: string;
 }
-
-const PANEL_STATUS_STYLES: Record<string, string> = {
-  candidate: 'bg-muted text-muted-foreground border-border',
-  vetted: 'bg-sky-100 text-sky-800 border-sky-300',
-  appointed: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  declined: 'bg-rose-100 text-rose-800 border-rose-300',
-};
 
 export function PanelRosterPanel({ roundId }: { roundId?: number }) {
   const { t } = useTranslation();
@@ -468,15 +462,16 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-3">
-        <Users2 className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">{t('proximate.reports.panel_roster')}</h3>
+        <Users2 className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
+        <h3 className="flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>{t('proximate.reports.panel_roster')}</h3>
         <input
           type="text" placeholder={t('proximate.reports.add_candidate_ph')}
           value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
-          className="text-xs rounded-md border bg-background p-1.5 w-44"
+          className="text-xs rounded-md p-1.5 w-44"
+          style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
         />
         <Button size="sm" variant="outline" disabled={busy || !name.trim()} onClick={add}>
           {t('common.add')}
@@ -492,15 +487,15 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
         }}
       />
       {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">{t('proximate.reports.no_panel_candidates')}</p>
+        <p className="text-xs italic" style={{ color: 'var(--prox-muted)' }}>{t('proximate.reports.no_panel_candidates')}</p>
       ) : (
         <ul className="space-y-2">
-          {rows.map((c) => (
-            <li key={c.id} className="text-xs border-b border-border/50 last:border-b-0 pb-2">
+          {rows.map((c, i) => (
+            <li key={c.id} className="text-xs pb-2" style={i < rows.length - 1 ? { borderBottom: '1px solid var(--prox-line)' } : undefined}>
               <div className="flex items-center gap-2">
                 <span className="font-medium flex-1">{c.name}</span>
                 {c.location && (
-                  <span className="text-muted-foreground">{c.location}</span>
+                  <span style={{ color: 'var(--prox-muted)' }}>{c.location}</span>
                 )}
                 <button
                   type="button"
@@ -509,14 +504,16 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
                     cvTargetRef.current = c.id;
                     cvInputRef.current?.click();
                   }}
-                  className="text-[10px] px-1.5 py-1 rounded-md border border-border hover:bg-muted"
+                  className="text-[10px] px-1.5 py-1 rounded-md"
+                  style={{ border: '1px solid var(--prox-line)', color: 'var(--prox-ink)' }}
                 >
                   {cvBusyId === c.id ? 'Uploading…' : 'CV'}
                 </button>
                 <select
                   value={c.status}
                   onChange={(e) => setStatus(c.id, e.target.value)}
-                  className={`text-[10px] rounded-md border p-1 ${PANEL_STATUS_STYLES[c.status] || ''}`}
+                  className="text-[10px] rounded-md p-1"
+                  style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
                 >
                   <option value="candidate">candidate</option>
                   <option value="vetted">vetted</option>
@@ -525,12 +522,12 @@ export function PanelRosterPanel({ roundId }: { roundId?: number }) {
                 </select>
               </div>
               {c.rationale && (
-                <p className="text-muted-foreground mt-0.5 line-clamp-2">{c.rationale}</p>
+                <p className="mt-0.5 line-clamp-2" style={{ color: 'var(--prox-muted)' }}>{c.rationale}</p>
               )}
             </li>
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

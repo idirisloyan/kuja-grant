@@ -14,8 +14,6 @@ import {
   Loader2, FileText, Copy, Check, MessageCircle, ExternalLink,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useOrigin } from '@/components/proximate/token-page-support';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -26,11 +24,11 @@ interface Pkg {
 }
 interface Participant { partner_id: number; partner_name: string | null; stage: string }
 
-const STATUS_TONE: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground border-border',
-  submitted: 'bg-amber-100 text-amber-800 border-amber-300',
-  changes_requested: 'bg-rose-100 text-rose-800 border-rose-300',
-  published: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+const STATUS_PILL: Record<string, string> = {
+  draft: 'slate',
+  submitted: 'warn',
+  changes_requested: 'danger',
+  published: 'good',
 };
 
 export function ReportPackagesCard({
@@ -83,11 +81,11 @@ export function ReportPackagesCard({
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-2">
         <FileText className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">{t('proximate.reports.partner_reporting')}</h3>
-        <p className="text-[10px] text-muted-foreground">
+        <h3 className="text-sm flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{t('proximate.reports.partner_reporting')}</h3>
+        <p className="text-[10px]" style={{ color: 'var(--prox-muted)' }}>
           {t('proximate.reports.partner_reporting_sub')}
         </p>
       </div>
@@ -96,37 +94,41 @@ export function ReportPackagesCard({
           const pkg = byPartner.get(p.partner_id);
           return (
             <li key={p.partner_id}
-                className="flex items-center gap-2 py-1 text-sm flex-wrap border-b border-border/50 last:border-b-0">
-              <span className="flex-1 min-w-0 truncate">
+                className="flex items-center gap-2 py-1 text-sm flex-wrap border-b last:border-b-0"
+                style={{ borderColor: 'var(--prox-line)' }}>
+              <span className="flex-1 min-w-0 truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
                 {p.partner_name || `Partner #${p.partner_id}`}
               </span>
               {pkg ? (
                 <>
-                  <Badge variant="outline"
-                         className={`text-[10px] ${STATUS_TONE[pkg.status] || ''}`}>
+                  <span className={`prox-pill ${STATUS_PILL[pkg.status] || 'slate'}`}>
                     {labelForProximateStatus(pkg.status) || pkg.status}
                     {pkg.item_count > 0 && ` · ${pkg.item_count} items`}
-                  </Badge>
+                  </span>
                   <button type="button" onClick={() => copy(pkg)}
-                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted">
+                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-muted"
+                    style={{ border: '1px solid var(--prox-line)' }}>
                     {copiedId === pkg.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                     {copiedId === pkg.id ? 'Copied' : 'Copy link'}
                   </button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(
                         `Salaam. Please use this link to submit your Proximate implementation report — numbers, photos, videos and voice notes all in one place: ${shareUrl(pkg.package_token)}`)}`}
                      target="_blank" rel="noopener noreferrer"
-                     className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100">
+                     className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                     style={{ background: 'var(--prox-good-tint)', color: 'var(--prox-good)', border: '1px solid var(--prox-good)' }}>
                     <MessageCircle className="w-3 h-3" /> WhatsApp
                   </a>
                   <Link href={`/proximate/reports/${pkg.id}`}
-                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20">
+                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                        style={{ background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)', border: '1px solid var(--prox-accent)' }}>
                     <ExternalLink className="w-3 h-3" /> Review
                   </Link>
                 </>
               ) : (
                 <button type="button" disabled={busyId === p.partner_id}
                         onClick={() => open(p.partner_id)}
-                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted">
+                        className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-muted"
+                        style={{ border: '1px solid var(--prox-line)' }}>
                   {busyId === p.partner_id && <Loader2 className="w-3 h-3 animate-spin" />}
                   {t('proximate.reports.open_reporting')}
                 </button>
@@ -135,6 +137,6 @@ export function ReportPackagesCard({
           );
         })}
       </ul>
-    </Card>
+    </div>
   );
 }

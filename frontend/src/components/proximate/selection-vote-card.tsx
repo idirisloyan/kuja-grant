@@ -12,9 +12,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Vote, Copy, Check, MessageCircle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useOrigin } from '@/components/proximate/token-page-support';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -135,38 +132,38 @@ export function SelectionVoteCard({
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <Vote className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold flex-1">{t('proximate.vote.title')}</h3>
+        <h3 className="text-sm flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{t('proximate.vote.title')}</h3>
         {session?.status === 'open' && (
-          <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-800 border-amber-300">
+          <span className="prox-pill warn">
             {t('proximate.vote.voted_count', { voted: data.voted ?? 0, invited: data.invited ?? 0 })}
-          </Badge>
+          </span>
         )}
         {session?.status === 'closed' && (
-          <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">
+          <span className="prox-pill good">
             {t('proximate.vote.decided')}
-          </Badge>
+          </span>
         )}
         {!session && (
-          <Button size="sm" disabled={busy} onClick={open}>
+          <button type="button" className="prox-btn primary" style={{ height: 34 }} disabled={busy} onClick={open}>
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
             {t('proximate.vote.open_btn')}
-          </Button>
+          </button>
         )}
         {session?.status === 'open' && (
-          <Button size="sm" variant="outline" disabled={busy} onClick={close}>
+          <button type="button" className="prox-btn ghost" style={{ height: 34 }} disabled={busy} onClick={close}>
             {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
             {t('proximate.vote.close_btn')}
-          </Button>
+          </button>
         )}
       </div>
 
-      {error && <p className="text-xs text-rose-600 mb-2">{error}</p>}
+      {error && <p className="text-xs mb-2" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
       {!session && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
           {t('proximate.vote.intro')}
         </p>
       )}
@@ -175,18 +172,19 @@ export function SelectionVoteCard({
         <ul className="space-y-1.5">
           {invites.map((inv) => (
             <li key={inv.id} className="flex items-center gap-2 text-sm flex-wrap">
-              <span className="flex-1 min-w-0 truncate">{inv.voter_name}</span>
+              <span className="flex-1 min-w-0 truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{inv.voter_name}</span>
               {inv.voted_at ? (
-                <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-300">
+                <span className="prox-pill good">
                   {t('proximate.vote.voted_badge')}
-                </Badge>
+                </span>
               ) : (
                 <>
-                  <Badge variant="outline" className="text-[10px]">{t('proximate.vote.awaiting')}</Badge>
+                  <span className="prox-pill slate">{t('proximate.vote.awaiting')}</span>
                   <button
                     type="button"
                     onClick={() => copyLink(inv)}
-                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border hover:bg-muted"
+                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-muted"
+                    style={{ border: '1px solid var(--prox-line)' }}
                   >
                     {copiedId === inv.id
                       ? <Check className="w-3 h-3" />
@@ -197,7 +195,8 @@ export function SelectionVoteCard({
                     href={waHref(inv)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                    className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                    style={{ background: 'var(--prox-good-tint)', color: 'var(--prox-good)', border: '1px solid var(--prox-good)' }}
                   >
                     <MessageCircle className="w-3 h-3" />
                     WhatsApp
@@ -213,7 +212,7 @@ export function SelectionVoteCard({
         const sel = new Set(session.outcome.selected_participant_ids);
         return (
           <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.vote.outcome', {
                 sel: sel.size,
                 total: session.ballot.length,
@@ -228,18 +227,13 @@ export function SelectionVoteCard({
                 const isSel = sel.has(b.participant_id);
                 return (
                   <li key={b.participant_id} className="flex items-center gap-2 text-sm">
-                    <span className="flex-1 min-w-0 truncate">{b.partner_name}</span>
-                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                    <span className="flex-1 min-w-0 truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>{b.partner_name}</span>
+                    <span className="text-[10px] prox-num" style={{ color: 'var(--prox-muted)' }}>
                       {tal.select}–{tal.pass}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] ${isSel
-                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        : 'bg-muted text-muted-foreground border-border'}`}
-                    >
+                    <span className={`prox-pill ${isSel ? 'good' : 'slate'}`}>
                       {isSel ? t('proximate.vote.selected') : t('proximate.vote.not_selected')}
-                    </Badge>
+                    </span>
                   </li>
                 );
               })}
@@ -247,6 +241,6 @@ export function SelectionVoteCard({
           </div>
         );
       })()}
-    </Card>
+    </div>
   );
 }

@@ -20,9 +20,7 @@ import {
   Loader2, UserPlus, ShieldCheck, Link2, Copy, Check, X, MapPin,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface Member {
@@ -69,6 +67,17 @@ const STATUS_LABEL: Record<string, { en: string; k: string }> = {
   stood_down: { en: 'Stood down', k: 'proximate.cycle.st_stood_down' },
 };
 
+// Member lifecycle → design-system pill tone.
+const MEMBER_PILL: Record<string, string> = {
+  candidate: 'slate', dd_in_progress: 'warn', dd_passed: 'good',
+  dd_failed: 'danger', confirmed: 'good', stood_down: 'slate',
+};
+
+// DD verdict → pill tone.
+const VERDICT_PILL: Record<string, string> = {
+  clear: 'good', low: 'good', medium: 'warn', high: 'danger', rejected: 'danger',
+};
+
 const CHECK_RESULTS = [
   { key: 'clear', label: 'Nothing found', k: 'proximate.cycle.res_clear' },
   { key: 'possible_match', label: 'Possible match', k: 'proximate.cycle.res_possible' },
@@ -96,63 +105,63 @@ export function PanelRosterCard({ roundId, canEdit }: { roundId: number; canEdit
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm" style={{ padding: '16px 18px', color: 'var(--prox-muted)' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading') || 'Loading…'}
-      </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '16px 18px' }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold">{t('proximate.cycle.panel_title') || 'Panel members'}</h3>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>{t('proximate.cycle.panel_title') || 'Panel members'}</h3>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.cycle.panel_blurb')
                 || 'They endorse partners and decide the awards. Each one is vetted before they are seated.'}
             </p>
           </div>
           {canEdit && (
-            <Button size="sm" onClick={() => setAdding(true)}>
+            <button type="button" className="prox-btn primary" style={{ height: 34 }} onClick={() => setAdding(true)}>
               <UserPlus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.add_member') || 'Add member'}
-            </Button>
+            </button>
           )}
         </div>
 
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.on_panel') || 'On the panel'}</p>
-              <p className="font-semibold">{summary.confirmed}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.on_panel') || 'On the panel'}</p>
+              <p className="prox-num" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--prox-ink)', marginTop: 2 }}>{summary.confirmed}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.awaiting_checks') || 'Awaiting checks'}</p>
-              <p className="font-semibold">{summary.awaiting_dd}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.awaiting_checks') || 'Awaiting checks'}</p>
+              <p className="prox-num" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--prox-ink)', marginTop: 2 }}>{summary.awaiting_dd}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.checks_failed') || 'Checks failed'}</p>
-              <p className="font-semibold">{summary.dd_failed}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.checks_failed') || 'Checks failed'}</p>
+              <p className="prox-num" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--prox-ink)', marginTop: 2 }}>{summary.dd_failed}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.localities_represented') || 'Localities represented'}</p>
-              <p className="font-semibold">{summary.locality_count}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.localities_represented') || 'Localities represented'}</p>
+              <p className="prox-num" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--prox-ink)', marginTop: 2 }}>{summary.locality_count}</p>
             </div>
           </div>
         )}
         {summary && summary.confirmed > 0 && summary.locality_count < 2 && (
-          <p className="text-xs text-amber-700 dark:text-amber-400">
+          <p className="text-xs" style={{ color: 'var(--prox-warn)' }}>
             {t('proximate.cycle.one_locality_warn')
               || 'Everyone seated so far is from the same locality. The panel is meant to span localities and networks.'}
           </p>
         )}
-      </Card>
+      </div>
 
       {members.length === 0 && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
+        <div className="prox-panel text-center text-sm" style={{ padding: '24px 18px', color: 'var(--prox-muted)' }}>
           {t('proximate.cycle.panel_empty')
             || 'No panel members yet. The cycle starts by finding people from the area with local knowledge and standing.'}
-        </Card>
+        </div>
       )}
 
       {members.map((m) => (
@@ -220,24 +229,18 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
     setBusy(false);
   }
 
-  const tone = m.status === 'confirmed'
-    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200'
-    : m.status === 'dd_failed'
-      ? 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-200'
-      : 'bg-muted text-muted-foreground';
-
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '14px 16px' }}>
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium truncate">{m.name}</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+            <p className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--prox-ink)' }}>{m.name}</p>
+            <p className="text-xs flex items-center gap-1 mt-0.5" style={{ color: 'var(--prox-muted)' }}>
               {m.location && <><MapPin className="w-3 h-3" />{m.location}</>}
               {m.network_represented && <span>· {m.network_represented}</span>}
             </p>
           </div>
-          <span className={`text-xs rounded-full px-2 py-0.5 whitespace-nowrap ${tone}`}>
+          <span className={`prox-pill ${MEMBER_PILL[m.status] || 'slate'} whitespace-nowrap`}>
             {STATUS_LABEL[m.status]
               ? (t(STATUS_LABEL[m.status].k) || STATUS_LABEL[m.status].en)
               : m.status}
@@ -246,16 +249,16 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
       </button>
 
       {open && (
-        <div className="mt-4 pt-4 border-t border-border space-y-4">
+        <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--prox-line)' }}>
           {m.rationale && (
             <div className="text-sm">
-              <p className="text-xs text-muted-foreground">{t('proximate.cycle.why_proposed') || 'Why they were proposed'}</p>
-              <p>{m.rationale}</p>
+              <p className="prox-eyebrow">{t('proximate.cycle.why_proposed') || 'Why they were proposed'}</p>
+              <p style={{ marginTop: 2 }}>{m.rationale}</p>
             </div>
           )}
 
           <div>
-            <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+            <p className="prox-eyebrow mb-2 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5" /> {t('proximate.cycle.dd_on_member') || 'Due diligence on this member'}
             </p>
             <div className="space-y-2">
@@ -270,7 +273,7 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
                         onSet={(r) => check('social', r)} />
               {m.other_checks.map((c, i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{c.label}</span>
+                  <span style={{ color: 'var(--prox-muted)' }}>{c.label}</span>
                   <span>{(() => { const r = CHECK_RESULTS.find((x) => x.key === c.result);
                     return r ? (t(r.k) || r.label) : c.result; })()}</span>
                 </div>
@@ -283,7 +286,7 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
 
           {canEdit && m.dd_complete === false && m.sanctions_status && m.media_status && (
             <div className="flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground self-center">{t('proximate.cycle.overall_verdict') || 'Overall verdict'}:</span>
+              <span className="text-xs self-center" style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.overall_verdict') || 'Overall verdict'}:</span>
               {['clear', 'low', 'medium', 'high', 'rejected'].map((v) => (
                 <Button key={v} size="sm" variant="outline" disabled={busy}
                         onClick={() => verdict(v)}>
@@ -294,20 +297,20 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
           )}
           {m.dd_verdict && (
             <p className="text-sm">
-              <span className="text-muted-foreground">{t('proximate.cycle.verdict') || 'Verdict'}: </span>
-              <Badge variant="outline">{m.dd_verdict}</Badge>
+              <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.verdict') || 'Verdict'}: </span>
+              <span className={`prox-pill ${VERDICT_PILL[m.dd_verdict] || 'slate'}`}>{m.dd_verdict}</span>
             </p>
           )}
 
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
 
           {canEdit && m.status !== 'confirmed' && m.status !== 'stood_down' && (
             <div>
-              <Button size="sm" disabled={busy || !m.can_be_confirmed} onClick={confirm}>
+              <button type="button" className="prox-btn primary" style={{ height: 34, opacity: (busy || !m.can_be_confirmed) ? 0.6 : 1 }} disabled={busy || !m.can_be_confirmed} onClick={confirm}>
                 {t('proximate.cycle.seat_member') || 'Seat on the panel'}
-              </Button>
+              </button>
               {!m.can_be_confirmed && (
-                <p className="text-xs text-muted-foreground mt-1.5">
+                <p className="text-xs mt-1.5" style={{ color: 'var(--prox-muted)' }}>
                   {t('proximate.cycle.seat_blocked')
                     || 'Run the checks and record a verdict first. A panel member decides who receives public money.'}
                 </p>
@@ -316,13 +319,13 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
           )}
 
           {(portal || (m.status === 'confirmed' && m.public_token)) && (
-            <div className="rounded-md border border-border p-3 space-y-2">
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <div className="rounded-md p-3 space-y-2" style={{ border: '1px solid var(--prox-line)' }}>
+              <p className="text-xs flex items-center gap-1.5" style={{ color: 'var(--prox-muted)' }}>
                 <Link2 className="w-3.5 h-3.5" />
                 {t('proximate.cycle.their_link') || 'Their link — no login, no app. Send it on WhatsApp.'}
               </p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-muted rounded px-2 py-1.5 truncate select-all">
+                <code className="prox-mono flex-1 text-xs rounded px-2 py-1.5 truncate select-all" style={{ background: 'var(--prox-inset)' }}>
                   {portal || `${window.location.origin}/proximate-endorse?t=${m.public_token}`}
                 </code>
                 <Button size="sm" variant="outline" onClick={async () => {
@@ -341,7 +344,7 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
           )}
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -352,7 +355,7 @@ function CheckRow({ label, value, canEdit, busy, onSet }: {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
+      <span style={{ color: 'var(--prox-muted)' }}>{label}</span>
       {value ? (
         <span>{(() => { const r = CHECK_RESULTS.find((x) => x.key === value);
           return r ? (t(r.k) || r.label) : value; })()}</span>
@@ -366,7 +369,7 @@ function CheckRow({ label, value, canEdit, busy, onSet }: {
           ))}
         </div>
       ) : (
-        <span className="text-muted-foreground">{t('proximate.cycle.not_checked') || 'Not checked'}</span>
+        <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.not_checked') || 'Not checked'}</span>
       )}
     </div>
   );
@@ -379,20 +382,22 @@ function OtherCheck({ onAdd, busy }: { onAdd: (l: string, r: string) => void; bu
   return (
     <div className="mt-3 flex flex-wrap items-end gap-2">
       <label className="text-sm flex-1 min-w-[12rem]">
-        <span className="text-xs text-muted-foreground">
+        <span className="prox-eyebrow">
           {t('proximate.cycle.other_check_label') || 'Anything else you checked'}
         </span>
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder={t('proximate.cycle.other_check_ph') || 'Reference call, radio interview, WhatsApp group…'}
-          className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+          className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+          style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
         />
       </label>
       <select
         value={result}
         onChange={(e) => setResult(e.target.value)}
-        className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+        className="rounded-md px-2 py-1.5 text-sm"
+        style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
       >
         {CHECK_RESULTS.map((r) => <option key={r.key} value={r.key}>{t(r.k) || r.label}</option>)}
       </select>
@@ -430,11 +435,11 @@ function AddMemberDialog({ roundId, onClose, onAdded }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+      <div className="prox-panel w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto" style={{ padding: '18px 20px' }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold">{t('proximate.cycle.add_panel_member') || 'Add a panel member'}</h3>
+          <h3 style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>{t('proximate.cycle.add_panel_member') || 'Add a panel member'}</h3>
           <button type="button" onClick={onClose} aria-label="Close">
-            <X className="w-4 h-4 text-muted-foreground" />
+            <X className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
           </button>
         </div>
         {[
@@ -448,31 +453,33 @@ function AddMemberDialog({ roundId, onClose, onAdded }: {
           ['recommended_by', t('proximate.cycle.recommended_by') || 'Recommended by'],
         ].map(([k, label]) => (
           <label key={k} className="block text-sm">
-            <span className="text-xs text-muted-foreground">{label}</span>
+            <span className="prox-eyebrow">{label}</span>
             <input
               value={f[k] || ''}
               onChange={(e) => setF({ ...f, [k]: e.target.value })}
-              className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+              className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+              style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
             />
           </label>
         ))}
         <label className="block text-sm">
-          <span className="text-xs text-muted-foreground">{t('proximate.cycle.why_person') || 'Why this person'}</span>
+          <span className="prox-eyebrow">{t('proximate.cycle.why_person') || 'Why this person'}</span>
           <textarea
             rows={2}
             value={f.rationale || ''}
             onChange={(e) => setF({ ...f, rationale: e.target.value })}
-            className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+            className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+            style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
           />
         </label>
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{err}</p>}
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</Button>
-          <Button size="sm" onClick={submit} disabled={busy || !(f.name || '').trim()}>
+          <button type="button" className="prox-btn ghost" style={{ height: 34 }} onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</button>
+          <button type="button" className="prox-btn primary" style={{ height: 34, opacity: (busy || !(f.name || '').trim()) ? 0.6 : 1 }} onClick={submit} disabled={busy || !(f.name || '').trim()}>
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (t('proximate.cycle.add') || 'Add')}
-          </Button>
+          </button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

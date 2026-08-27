@@ -13,7 +13,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, ClipboardList, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -96,33 +95,33 @@ export function ApprovedActivitiesCard({
   };
 
   return (
-    <Card className="p-4">
+    <div className="prox-panel" style={{ padding: '16px 18px' }}>
       <button type="button" onClick={() => setOpen((o) => !o)}
               className="w-full flex items-center gap-2 text-left">
         <ClipboardList className="w-4 h-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold flex-1">
+        <h2 className="text-sm flex-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
           {t('proximate.reports.approved_activities', { n: acts.length })}
         </h2>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="mt-3 space-y-3">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px]" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.activities.baseline')}
           </p>
           {acts.map((a) => (
-            <div key={a.id} className="rounded-md border px-3 py-2 text-xs space-y-0.5">
+            <div key={a.id} className="rounded-md px-3 py-2 text-xs space-y-0.5" style={{ border: '1px solid var(--prox-line)' }}>
               <div className="flex items-center gap-2">
-                <span className="font-medium flex-1 min-w-0 truncate">
+                <span className="flex-1 min-w-0 truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
                   {partnerName(a.partner_id)} — {a.name}
                 </span>
                 <button type="button" onClick={() => remove(a.id)} disabled={busy}
                         aria-label={t('proximate.activities.delete')}
-                        className="text-muted-foreground hover:text-rose-600">
+                        className="text-muted-foreground hover:text-[color:var(--prox-danger)]">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <p className="text-muted-foreground">
+              <p className="prox-mono" style={{ color: 'var(--prox-muted)' }}>
                 {(a.budget_lines || []).map((l) =>
                   `${l.label} $${Number(l.amount).toLocaleString()}`).join(' · ')
                   || t('proximate.activities.no_lines')}
@@ -130,7 +129,7 @@ export function ApprovedActivitiesCard({
             </div>
           ))}
           {/* add form */}
-          <div className="rounded-md border border-dashed p-3 space-y-2">
+          <div className="rounded-md p-3 space-y-2" style={{ border: '1px dashed var(--prox-line-2)' }}>
             <div className="flex gap-2 flex-wrap">
               <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}
                       className="text-xs rounded-md border bg-background px-2 py-1.5 min-w-[160px]">
@@ -164,10 +163,10 @@ export function ApprovedActivitiesCard({
                     : <Plus className="w-3.5 h-3.5 me-1" />}
               {t('proximate.activities.add')}
             </Button>
-            {error && <p className="text-[10px] text-rose-600">{error}</p>}
+            {error && <p className="text-[10px]" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

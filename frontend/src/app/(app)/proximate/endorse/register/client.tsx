@@ -23,8 +23,6 @@ import { useState } from 'react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -85,22 +83,22 @@ export function ProximateEndorserRegisterClient() {
       <PageShell>
         <PageHeader title={t('proximate.register.title')} />
         <PageMain>
-          <Card className="p-6 text-center space-y-3">
-            <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-            <p className="text-lg font-medium">
+          <div className="prox-panel text-center space-y-3" style={{ padding: '24px' }}>
+            <CheckCircle2 className="w-12 h-12 mx-auto" style={{ color: 'var(--prox-good)' }} />
+            <p className="text-lg" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
               {result.already_registered
                 ? t('proximate.register.already_done')
                 : t('proximate.register.thanks')}
             </p>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--prox-muted)' }}>
               {result.endorser.status === 'approved'
                 ? t('proximate.register.you_can_endorse')
                 : t('proximate.register.pending_review')}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.register.status')}: {result.endorser.status}
             </p>
-          </Card>
+          </div>
         </PageMain>
       </PageShell>
     );
@@ -113,14 +111,14 @@ export function ProximateEndorserRegisterClient() {
         subtitle={t('proximate.register.subtitle')}
       />
       <PageMain>
-        <Card className="p-4 space-y-4 max-w-2xl">
-          <p className="text-xs text-muted-foreground">
+        <div className="prox-panel space-y-4 max-w-2xl" style={{ padding: '18px' }}>
+          <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.register.coi_explainer')}
           </p>
 
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.register.locality')}
               </label>
               <input
@@ -133,7 +131,7 @@ export function ProximateEndorserRegisterClient() {
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">
+              <label className="prox-eyebrow block mb-1">
                 {t('proximate.register.country')}
               </label>
               <input
@@ -145,17 +143,17 @@ export function ProximateEndorserRegisterClient() {
               />
             </div>
 
-            <div className="pt-2 border-t">
-              <p className="text-xs font-medium mb-2">
+            <div className="pt-2" style={{ borderTop: '1px solid var(--prox-line)' }}>
+              <p className="prox-eyebrow mb-2">
                 {t('proximate.register.coi_section')}
               </p>
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="text-xs mb-3" style={{ color: 'var(--prox-muted)' }}>
                 {t('proximate.register.coi_section_help')}
               </p>
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">
+                  <label className="prox-eyebrow block mb-1">
                     {t('proximate.register.village')}
                   </label>
                   <input
@@ -167,7 +165,7 @@ export function ProximateEndorserRegisterClient() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">
+                  <label className="prox-eyebrow block mb-1">
                     {t('proximate.register.family')}
                   </label>
                   <input
@@ -179,7 +177,7 @@ export function ProximateEndorserRegisterClient() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">
+                  <label className="prox-eyebrow block mb-1">
                     {t('proximate.register.employer')}
                   </label>
                   <input
@@ -193,19 +191,20 @@ export function ProximateEndorserRegisterClient() {
             </div>
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
 
-          <Button
+          <button
+            type="button"
+            className="prox-btn primary w-full justify-center"
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin me-2" />
             ) : null}
             {t('proximate.register.submit')}
-          </Button>
-        </Card>
+          </button>
+        </div>
       </PageMain>
     </PageShell>
   );

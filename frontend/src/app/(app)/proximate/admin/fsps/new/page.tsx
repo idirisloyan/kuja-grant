@@ -12,12 +12,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Banknote } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 const input = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
-const label = 'block text-sm font-medium mb-1';
+const label = 'prox-eyebrow block mb-1';
 
 export default function RegisterFspPage() {
   const { t } = useTranslation();
@@ -58,10 +57,10 @@ export default function RegisterFspPage() {
         <Link href="/proximate/admin" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
           <ArrowLeft className="w-4 h-4" /> {t('proximate.nom.back')}
         </Link>
-        <Card className="p-5 max-w-xl">
+        <div className="prox-panel max-w-xl" style={{ padding: '20px' }}>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className={label}>{t('proximate.fsp.provider_name')}<span className="text-destructive"> *</span></label>
+              <label className={label}>{t('proximate.fsp.provider_name')}<span style={{ color: 'var(--prox-danger)' }}> *</span></label>
               <input className={input} value={form.name} onChange={set('name')} placeholder={t('proximate.fsp.name_ph')} required />
             </div>
             <div>
@@ -89,15 +88,14 @@ export default function RegisterFspPage() {
               <textarea className={input} rows={2} value={form.notes} onChange={set('notes')} placeholder={t('proximate.fsp.optional')} />
             </div>
             {msg && (
-              <p className={`text-sm ${msg.ok ? 'text-emerald-600' : 'text-destructive'}`}>{msg.text}</p>
+              <p className="text-sm" style={{ color: msg.ok ? 'var(--prox-good)' : 'var(--prox-danger)' }}>{msg.text}</p>
             )}
-            <button type="submit" disabled={busy}
-              className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-60">
+            <button type="submit" disabled={busy} className="prox-btn primary disabled:opacity-60">
               <Banknote className="w-4 h-4" />
               {busy ? t('proximate.fsp.submitting') : t('proximate.fsp.submit')}
             </button>
           </form>
-        </Card>
+        </div>
       </PageMain>
     </PageShell>
   );

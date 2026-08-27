@@ -19,8 +19,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2, MapPin, Banknote, CalendarClock, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 const AREA_SOURCES: { key: string; label: string; k: string }[] = [
@@ -133,9 +131,9 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
 
   if (loading) {
     return (
-      <Card className="p-5 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="prox-panel flex items-center gap-2 text-sm" style={{ padding: '16px 18px', color: 'var(--prox-muted)' }}>
         <Loader2 className="w-4 h-4 animate-spin" /> {t('proximate.cycle.loading_setup') || 'Loading cycle setup…'}
-      </Card>
+      </div>
     );
   }
   if (!setup) return null;
@@ -146,25 +144,25 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
   return (
     <div className="space-y-4">
       {setup.date_warnings.length > 0 && (
-        <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+        <div className="prox-panel" style={{ padding: '14px 18px', borderColor: 'var(--prox-warn)', background: 'var(--prox-warn-tint)' }}>
           <div className="flex gap-2">
-            <CalendarClock className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
+            <CalendarClock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
             <div className="space-y-1">
               {setup.date_warnings.map((w) => (
-                <p key={w.kind} className="text-sm text-amber-900 dark:text-amber-200">
+                <p key={w.kind} className="text-sm" style={{ color: 'var(--prox-ink)' }}>
                   {w.message}
                 </p>
               ))}
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* ---- Money ---------------------------------------------------- */}
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '16px 18px' }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Banknote className="w-4 h-4 text-muted-foreground" />
+          <h3 className="flex items-center gap-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>
+            <Banknote className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
             {t('proximate.cycle.money_title') || 'Funding for this cycle'}
           </h3>
         </div>
@@ -182,51 +180,52 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
             tone={overCommitted ? 'bad' : undefined}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
           {usd(m.awarded_usd)} awarded so far.
           {m.grant_size_usd
             ? ` This cycle is built around grants of about ${usd(m.grant_size_usd)}.`
             : ''}
         </p>
         {overCommitted && (
-          <p className="text-xs text-red-700 dark:text-red-400 flex items-start gap-1.5">
+          <p className="text-xs flex items-start gap-1.5" style={{ color: 'var(--prox-danger)' }}>
             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             {t('proximate.cycle.over_committed')
               || 'Awards exceed what is available for partners in this cycle.'}
           </p>
         )}
-      </Card>
+      </div>
 
       {/* ---- Area ----------------------------------------------------- */}
-      <Card className="p-5 space-y-4">
+      <div className="prox-panel space-y-4" style={{ padding: '16px 18px' }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
+          <h3 className="flex items-center gap-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--prox-ink)' }}>
+            <MapPin className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
             {t('proximate.cycle.area_title') || 'Area and rationale'}
           </h3>
           {canEdit && !editing && (
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            <button type="button" className="prox-btn ghost" style={{ height: 34 }} onClick={() => setEditing(true)}>
               {t('proximate.cycle.edit_setup') || 'Edit setup'}
-            </Button>
+            </button>
           )}
         </div>
 
         {!editing ? (
           <div className="space-y-3 text-sm">
             <div>
-              <span className="text-muted-foreground">{t('proximate.cycle.where') || 'Where'}: </span>
+              <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.where') || 'Where'}: </span>
               {[setup.target_locality, setup.target_region].filter(Boolean).join(', ') || '—'}
             </div>
             <div>
-              <span className="text-muted-foreground">{t('proximate.cycle.why_area') || 'Why this area'}: </span>
-              {setup.area_rationale || <span className="text-muted-foreground">{t('proximate.cycle.why_area_none') || 'Not recorded yet.'}</span>}
+              <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.why_area') || 'Why this area'}: </span>
+              {setup.area_rationale || <span style={{ color: 'var(--prox-muted)' }}>{t('proximate.cycle.why_area_none') || 'Not recorded yet.'}</span>}
             </div>
             {setup.area_sources.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {setup.area_sources.map((s) => (
                   <span
                     key={s}
-                    className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground"
+                    className="text-xs rounded-full px-2 py-0.5"
+                    style={{ border: '1px solid var(--prox-line)', color: 'var(--prox-muted)', background: 'var(--prox-surface)' }}
                   >
                     {(() => { const it = AREA_SOURCES.find((x) => x.key === s);
                       return it ? (t(it.k) || it.label) : s; })()}
@@ -260,7 +259,7 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
                   on={(x) => setForm({ ...form, area_rationale: x })} />
 
             <div>
-              <p className="text-xs text-muted-foreground mb-1.5">
+              <p className="prox-eyebrow mb-1.5">
                 {t('proximate.cycle.sources_label') || 'What the selection is based on'}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -273,11 +272,10 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
                       onClick={() => setSources(
                         on ? sources.filter((x) => x !== s.key) : [...sources, s.key],
                       )}
-                      className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
-                        on
-                          ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay))]/10 text-foreground'
-                          : 'border-border text-muted-foreground hover:text-foreground'
-                      }`}
+                      className="text-xs rounded-full px-2.5 py-1 border transition-colors"
+                      style={on
+                        ? { borderColor: 'var(--prox-accent)', background: 'var(--prox-accent-tint)', color: 'var(--prox-ink)' }
+                        : { borderColor: 'var(--prox-line)', color: 'var(--prox-muted)' }}
                     >
                       {t(s.k) || s.label}
                     </button>
@@ -305,24 +303,24 @@ export function CycleSetupCard({ roundId, canEdit }: { roundId: number; canEdit:
               <Field label={t('proximate.cycle.target_report_date') || 'Target reporting date'} type="date" v={form.target_report_date}
                      on={(x) => setForm({ ...form, target_report_date: x })} />
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>
               {t('proximate.cycle.dates_warn_note')
                 || 'Target dates raise a note when they pass. They never stop you continuing — ground conditions delay cycles, and that is not a reason for the system to refuse the next step.'}
             </p>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm" style={{ color: 'var(--prox-danger)' }}>{error}</p>}
             <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="outline" onClick={() => { setEditing(false); setError(''); }}>
+              <button type="button" className="prox-btn ghost" style={{ height: 34 }} onClick={() => { setEditing(false); setError(''); }}>
                 {t('proximate.cycle.cancel') || 'Cancel'}
-              </Button>
-              <Button size="sm" onClick={save} disabled={saving}>
+              </button>
+              <button type="button" className="prox-btn primary" style={{ height: 34, opacity: saving ? 0.6 : 1 }} onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : (t('proximate.cycle.save_setup') || 'Save setup')}
-              </Button>
+              </button>
             </div>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
@@ -336,10 +334,10 @@ function Notes({ setup }: { setup: Setup }) {
   ].filter(([, v]) => v);
   if (!rows.length) return null;
   return (
-    <dl className="grid sm:grid-cols-2 gap-3 pt-2 border-t border-border">
+    <dl className="grid sm:grid-cols-2 gap-3 pt-2" style={{ borderTop: '1px solid var(--prox-line)' }}>
       {rows.map(([k, v]) => (
         <div key={k as string}>
-          <dt className="text-xs text-muted-foreground">{k}</dt>
+          <dt className="prox-eyebrow">{k}</dt>
           <dd className="text-sm">{v}</dd>
         </div>
       ))}
@@ -351,14 +349,18 @@ function Stat({ label, value, emphasis, tone }: {
   label: string; value: string; emphasis?: boolean; tone?: 'bad';
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`tabular-nums ${
-        tone === 'bad' ? 'text-red-600 dark:text-red-400 font-semibold'
-          : emphasis ? 'font-semibold text-base' : ''
-      }`}>
+    <div className={`prox-stat${tone === 'bad' ? ' alert' : ''}`}>
+      <div className="lab">{label}</div>
+      <div
+        className="val prox-num"
+        style={{
+          color: tone === 'bad'
+            ? 'var(--prox-danger)'
+            : emphasis ? 'var(--prox-accent-deep)' : undefined,
+        }}
+      >
         {value}
-      </p>
+      </div>
     </div>
   );
 }
@@ -368,14 +370,15 @@ function Field({ label, v, on, type = 'text', hint }: {
 }) {
   return (
     <label className="block text-sm">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="prox-eyebrow">{label}</span>
       <input
         type={type}
         value={v || ''}
         onChange={(e) => on(e.target.value)}
-        className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+        className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+        style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
       />
-      {hint && <span className="block mt-1 text-xs text-muted-foreground">{hint}</span>}
+      {hint && <span className="block mt-1 text-xs" style={{ color: 'var(--prox-muted)' }}>{hint}</span>}
     </label>
   );
 }
@@ -383,12 +386,13 @@ function Field({ label, v, on, type = 'text', hint }: {
 function Area({ label, v, on }: { label: string; v: string; on: (x: string) => void }) {
   return (
     <label className="block text-sm">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="prox-eyebrow">{label}</span>
       <textarea
         rows={2}
         value={v || ''}
         onChange={(e) => on(e.target.value)}
-        className="mt-1 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+        className="mt-1 w-full rounded-md px-2.5 py-1.5 text-sm"
+        style={{ border: '1px solid var(--prox-line)', background: 'var(--prox-surface)', color: 'var(--prox-ink)' }}
       />
     </label>
   );
