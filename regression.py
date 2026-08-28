@@ -650,6 +650,59 @@ def run_proximate_writes(base):
     check("GUARD untied disburse non-cleared -> 422; valid override clears gate",
           guard_disburse_requires_clear)
 
+    def guard_award_against_vote():
+        # (4) Awarding a partner the panel selection vote did NOT select must
+        # require a written justification (the vote is advisory; the OB is
+        # accountable but must document a divergence). Set up a CLOSED vote on
+        # the standing happy-path fixture round (dd_clear partner + award) that
+        # selects NOBODY, then decide the award: no note -> 409; with a note ->
+        # allowed. The vote row is removed afterwards so the disburse fixture
+        # is untouched.
+        import sqlite3, json as _json
+        from datetime import datetime as _dt
+        dbp = os.environ.get("KUJA_DB_PATH")
+        if not dbp:
+            raise Skip("no KUJA_DB_PATH")
+        con = sqlite3.connect(dbp)
+        try:
+            row = con.execute(
+                "select a.id, a.round_id, a.network_id from proximate_awards a "
+                "join proximate_rounds r on r.id=a.round_id "
+                "where r.status='active' limit 1").fetchone()
+            if not row:
+                raise Skip("no active-round award fixture")
+            aid, rid_f, nid = row
+            obid = con.execute("select id from users where email=?",
+                               ("ob@proximate.org",)).fetchone()[0]
+            ts = _dt.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            cur = con.execute(
+                "insert into proximate_panel_vote_sessions "
+                "(network_id, round_id, status, ballot_json, outcome_json, "
+                " created_by_user_id, created_at, closed_by_user_id, closed_at) "
+                "values (?,?,?,?,?,?,?,?,?)",
+                (nid, rid_f, "closed", "[]",
+                 _json.dumps({"selected_participant_ids": []}),
+                 obid, ts, obid, ts))
+            vsid = cur.lastrowid
+            con.commit()
+        finally:
+            con.close()
+        try:
+            r1 = _write("PATCH", ob, base, f"/api/proximate/awards/{aid}",
+                        {"decision": "awarded"}, OV, {409}, 60)
+            assert r1.json().get("code") == "err.award_against_vote", r1.text[:200]
+            r2 = _write("PATCH", ob, base, f"/api/proximate/awards/{aid}",
+                        {"decision": "awarded",
+                         "panel_comments": "OB override: uniquely placed for this locality."},
+                        OV, {200, 400}, 60)
+            assert r2.json().get("code") != "err.award_against_vote", r2.text[:200]
+        finally:
+            con = sqlite3.connect(dbp)
+            con.execute("delete from proximate_panel_vote_sessions where id=?", (vsid,))
+            con.commit(); con.close()
+    check("GUARD award against the panel vote -> 409 unless justified",
+          guard_award_against_vote)
+
     # --- interventions module ---
     def intervention_create():
         if not pid:

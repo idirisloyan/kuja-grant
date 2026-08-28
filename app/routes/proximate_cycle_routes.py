@@ -858,6 +858,50 @@ def api_award_decide(award_id):
                 'partner_status': _apart.status if _apart else None,
             }), 409
 
+    # Panel-vote divergence gate (2026-08-27): if a selection vote was CLOSED
+    # for this round and this partner was NOT among the panel's selected set,
+    # the OB is awarding against the recorded panel preference. The vote is
+    # advisory, not binding — the OB is the accountable decision-maker — so
+    # this is ALLOWED, but it must be documented: require a written
+    # justification on the award. Awards with no closed vote, or where the
+    # partner WAS selected, need no extra note (the dd_clear floor already
+    # applies). This answers the QA "panel agreement" question without turning
+    # a raw tally into a binding referendum.
+    if a.decision == 'awarded':
+        from app.models import (
+            ProximatePanelVoteSession, ProximateRoundParticipant,
+        )
+        _vs = (ProximatePanelVoteSession.query
+               .filter_by(round_id=a.round_id, network_id=a.network_id,
+                          status='closed')
+               .order_by(ProximatePanelVoteSession.closed_at.desc())
+               .first())
+        if _vs and _vs.outcome_json:
+            try:
+                _selected = set(json.loads(_vs.outcome_json)
+                                .get('selected_participant_ids') or [])
+            except Exception:
+                _selected = set()
+            _part = ProximateRoundParticipant.query.filter_by(
+                round_id=a.round_id, partner_id=a.partner_id).first()
+            _against = not (_part and _part.id in _selected)
+            if _against:
+                _just = ((body.get('panel_comments')
+                          or body.get('amount_reason')
+                          or body.get('override_reason') or '') or '').strip()
+                if len(_just) < 15:
+                    db.session.rollback()
+                    return jsonify({
+                        'success': False,
+                        'code': 'err.award_against_vote',
+                        'error': (
+                            'The panel selection vote did not select this '
+                            'partner. Awarding against the recorded vote is '
+                            'allowed (the Oversight Body decides), but it must '
+                            'be documented — provide panel_comments '
+                            '(>=15 chars) explaining the decision.'),
+                    }), 409
+
     # Money guard. The cycle can only award what is actually disbursable
     # after administration — see ProximateRound.disbursable_usd.
     if a.decision == 'awarded':
