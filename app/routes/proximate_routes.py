@@ -411,13 +411,19 @@ def api_get_partner(partner_id):
 @proximate_bp.route('/partners', methods=['POST'])
 @login_required
 def api_nominate_partner():
-    """Nominate a new informal group. Any authenticated Proximate
-    user can nominate; the partner lands in 'nominated' status. The
-    secretariat moves them to 'endorsements_open' after a quick
-    intake-form sanity check (Phase 629)."""
+    """Nominate a new informal group via the operator surface. OB /
+    secretariat only (2026-08-27) — the partner lands in 'nominated'
+    status. Community members use the PUBLIC self-nominate route
+    (`/partners/self-nominate`) instead; this operator endpoint is
+    gated so a plain authenticated tenant user cannot inject partners.
+    The secretariat then moves them to 'endorsements_open' after a
+    quick intake-form sanity check (Phase 629)."""
     net, err = _require_proximate_tenant()
     if err:
         return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
     payload = request.get_json(silent=True) or {}
 
     name = (payload.get('name') or '').strip()
@@ -4933,10 +4939,28 @@ def api_record_disbursement():
     ).first()
     if not partner:
         return jsonify({'success': False, 'error': 'Partner not in tenant'}), 404
-    if partner.status not in ('dd_clear', 'endorsements_open', 'dd_pending'):
-        # OB-only override allowed but flag it
+    # Cleared-partner gate (2026-08-27): money may only be released to a
+    # dd_clear partner — one that passed the >=2-endorsement + due-diligence
+    # floor — UNLESS an explicit OB override reason (>=15 chars) is recorded.
+    # This applies to EVERY disbursement, including untied/ad-hoc ones (which
+    # otherwise skip the round-tied cycle gate). Previously this only logged a
+    # warning and let a release to a non-cleared partner through silently.
+    if partner.status != 'dd_clear':
+        _ovr = (payload.get('override_reason') or '').strip()
+        if len(_ovr) < 15:
+            return jsonify({
+                'success': False,
+                'code': 'err.partner_not_cleared',
+                'error': (
+                    f'Partner is "{partner.status}", not cleared for disbursement. '
+                    'A cleared (dd_clear) partner is required, or provide '
+                    'override_reason (>=15 chars) to record an explicit OB override.'
+                ),
+                'partner_status': partner.status,
+            }), 422
         logger.warning(
-            f"Proximate: disbursement on non-cleared partner id={partner.id} status={partner.status}"
+            f"Proximate: OB-OVERRIDE disbursement to non-cleared partner "
+            f"id={partner.id} status={partner.status} reason={_ovr!r}"
         )
 
     # ---- R-01: two-signer activation gate (2026-08-24) ------------------

@@ -586,6 +586,70 @@ def run_proximate_writes(base):
              override=OV, allow={200, 400, 403, 404, 409})
     check("OB POST /proximate/disbursements/<id>/cosign", disbursement_cosign)
 
+    # --- workflow-integrity guards (2026-08-27) --------------------------
+    # These prove the three enforcement gates actually REJECT the invalid
+    # case. A happy-path check only proves a guard does not OVER-block; a
+    # guard that silently no-ops would leave every happy-path check green
+    # (see feedback: "checks that report unearned passes"). Each asserts the
+    # SPECIFIC 4xx code, and uses a fresh 'nominated' (non-cleared) partner so
+    # the reject is unambiguous.
+
+    def guard_nominate_ob_only():
+        # (1) POST /partners is OB-only. A non-OB tenant member (donor) must
+        # be refused with err.ob_required; community members use self-nominate.
+        r = post(donor, base, "/api/proximate/partners",
+                 {"name": "Non-OB Should Be Refused", "locality": "Kassala",
+                  "country": "Sudan"}, override=OV, allow={403})
+        assert r.json().get("code") == "err.ob_required", r.text[:200]
+    check("GUARD non-OB nominate -> 403 err.ob_required", guard_nominate_ob_only)
+
+    def guard_award_requires_clear():
+        # (2) A partner may only be AWARDED once dd_clear. Open an award for a
+        # fresh 'nominated' partner, then decide 'awarded' -> 409.
+        if not rid:
+            raise Skip("no round to open an award on")
+        rp = post(ob, base, "/api/proximate/partners",
+                  {"name": "Uncleared Award Target", "locality": "Gedaref",
+                   "country": "Sudan"}, override=OV, allow={200, 201})
+        npid = (rp.json().get("partner") or {}).get("id")
+        if not npid:
+            raise Skip(f"fresh partner not created: {rp.text[:120]}")
+        ra = post(ob, base, f"/api/proximate/rounds/{rid}/awards",
+                  {"partner_id": npid, "requested_amount_usd": 1000,
+                   "recommended_amount_usd": 1000},
+                  override=OV, allow={200, 201, 409})
+        aid = (ra.json().get("award") or {}).get("id") or ra.json().get("award_id")
+        if not aid:
+            raise Skip(f"award not opened: {ra.text[:120]}")
+        rd = _write("PATCH", ob, base, f"/api/proximate/awards/{aid}",
+                    {"decision": "awarded"}, OV, {409}, 60)
+        assert rd.json().get("code") == "err.award_requires_clear", rd.text[:200]
+    check("GUARD award a non-cleared partner -> 409 err.award_requires_clear",
+          guard_award_requires_clear)
+
+    def guard_disburse_requires_clear():
+        # (3) Every disbursement (incl. UNTIED) needs a dd_clear partner OR an
+        # explicit >=15-char OB override. Untied release to a fresh 'nominated'
+        # partner -> 422 err.partner_not_cleared; the SAME release WITH a valid
+        # override clears THIS gate (untied -> no round gate follows).
+        rp = post(ob, base, "/api/proximate/partners",
+                  {"name": "Uncleared Disburse Target", "locality": "Sennar",
+                   "country": "Sudan"}, override=OV, allow={200, 201})
+        npid = (rp.json().get("partner") or {}).get("id")
+        if not npid:
+            raise Skip(f"fresh partner not created: {rp.text[:120]}")
+        r1 = post(ob, base, "/api/proximate/disbursements",
+                  {"partner_id": npid, "amount_usd": 250, "purpose": "guard"},
+                  override=OV, allow={422})
+        assert r1.json().get("code") == "err.partner_not_cleared", r1.text[:200]
+        r2 = post(ob, base, "/api/proximate/disbursements",
+                  {"partner_id": npid, "amount_usd": 250, "purpose": "guard",
+                   "override_reason": "OB explicit override for regression test"},
+                  override=OV, allow={200, 201})
+        assert r2.json().get("code") != "err.partner_not_cleared", r2.text[:200]
+    check("GUARD untied disburse non-cleared -> 422; valid override clears gate",
+          guard_disburse_requires_clear)
+
     # --- interventions module ---
     def intervention_create():
         if not pid:

@@ -837,6 +837,27 @@ def api_award_decide(award_id):
         if field in body and isinstance(body[field], list):
             setattr(a, col, json.dumps(body[field]))
 
+    # Panel-agreement gate (2026-08-27): a partner may only be AWARDED once
+    # they have cleared the endorsement + due-diligence floor. `dd_clear` is
+    # reached only after >=2 independent, COI-clean endorsements AND due
+    # diligence (ProximatePartner.trust_floor_signals), so this ties the award
+    # to the panel/endorser agreement rather than a bare secretariat PATCH.
+    # Hard server-side guard; the UI already restricts award to cleared partners.
+    if a.decision == 'awarded':
+        _apart = ProximatePartner.query.get(a.partner_id)
+        if not _apart or _apart.status != 'dd_clear':
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'code': 'err.award_requires_clear',
+                'error': (
+                    f'This partner is "{_apart.status if _apart else "unknown"}", '
+                    'not cleared. A partner must clear the endorsement + '
+                    'due-diligence floor (dd_clear) before they can be awarded.'
+                ),
+                'partner_status': _apart.status if _apart else None,
+            }), 409
+
     # Money guard. The cycle can only award what is actually disbursable
     # after administration — see ProximateRound.disbursable_usd.
     if a.decision == 'awarded':
