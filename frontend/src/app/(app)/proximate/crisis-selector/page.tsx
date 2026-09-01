@@ -378,9 +378,17 @@ export default function CrisisSelectorPage() {
 
         {!loading && data && data.rows.length === 0 && (
           <div className="prox-panel text-center" style={{ padding: '24px' }}>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm" style={{ fontWeight: 600 }}>
               {t('proximate.crisis_selector.empty')}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('proximate.crisis_selector.empty_sub')}
+            </p>
+            {signals.length > 0 && (
+              <p className="text-xs mt-2" style={{ color: 'var(--prox-accent)', fontWeight: 600 }}>
+                {signals.length} {t('proximate.crisis_signal.pending_heading')} ↑
+              </p>
+            )}
           </div>
         )}
 

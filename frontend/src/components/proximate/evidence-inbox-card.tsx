@@ -99,7 +99,10 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
             </Button>
           )}
         </div>
-        {summary && (
+        {/* PF-UX-062: don't show four zero KPIs above an empty card. The
+            metric row appears only once there is evidence to count; before
+            that the empty state below carries the message. */}
+        {summary && summary.total > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
             <Stat label={t('proximate.cycle.items') || 'Items'} v={summary.total} />
             <Stat label={t('proximate.cycle.open_issues') || 'Open issues'} v={summary.open_issues} bad={summary.open_issues > 0} />
