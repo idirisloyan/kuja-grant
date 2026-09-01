@@ -242,20 +242,31 @@ export function ProximateDonorClient() {
           )}
         </div>
         <div style={{ padding: '20px 18px 22px' }}>
-          <div className="prox-pipe" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+          {/* Responsive funnel: five columns on desktop, a stacked vertical
+              funnel on a phone so the stages + dollar amounts don't crush into
+              a fixed 5-across grid (mobile-first). Each stage carries its own
+              proportional bar. */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-x-3 gap-y-3.5">
             {mtStages.map((s, i) => (
-              <div className="prox-stage" key={i}>
-                <span className="lab" style={s.good ? { color: 'var(--prox-good)' } : undefined}>{s.lab}</span>
-                <div className="val prox-num">{s.val == null ? t('proximate.donor.not_recorded') : usd(s.val)}</div>
-                <span className="meta">{s.sub}</span>
-              </div>
-            ))}
-          </div>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 0, marginTop: 16 }}>
-            {mtStages.map((s, i) => (
-              <div key={i} className={`prox-bar ${s.good ? 'good' : ''}`}
-                style={{ margin: i === 0 ? '0 14px 0 0' : i === mtStages.length - 1 ? '0 0 0 14px' : '0 14px' }}>
-                <i style={{ width: s.val == null ? '0%' : `${Math.max(2, Math.round((s.val / mtScale) * 100))}%` }} />
+              <div key={i} className="min-w-0">
+                <div className="flex items-baseline justify-between gap-2 sm:block">
+                  <span
+                    className="text-[11px] font-semibold uppercase"
+                    style={{ letterSpacing: '.06em', color: s.good ? 'var(--prox-good)' : 'var(--prox-muted)' }}
+                  >
+                    {s.lab}
+                  </span>
+                  <div
+                    className="prox-num"
+                    style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 800, fontSize: 20, letterSpacing: '-.02em', color: 'var(--prox-ink)' }}
+                  >
+                    {s.val == null ? t('proximate.donor.not_recorded') : usd(s.val)}
+                  </div>
+                </div>
+                <div className={`prox-bar ${s.good ? 'good' : ''}`} style={{ marginTop: 8 }}>
+                  <i style={{ width: s.val == null ? '0%' : `${Math.max(2, Math.round((s.val / mtScale) * 100))}%` }} />
+                </div>
+                <span className="text-[11px] block mt-1" style={{ color: 'var(--prox-muted)' }}>{s.sub}</span>
               </div>
             ))}
           </div>
