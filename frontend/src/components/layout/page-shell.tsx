@@ -41,6 +41,7 @@ import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { useNetworkStore } from '@/stores/network-store';
 
 // ---------------------------------------------------------------------------
 // Tones — shared status / attention vocabulary
@@ -141,8 +142,16 @@ export function PageHeader({
       is NOT included; the last crumb is the parent list. */
   breadcrumbs?: { label: string; href?: string }[];
 }) {
+  // PF-UX-009: the Proximate tenant wants the page title on the canvas, not
+  // wrapped in a bordered card. Scoped to Proximate so other tenants' headers
+  // are unchanged — hostname covers first paint on proximate.kuja.org; the
+  // network store covers localhost / override once hydrated.
+  const network = useNetworkStore((s) => s.network);
+  const flatHeader =
+    network?.slug === 'proximate'
+    || (typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes('proximate'));
   return (
-    <header className="border border-border rounded-lg bg-card p-5">
+    <header className={flatHeader ? 'pb-1' : 'border border-border rounded-lg bg-card p-5'}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav
           aria-label="Breadcrumb"
