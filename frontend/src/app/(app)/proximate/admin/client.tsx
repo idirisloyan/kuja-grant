@@ -267,7 +267,7 @@ export function ProximateAdminClient() {
         <div className="prox-panel">
           <div className="prox-phead">
             <h2>{t('proximate.admin.audit')}</h2>
-            <Link href="/proximate/admin/audit-chain" className="prox-link">{t('proximate.admin.view_all')} →</Link>
+            <Link href="/admin/audit-chain" className="prox-link">{t('proximate.admin.view_all')} →</Link>
           </div>
           <div style={{ padding: '6px 18px 12px' }}>
             {data.recent_audit.length === 0 ? (

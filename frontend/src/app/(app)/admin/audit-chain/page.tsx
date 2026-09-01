@@ -392,8 +392,10 @@ export default function AuditChainPage() {
           </div>
         )}
 
+        {/* Desktop keeps the table — it is the right form for a ledger
+            (PF-UX-120). Mobile gets stacked cards below (PF-MOB-015). */}
         {recent && recent.entries.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 overflow-x-auto hidden md:block">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[hsl(var(--border))] text-[hsl(var(--kuja-ink-soft))]">
@@ -492,6 +494,73 @@ export default function AuditChainPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Mobile: stacked entry cards — the table is unreadable at phone
+            width (PF-MOB-015). Same fields, same expand-for-hashes. */}
+        {recent && recent.entries.length > 0 && (
+          <div className="md:hidden mt-4 space-y-2">
+            {recent.entries.map((e) => {
+              const href = subjectDrillHref(e.subject_kind, e.subject_id ?? null);
+              const open = expandedSeq === e.seq;
+              return (
+                <div key={e.seq} className="rounded-lg border border-[hsl(var(--border))] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSeq(open ? null : e.seq)}
+                    className="w-full text-start p-3 hover:bg-[hsl(var(--kuja-sand-50))]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn('text-sm font-semibold', actionTone(e.action))}>
+                        {actionLabel(e.action, t)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[hsl(var(--kuja-ink-soft))] shrink-0">
+                        #{e.seq}
+                        <ChevronRight className={cn('w-3.5 h-3.5 transition-transform', open && 'rotate-90')} />
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[hsl(var(--kuja-ink-soft))] mt-1.5">
+                      {e.actor_email && (
+                        <span className="inline-flex items-center gap-1">
+                          <UserIcon className="w-3 h-3" />{e.actor_email}
+                        </span>
+                      )}
+                      {e.subject_kind && (
+                        <span>{labelForAuditSubject(e.subject_kind, t)} #{e.subject_id}</span>
+                      )}
+                      <span>{new Date(e.created_at).toLocaleString()}</span>
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="px-3 pb-3 bg-[hsl(var(--kuja-sand-50))]/50">
+                      <div className="grid gap-1.5 text-[10px] font-mono pt-2 border-t border-[hsl(var(--border))]">
+                        <div>
+                          <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.prev_hash')}</span>
+                          <span className="break-all">{e.prev_hash || t('audit_chain.genesis')}</span>
+                        </div>
+                        <div>
+                          <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.payload_hash')}</span>
+                          <span className="break-all">{e.payload_hash}</span>
+                        </div>
+                        {e.details && Object.keys(e.details).length > 0 && (
+                          <div>
+                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('common.details')}</span>
+                            <pre className="whitespace-pre-wrap break-all inline">{JSON.stringify(e.details)}</pre>
+                          </div>
+                        )}
+                        {href && (
+                          <Link href={href} className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))] font-sans font-semibold mt-1">
+                            {t('audit_chain.open_subject', { kind: e.subject_kind ?? '', id: e.subject_id ?? '' })}
+                            <ArrowUpRight className="w-2.5 h-2.5" />
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>
