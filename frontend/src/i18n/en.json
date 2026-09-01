@@ -1877,6 +1877,7 @@
   "proximate.cycle.grant_size": "Grant size for this cycle (USD)",
   "proximate.cycle.grant_size_note": "This cycle is built around grants of about {n}.",
   "proximate.cycle.history_title": "History with the fund",
+  "proximate.cycle.history_empty": "No fund history yet — it builds as this partner joins rounds, receives funds and reports.",
   "proximate.history.observations_note": "These are observations, not a rating. Report timing in Sudan reflects connectivity and conflict as much as diligence — read them alongside what you know about the context.",
   "proximate.dd.evidence_title": "Due-diligence evidence",
   "proximate.mediaverif.title": "Media verification",

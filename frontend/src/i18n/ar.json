@@ -1874,6 +1874,7 @@
   "proximate.cycle.grant_size": "حجم المنحة لهذه الدورة (دولار)",
   "proximate.cycle.grant_size_note": "بُنيت هذه الدورة على منح بحجم {n} تقريبًا.",
   "proximate.cycle.history_title": "التاريخ مع الصندوق",
+  "proximate.cycle.history_empty": "لا يوجد تاريخ مع الصندوق بعد — يتكوّن عندما ينضم الشريك إلى الدورات ويستلم الأموال ويقدّم التقارير.",
   "proximate.history.observations_note": "هذه ملاحظات وليست تقييمًا. توقيت التقارير في السودان يعكس الاتصال والنزاع بقدر ما يعكس الالتزام — اقرأها في ضوء ما تعرفه عن السياق.",
   "proximate.dd.evidence_title": "أدلة العناية الواجبة",
   "proximate.mediaverif.title": "التحقق الإعلامي",

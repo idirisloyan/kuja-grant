@@ -644,14 +644,24 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
         </div>
       )}
 
-      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {rows.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs text-muted-foreground">{k}</dt>
-            <dd className="text-sm tabular-nums">{v}</dd>
-          </div>
-        ))}
-      </dl>
+      {/* PF-UX-062: a brand-new partner has no fund history yet — show a
+          contextual line instead of a grid of twelve zeros / "No data yet". */}
+      {((o.cycles_participated ?? 0) > 0 || (o.times_awarded ?? 0) > 0
+        || (o.total_sent_usd ?? 0) > 0 || (o.evidence_items ?? 0) > 0) ? (
+        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {rows.map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-muted-foreground">{k}</dt>
+              <dd className="text-sm tabular-nums">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {t('proximate.cycle.history_empty')
+            || 'No fund history yet — it builds as this partner joins rounds, receives funds and reports.'}
+        </p>
+      )}
 
       <p className="text-xs text-muted-foreground border-t border-border pt-3">
         {data.note}
