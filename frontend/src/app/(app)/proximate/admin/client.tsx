@@ -13,8 +13,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Plus, ArrowRight, AlertTriangle, ShieldCheck, FileText, Users, Coins,
-  Banknote, UserPlus, Flame, ShieldAlert,
+  Plus, ArrowRight, ShieldCheck, Banknote, UserPlus, Flame,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -120,7 +119,6 @@ export function ProximateAdminClient() {
   const cleared = pb.dd_clear ?? 0;
   const suspended = pb.suspended ?? 0;
   const total = data.partners_total;
-  const pct = (n: number) => `${Math.max(2, Math.round((n / Math.max(1, total)) * 100))}%`;
 
   const iv = data.interventions;
 
@@ -161,18 +159,31 @@ export function ProximateAdminClient() {
   if (data.monitoring_due_this_month > 0) signals.push({ label: t('proximate.admin.monitoring_due'), sub: data.month, pill: 'slate', pillTx: String(data.monitoring_due_this_month), href: '/proximate/admin/partners' });
   if (intake > 0) signals.push({ label: t('proximate.admin.pipe_intake'), sub: t('proximate.admin.partners'), pill: 'slate', pillTx: String(intake), href: '/proximate/admin/partners' });
 
+  // Quick actions = creation shortcuts only. Pure navigation destinations
+  // (Rounds, Disbursements, Grievances, Messages, Partners) live in the
+  // sidebar and were removed here to stop the dashboard duplicating the nav
+  // (PF-UX-014). "New round" is the header's primary action.
   const workflow = [
-    { icon: Coins, label: t('proximate.admin.tile_rounds'), href: '/proximate/rounds' },
-    { icon: Banknote, label: t('proximate.admin.tile_disbursements'), href: '/proximate/disbursements' },
     { icon: UserPlus, label: t('proximate.admin.tile_nominate_partner') || 'Nominate a partner', href: '/proximate/admin/partners/new' },
     { icon: Flame, label: t('proximate.admin.tile_crisis_selector'), href: '/proximate/crisis-selector' },
-    { icon: ShieldAlert, label: t('proximate.grievance_queue.title'), href: '/proximate/admin/grievances' },
     { icon: Banknote, label: t('proximate.admin.tile_register_fsp') || 'Providers', href: '/proximate/admin/fsps' },
-    { icon: FileText, label: t('proximate.admin.tile_messages') || 'Messages', href: '/proximate/admin/messages' },
-    { icon: Users, label: t('proximate.admin.partners'), href: '/proximate/admin/partners' },
   ];
 
   const arrow = <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.4} />;
+
+  // Collapse consecutive identical automated events (e.g. a burst of cron
+  // overdue-report nudges) into one line with a count, so human decisions are
+  // not buried under machine noise (PF-UX-013). Individual immutable rows
+  // remain in the full audit chain.
+  const auditGroups: { action: string; actor: string; seq: number; count: number }[] = [];
+  for (const row of data.recent_audit) {
+    const last = auditGroups[auditGroups.length - 1];
+    if (last && last.action === row.action && last.actor === row.actor_email) {
+      last.count += 1;
+    } else {
+      auditGroups.push({ action: row.action, actor: row.actor_email, seq: row.seq, count: 1 });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -201,17 +212,22 @@ export function ProximateAdminClient() {
           <Link href="/proximate/admin/partners" className="prox-link">{t('proximate.admin.view_all')} →</Link>
         </div>
         <div style={{ padding: '20px 18px 22px' }}>
-          <div className="prox-pipe" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <div className="prox-stage"><span className="lab">{t('proximate.admin.partners')}</span><div className="val prox-num">{total}</div><span className="meta">{t('proximate.admin.pipe_all')}</span></div>
+          {/* One funnel, not four independent bars (PF-UX-011): the total sits
+              up top, the three stages read as a single progression, and one
+              segmented bar shows how the total splits across them. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
+            <span className="prox-num" style={{ fontSize: 26, fontWeight: 800, color: 'var(--prox-ink)', lineHeight: 1 }}>{total}</span>
+            <span className="text-[13px]" style={{ color: 'var(--prox-muted)' }}>{t('proximate.admin.partners')}</span>
+          </div>
+          <div className="prox-pipe" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
             <div className="prox-stage"><span className="lab">{t('proximate.admin.pipe_intake')}</span><div className="val prox-num">{intake}</div><span className="meta">{t('proximate.admin.pipe_intake_sub')}</span></div>
             <div className="prox-stage"><span className="lab">{t('proximate.admin.pipe_dd')}</span><div className="val prox-num">{ddPending}</div><span className="meta">{t('proximate.admin.pipe_dd_sub')}</span></div>
             <div className="prox-stage"><span className="lab" style={{ color: 'var(--prox-good)' }}>{t('proximate.admin.pipe_cleared')}</span><div className="val prox-num">{cleared}</div><span className="meta">{t('proximate.admin.pipe_cleared_sub')}</span></div>
           </div>
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 0, marginTop: 16 }}>
-            <div className="prox-bar" style={{ margin: '0 14px 0 0' }}><i style={{ width: '100%' }} /></div>
-            <div className="prox-bar" style={{ margin: '0 14px' }}><i style={{ width: pct(intake) }} /></div>
-            <div className="prox-bar" style={{ margin: '0 14px' }}><i style={{ width: pct(ddPending) }} /></div>
-            <div className="prox-bar good" style={{ margin: '0 0 0 14px' }}><i style={{ width: pct(cleared) }} /></div>
+          <div style={{ display: 'flex', height: 8, borderRadius: 999, overflow: 'hidden', background: 'var(--prox-inset, var(--prox-line))', marginTop: 16 }}>
+            <div style={{ flexGrow: intake, background: 'var(--prox-slate)' }} title={`${t('proximate.admin.pipe_intake')}: ${intake}`} />
+            <div style={{ flexGrow: ddPending, background: 'var(--prox-warn)' }} title={`${t('proximate.admin.pipe_dd')}: ${ddPending}`} />
+            <div style={{ flexGrow: cleared, background: 'var(--prox-good)' }} title={`${t('proximate.admin.pipe_cleared')}: ${cleared}`} />
           </div>
           {suspended > 0 && (
             <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -228,7 +244,7 @@ export function ProximateAdminClient() {
           <div className="prox-phead">
             <h2>{t('proximate.admin.needs_attention')}</h2>
             <span className={`prox-pill ${signals.length ? 'acc' : 'good'}`}>
-              {signals.length ? `${signals.length} ${t('proximate.admin.open_count')}` : t('proximate.admin.all_clear')}
+              {signals.length ? `${signals.length} ${t('proximate.admin.attention_areas')}` : t('proximate.admin.all_clear')}
             </span>
           </div>
           {signals.length === 0 ? (
@@ -256,15 +272,15 @@ export function ProximateAdminClient() {
           <div style={{ padding: '6px 18px 12px' }}>
             {data.recent_audit.length === 0 ? (
               <p className="text-[12.5px] py-3" style={{ color: 'var(--prox-muted)' }}>{t('proximate.admin.no_activity')}</p>
-            ) : data.recent_audit.slice(0, 6).map((row) => {
+            ) : auditGroups.slice(0, 6).map((row) => {
               const tone = auditTone(row.action);
               return (
                 <div key={row.seq} className={`prox-aitem ${tone}`}>
                   <div className="node"><span className="d" /><span className="l" /></div>
                   <div>
-                    <p>{labelForProximateAction(row.action, t)}</p>
+                    <p>{row.count > 1 ? `${row.count} × ` : ''}{labelForProximateAction(row.action, t)}</p>
                     <div className="prox-amon">
-                      {row.actor_email?.split('@')[0]}
+                      {row.actor?.split('@')[0]}
                       <span className="prox-hash prox-mono">#{row.seq}</span>
                     </div>
                   </div>
