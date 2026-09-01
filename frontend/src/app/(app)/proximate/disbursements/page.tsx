@@ -47,6 +47,29 @@ interface Disbursement {
   has_report: boolean;
 }
 
+// Priority queues (PF-UX-090): needs-action stages first, in urgency order.
+// Completed (verified) history collapses below these.
+const NEEDS_ACTION_SECTIONS: {
+  key: string; tone: string; match: (d: Disbursement) => boolean;
+}[] = [
+  { key: 'overdue', tone: 'danger', match: (d) => d.status === 'pending_report' && d.overdue },
+  { key: 'flagged', tone: 'danger', match: (d) => d.status === 'flagged' },
+  { key: 'cosign', tone: 'warn', match: (d) => d.status === 'pending_cosign' },
+  { key: 'review', tone: 'warn', match: (d) => d.status === 'reported' },
+  { key: 'due', tone: 'acc', match: (d) => d.status === 'pending_report' && !d.overdue },
+];
+
+// The single next action for a row's stage — one obvious verb, not a row of
+// competing controls (PF-MOB-012 / PF-UX one-primary-action).
+function actionKey(status: string): string {
+  switch (status) {
+    case 'pending_cosign': return 'proximate.disbursements.action_cosign';
+    case 'reported': return 'proximate.disbursements.action_review';
+    case 'flagged': return 'proximate.disbursements.action_resolve';
+    default: return 'proximate.disbursements.action_view';
+  }
+}
+
 export default function ProximateDisbursementsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
@@ -63,49 +86,21 @@ export default function ProximateDisbursementsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [copied, setCopied] = useState<number | null>(null);
-  // Redesign Stage 3c — status filter chips, URL-persisted (same
-  // pattern as the rounds and partners registers).
-  const [statusFilter, setStatusFilter] = useState('all');
   // Fixture rows are hidden by default so a live session does not open on a
   // list of QA Fixture / UAT records. Never removed — the count stays
   // visible and one click brings them back.
   const [showTest, setShowTest] = useState(false);
-  useEffect(() => {
-    const s = new URLSearchParams(window.location.search).get('status');
-    if (s) setStatusFilter(s);
-  }, []);
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    if (statusFilter && statusFilter !== 'all') sp.set('status', statusFilter);
-    else sp.delete('status');
-    const qs = sp.toString();
-    window.history.replaceState(
-      null, '', window.location.pathname + (qs ? `?${qs}` : ''),
-    );
-  }, [statusFilter]);
+  // Redesign (PF-UX-090): the register groups into needs-action queues; the
+  // completed (verified) history collapses so it never sits at the same
+  // prominence as unresolved risk.
+  const [showCompleted, setShowCompleted] = useState(false);
   const { real: realRows, test: testRows } = useMemo(
     () => splitTestRecords(rows ?? [], (d) => d.partner_name),
     [rows],
   );
-  // Everything the register is willing to show right now, before the status
-  // chips narrow it further.
   const countedRows = useMemo(
     () => (showTest ? [...realRows, ...testRows] : realRows),
     [realRows, testRows, showTest],
-  );
-  // Counted over the same set the list shows. Counting hidden fixtures here
-  // would put a number on a chip that then filters to fewer rows than it
-  // promised — the kind of small dishonesty that erodes trust in a register.
-  const statusCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const d of countedRows) c[d.status] = (c[d.status] || 0) + 1;
-    return c;
-  }, [countedRows]);
-  const visibleRows = useMemo(
-    () => countedRows.filter(
-      (d) => statusFilter === 'all' || d.status === statusFilter,
-    ),
-    [countedRows, statusFilter],
   );
 
   const load = useCallback(() => {
@@ -168,6 +163,80 @@ export default function ProximateDisbursementsPage() {
     setTimeout(() => setCopied(null), 1500);
   }
 
+  const inNeedsAction = (d: Disbursement) =>
+    NEEDS_ACTION_SECTIONS.some((s) => s.match(d));
+  const sectioned = NEEDS_ACTION_SECTIONS
+    .map((s) => ({
+      ...s,
+      rows: countedRows
+        .filter(s.match)
+        .sort((a, b) =>
+          s.key === 'overdue'
+            // most overdue first
+            ? (a.report_due_at ? Date.parse(a.report_due_at) : 0) - (b.report_due_at ? Date.parse(b.report_due_at) : 0)
+            : (b.sent_at ? Date.parse(b.sent_at) : 0) - (a.sent_at ? Date.parse(a.sent_at) : 0)),
+    }))
+    .filter((s) => s.rows.length > 0);
+  // Everything not needing action (verified + any residual status) collapses
+  // into the completed group — nothing is dropped from the register.
+  const completedRows = countedRows
+    .filter((d) => !inNeedsAction(d))
+    .sort((a, b) => (b.sent_at ? Date.parse(b.sent_at) : 0) - (a.sent_at ? Date.parse(a.sent_at) : 0));
+
+  const renderRow = (d: Disbursement, i: number) => {
+    const isReport = d.status === 'pending_report';
+    const age = isReport ? dueAge(d.report_due_at) : null;
+    return (
+      <div key={d.id} className="prox-qrow" style={i === 0 ? { borderTop: 0 } : undefined}>
+        <Link href={`/proximate/disbursements/${d.id}`} className="min-w-0 block">
+          <div className="flex items-center gap-2 flex-wrap">
+            <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+              {d.partner_name || `Partner #${d.partner_id}`}
+            </strong>
+            {/* One workflow badge per row; lateness is supporting text below,
+                not a competing pill (PF-UX-005 / PF-MOB-017). */}
+            <span className={`prox-pill ${DISB_PILL[d.status] || 'slate'}`}>
+              {labelForProximateStatus(d.status, t)}
+            </span>
+            {showTest && isTestRecord(d.partner_name) && (
+              <span className="prox-pill slate">{t('common.test_record')}</span>
+            )}
+          </div>
+          <small className="block" style={{ marginTop: 3 }}>
+            {d.amount_usd != null && (
+              <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>${d.amount_usd.toLocaleString()}</span>
+            )}
+            {age && (
+              <span style={age.late ? { color: 'var(--prox-danger)', fontWeight: 600 } : undefined}>
+                {' · '}{age.text}
+              </span>
+            )}
+            {!age && d.sent_at && <> · {formatComplianceDate(d.sent_at)}</>}
+            {d.purpose && <> · {d.purpose}</>}
+          </small>
+        </Link>
+        {isReport && d.report_token ? (
+          <button
+            className="prox-btn ghost"
+            style={{ height: 30, fontSize: 12, padding: '0 11px' }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
+          >
+            {copied === d.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied === d.id ? t('proximate.disbursements.copied') : t('proximate.disbursements.copy_report_link')}
+          </button>
+        ) : (
+          <Link
+            href={`/proximate/disbursements/${d.id}`}
+            className="text-xs self-center whitespace-nowrap"
+            style={{ color: 'var(--prox-muted)' }}
+          >
+            {t(actionKey(d.status))} →
+          </Link>
+        )}
+      </div>
+    );
+  };
+
   return (
     <PageShell>
       <PageHeader
@@ -203,96 +272,70 @@ export default function ProximateDisbursementsPage() {
           </Card>
         )}
         {!loadError && rows !== null && rows.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-2">
-            {['all', 'draft', 'pending_cosign', 'disbursed', 'pending_report',
-              'reported', 'verified', 'flagged']
-              .filter((s) => s === 'all' || statusCounts[s])
-              .map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusFilter(s)}
-                  className="text-xs px-3 py-1 rounded-full border transition-colors"
-                  style={statusFilter === s
-                    ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
-                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
-                >
-                  {s === 'all'
-                    ? `${t('common.all')} (${countedRows.length})`
-                    : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
-                </button>
-              ))}
+          <div className="space-y-4">
             {testRows.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowTest((v) => !v)}
-                className="text-xs px-3 py-1 rounded-full border border-dashed transition-colors"
-                style={showTest
-                  ? { background: 'var(--prox-slate)', color: '#fff', borderColor: 'transparent' }
-                  : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
-                title={t('proximate.disbursements.test_toggle_hint')}
-              >
-                {showTest
-                  ? t('proximate.disbursements.hide_test', { n: testRows.length })
-                  : t('proximate.disbursements.show_test', { n: testRows.length })}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowTest((v) => !v)}
+                  className="text-xs px-3 py-1 rounded-full border border-dashed transition-colors"
+                  style={showTest
+                    ? { background: 'var(--prox-slate)', color: '#fff', borderColor: 'transparent' }
+                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
+                  title={t('proximate.disbursements.test_toggle_hint')}
+                >
+                  {showTest
+                    ? t('proximate.disbursements.hide_test', { n: testRows.length })
+                    : t('proximate.disbursements.show_test', { n: testRows.length })}
+                </button>
+              </div>
             )}
-          </div>
-        )}
-        {visibleRows.length > 0 && (
-          <div className="prox-panel overflow-hidden">
-            {visibleRows.map((d, i) => (
-              <div key={d.id} className="prox-qrow" style={i === 0 ? { borderTop: 0 } : undefined}>
-                <Link href={`/proximate/disbursements/${d.id}`} className="min-w-0 block">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
-                      {d.partner_name || `Partner #${d.partner_id}`}
-                    </strong>
-                    <span className={`prox-pill ${DISB_PILL[d.status] || 'slate'}`}>
-                      {labelForProximateStatus(d.status, t)}
-                    </span>
-                    {d.overdue && (
-                      <span className="prox-pill danger">{t('proximate.disbursements.overdue')}</span>
-                    )}
-                    {isTestRecord(d.partner_name) && (
-                      <span className="prox-pill slate">{t('common.test_record')}</span>
-                    )}
-                  </div>
-                  <small className="block" style={{ marginTop: 3 }}>
-                    {d.amount_usd != null && (
-                      <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>${d.amount_usd.toLocaleString()}</span>
-                    )}
-                    {d.purpose && <> · {d.purpose}</>}
-                    {d.sent_at && <> · {formatComplianceDate(d.sent_at)}</>}
-                    {d.report_due_at && d.status === 'pending_report' && (() => {
-                      const age = dueAge(d.report_due_at);
-                      return (
-                        <span style={age?.late ? { color: 'var(--prox-danger)', fontWeight: 600 } : undefined}>
-                          {' · '}{t('proximate.disbursements.due')} {formatComplianceDate(d.report_due_at)}
-                          {age ? ` (${age.text})` : ''}
-                        </span>
-                      );
-                    })()}
-                  </small>
-                </Link>
-                {d.report_token && d.status === 'pending_report' && (
-                  <button
-                    className="prox-btn ghost"
-                    style={{ height: 30, fontSize: 12, padding: '0 11px' }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
-                  >
-                    {copied === d.id ? (
-                      <Check className="w-3.5 h-3.5" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                    {copied === d.id
-                      ? t('proximate.disbursements.copied')
-                      : t('proximate.disbursements.copy_report_link')}
-                  </button>
-                )}
+
+            {/* Needs-action queues, most urgent first. */}
+            {sectioned.map((s) => (
+              <div key={s.key} className="prox-panel overflow-hidden">
+                <div className="prox-phead">
+                  <h2>{t(`proximate.disbursements.section_${s.key}`)}</h2>
+                  <span className={`prox-pill ${s.tone}`}>{s.rows.length}</span>
+                </div>
+                <div>{s.rows.map((d, i) => renderRow(d, i))}</div>
               </div>
             ))}
+
+            {sectioned.length === 0 && (
+              <div className="prox-panel" style={{ padding: '18px' }}>
+                <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>
+                  {t('proximate.disbursements.needs_action_none')}
+                </p>
+              </div>
+            )}
+
+            {/* Completed (verified) history — collapsed by default. */}
+            {completedRows.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowCompleted((v) => !v)}
+                  className="text-xs px-3 py-1 rounded-full border border-dashed transition-colors"
+                  style={showCompleted
+                    ? { background: 'var(--prox-slate)', color: '#fff', borderColor: 'transparent' }
+                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
+                >
+                  {showCompleted
+                    ? t('proximate.disbursements.hide_completed')
+                    : t('proximate.disbursements.show_completed', { n: completedRows.length })}
+                </button>
+                {showCompleted && (
+                  <div className="prox-panel overflow-hidden mt-3">
+                    <div className="prox-phead">
+                      <h2>{t('proximate.disbursements.section_verified')}</h2>
+                      <span className="prox-pill good">{completedRows.length}</span>
+                    </div>
+                    <div>{completedRows.map((d, i) => renderRow(d, i))}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </PageMain>
