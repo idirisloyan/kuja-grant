@@ -1811,6 +1811,7 @@
   "proximate.crisis_signal.pending_heading": "Pending signals",
   "proximate.crisis_signal.pending_subline": "OB-logged. Triage to publish.",
   "proximate.crisis_signal.start_round": "Start round",
+  "proximate.crisis_signal.review": "Review",
   "proximate.cycle.add": "Add",
   "proximate.cycle.add_member": "Add member",
   "proximate.cycle.add_panel_member": "Add a panel member",

@@ -90,6 +90,11 @@ export default function CrisisSelectorPage() {
   // only re-fetched the published-rows endpoint. Now we also fetch
   // /crisis-signals after each submit and render them on top.
   const [signals, setSignals] = useState<CrisisSignal[]>([]);
+  // PF-UX-110: a pending signal must be inspected (read-only) before the
+  // OB starts a funding round. Expanding a signal reveals its full detail
+  // and moves "Start round" inside that review — so the action follows
+  // review, not instead of it.
+  const [expandedSignal, setExpandedSignal] = useState<number | null>(null);
   // Redesign Stage 4 — severity filter over the curated list, built
   // from the attention bands actually present (same chip pattern as
   // the rounds/disbursements registers). Red stays reserved for the
@@ -303,48 +308,57 @@ export default function CrisisSelectorPage() {
                   || 'OB-logged. Triage to publish.'}
               </p>
             </div>
-            <ul className="space-y-1.5">
-              {signals.slice(0, 8).map((sig) => (
-                <li key={sig.id} className="text-xs flex items-start gap-2">
-                  <span
-                    className={`prox-pill ${
-                      sig.status === 'pending'
-                        ? 'warn'
-                        : sig.status === 'triaged'
-                          ? 'good'
-                          : 'slate'
-                    }`}
-                    style={{ marginTop: 2 }}
-                  >
-                    {labelForProximateStatus(sig.status, t)}
-                  </span>
-                  <span className="prox-mono" style={{ color: 'var(--prox-muted)' }}>
-                    {sig.country}
-                  </span>
-                  {sig.event_type && (
-                    <span className="text-muted-foreground">
-                      · {sig.event_type}
-                    </span>
-                  )}
-                  <span className="flex-1 line-clamp-2">{sig.description}</span>
-                  {sig.submitted_at && (
-                    <span className="text-muted-foreground whitespace-nowrap text-[10px]">
-                      {new Date(sig.submitted_at).toLocaleDateString()}
-                    </span>
-                  )}
-                  <Link
-                    href={`/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
-                      `${sig.country} — ${(sig.event_type || 'emergency response')}`,
-                    )}&summary=${encodeURIComponent(sig.description.slice(0, 500))}&region=${encodeURIComponent(sig.country)}`}
-                    className="text-[10px] hover:underline whitespace-nowrap inline-flex items-center gap-0.5"
-                    style={{ color: 'var(--prox-accent)', fontWeight: 600 }}
-                  >
-                    <Rocket className="w-3 h-3" />
-                    {t('proximate.crisis_signal.start_round')}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="space-y-2">
+              {signals.slice(0, 8).map((sig) => {
+                const open = expandedSignal === sig.id;
+                const startHref = `/proximate/rounds/new?trigger=disaster&title=${encodeURIComponent(
+                  `${sig.country} — ${(sig.event_type || 'emergency response')}`,
+                )}&summary=${encodeURIComponent(sig.description.slice(0, 500))}&region=${encodeURIComponent(sig.country)}`;
+                return (
+                  <div key={sig.id} className="rounded-lg" style={{ border: '1px solid var(--prox-line)', overflow: 'hidden' }}>
+                    {/* Collapsed row = summary + "Review →". The round action is
+                        NOT here — it lives inside the review below, so the OB
+                        inspects the signal before opening a round (PF-UX-110). */}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSignal(open ? null : sig.id)}
+                      className="w-full text-start hover:bg-[var(--prox-surface-2)]"
+                      style={{ padding: '10px 12px' }}
+                      aria-expanded={open}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`prox-pill ${sig.status === 'pending' ? 'warn' : sig.status === 'triaged' ? 'good' : 'slate'}`}>
+                          {labelForProximateStatus(sig.status, t)}
+                        </span>
+                        <span className="prox-mono text-xs" style={{ color: 'var(--prox-muted)' }}>{sig.country}</span>
+                        {sig.event_type && <span className="text-xs text-muted-foreground">· {sig.event_type}</span>}
+                        <span className="text-xs flex-1 line-clamp-1 min-w-0">{sig.description}</span>
+                        <span className="text-[11px] inline-flex items-center gap-1 whitespace-nowrap" style={{ color: 'var(--prox-accent)', fontWeight: 600 }}>
+                          {t('proximate.crisis_signal.review')}
+                          <ArrowRight className={`w-3 h-3 rtl:rotate-180 transition-transform ${open ? 'rotate-90' : ''}`} />
+                        </span>
+                      </div>
+                    </button>
+                    {open && (
+                      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--prox-line)', background: 'var(--prox-inset)' }}>
+                        <p className="text-sm whitespace-pre-wrap" dir="auto">{sig.description}</p>
+                        <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground mt-2">
+                          <span className="prox-mono">{sig.country}</span>
+                          {sig.event_type && <span>· {sig.event_type}</span>}
+                          {sig.submitted_at && <span>· {new Date(sig.submitted_at).toLocaleString()}</span>}
+                        </div>
+                        <div className="mt-3">
+                          <Link href={startHref} className="prox-btn primary" style={{ height: 32, fontSize: 12.5, padding: '0 14px' }}>
+                            <Rocket className="w-3.5 h-3.5" />
+                            {t('proximate.crisis_signal.start_round')}
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
             {signals.length > 8 && (
               <p className="text-[10px] text-muted-foreground">
                 +{signals.length - 8} {t('proximate.crisis_signal.more') || 'more'}
