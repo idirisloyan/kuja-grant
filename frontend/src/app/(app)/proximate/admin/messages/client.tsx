@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, MessagesSquare, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
+import { splitTestRecords } from '@/lib/test-records';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Button } from '@/components/ui/button';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -51,6 +52,10 @@ export function ProximateMessagesClient() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Test/UAT hygiene (PF-MOB-016 / PF-UX): fixtures are hidden by default and
+  // revealed only on request. Keyed on the recipient name, the same heuristic
+  // the partners/disbursements registers use.
+  const [showTest, setShowTest] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -153,11 +158,18 @@ export function ProximateMessagesClient() {
     );
   };
 
+  // Hide test/UAT rows by default; keep the count so they can be revealed.
+  const inSplit = splitTestRecords(inbound, (m) => m.recipient_name || '');
+  const outSplit = splitTestRecords(outbound, (m) => m.recipient_name || '');
+  const testCount = inSplit.test.length + outSplit.test.length;
+  const inboxRows = showTest ? [...inSplit.real, ...inSplit.test] : inSplit.real;
+  const outboundRows = showTest ? [...outSplit.real, ...outSplit.test] : outSplit.real;
+
   const TABS: { key: Tab; label: string; count?: number }[] = [
     {
       key: 'inbox',
       label: t('proximate.messaging.tab_inbox'),
-      count: inbound.filter((m) => !m.handled_at).length,
+      count: inboxRows.filter((m) => !m.handled_at).length,
     },
     { key: 'outbound', label: t('proximate.messaging.tab_outbound') },
     { key: 'delivery', label: t('proximate.messaging.tab_delivery') },
@@ -180,7 +192,7 @@ export function ProximateMessagesClient() {
         }
       />
       <PageMain>
-        <div className="space-y-4 max-w-4xl">
+        <div className="space-y-5">
           {/* Always first, always visible — never behind the active tab. */}
           <MessagingConfigBanner
             state={configState}
@@ -196,27 +208,49 @@ export function ProximateMessagesClient() {
             role="tablist"
             style={{ borderBottom: '1px solid var(--prox-line)' }}
           >
-            {TABS.map((x) => (
-              <button
-                key={x.key}
-                type="button"
-                role="tab"
-                aria-selected={tab === x.key}
-                onClick={() => setTab(x.key)}
-                className="px-3.5 py-2.5 text-[13.5px] whitespace-nowrap border-b-2 -mb-px transition-colors"
-                style={tab === x.key
-                  ? { borderColor: 'var(--prox-accent)', color: 'var(--prox-ink)', fontWeight: 600 }
-                  : { borderColor: 'transparent', color: 'var(--prox-muted)' }}
-              >
-                {x.label}
-                {x.count ? (
-                  <span className="ms-1.5 text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)' }}>
-                    {x.count}
-                  </span>
-                ) : null}
-              </button>
-            ))}
+            {TABS.map((x) => {
+              const active = tab === x.key;
+              return (
+                <button
+                  key={x.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(x.key)}
+                  className="px-4 py-2.5 text-[13.5px] whitespace-nowrap shrink-0 transition-colors"
+                  // Active underline drawn as an inset shadow, not a
+                  // border-b + negative margin — the old approach was clipped
+                  // by overflow-x-auto on phones, so the underline doubled and
+                  // the tab row read as "broken" (PF-MOB-011).
+                  style={active
+                    ? { color: 'var(--prox-ink)', fontWeight: 600, boxShadow: 'inset 0 -2px 0 var(--prox-accent)' }
+                    : { color: 'var(--prox-muted)' }}
+                >
+                  {x.label}
+                  {x.count ? (
+                    <span className="ms-1.5 text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'var(--prox-accent-tint)', color: 'var(--prox-accent-deep)' }}>
+                      {x.count}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
+
+          {tab !== 'delivery' && testCount > 0 && (
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={() => setShowTest((v) => !v)}
+                className="text-xs px-2.5 py-1 rounded-full border border-dashed text-muted-foreground hover:text-foreground transition-colors"
+                style={{ borderColor: 'var(--prox-line)' }}
+              >
+                {showTest
+                  ? t('proximate.messaging.hide_test')
+                  : t('proximate.messaging.show_test', { n: testCount })}
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-10">
@@ -226,7 +260,7 @@ export function ProximateMessagesClient() {
             <>
               {tab === 'inbox' && (
                 <MessagingInbox
-                  rows={inbound}
+                  rows={inboxRows}
                   configState={configState}
                   sentInWindow={sentInWindow}
                   days={STATS_DAYS}
@@ -235,7 +269,7 @@ export function ProximateMessagesClient() {
                 />
               )}
               {tab === 'outbound' && (
-                <MessagingOutbound rows={outbound} configState={configState} />
+                <MessagingOutbound rows={outboundRows} configState={configState} />
               )}
               {tab === 'delivery' && (
                 <MessagingStats

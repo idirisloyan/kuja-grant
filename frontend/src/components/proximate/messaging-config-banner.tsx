@@ -97,19 +97,23 @@ export function MessagingConfigBanner({
 
   // Configured. Still worth a line: it is what licenses the OB to read an
   // empty inbox as real silence. Kept quiet unless something is stuck.
+  const channelsLabel = (channels || [])
+    .map((c) => (c === 'whatsapp' ? 'WhatsApp' : c === 'sms' ? 'SMS' : c.charAt(0).toUpperCase() + c.slice(1)))
+    .join(' + ');
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--prox-good)' }}>
-        <CheckCircle2 className="w-4 h-4 shrink-0" />
-        <span className="font-medium">{t('proximate.messaging.configured_title')}</span>
-        {channels && channels.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            ({channels.join(', ')})
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--prox-good)' }}>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span className="font-medium">
+            {channelsLabel
+              ? t('proximate.messaging.connected_label', { channels: channelsLabel })
+              : t('proximate.messaging.configured_title')}
           </span>
-        )}
-        <span className="text-xs text-muted-foreground">
-          — {t('proximate.messaging.configured_body')}
-        </span>
+        </div>
+        <p className="text-xs ps-6" style={{ color: 'var(--prox-muted)' }}>
+          {t('proximate.messaging.configured_body')}
+        </p>
       </div>
 
       {unsentCount > 0 && (
@@ -134,7 +138,7 @@ export function MessagingConfigBanner({
                   className="text-xs font-medium underline hover:no-underline"
                   style={{ color: 'var(--prox-warn)' }}
                 >
-                  {t('proximate.messaging.tab_outbound')}
+                  {t('proximate.messaging.review_delivery')}
                 </button>
               )}
             </div>
