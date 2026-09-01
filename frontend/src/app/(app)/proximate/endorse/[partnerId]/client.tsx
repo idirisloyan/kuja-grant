@@ -220,6 +220,22 @@ export default function ProximateEndorseWizardClient() {
       window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash,
     );
   }, [tab]);
+  // PF-UX-061: land the OB on the stage where the work is, rather than always
+  // opening on Overview and making them hunt for it. Fires once, and only when
+  // the URL carried no explicit ?tab= (deep links / prev-next nav still win).
+  const [autoTab, setAutoTab] = useState(false);
+  useEffect(() => {
+    if (autoTab || !isOb || !data?.partner) return;
+    setAutoTab(true);
+    if (new URLSearchParams(window.location.search).get('tab')) return;
+    const s = data.partner.status;
+    const target =
+      s === 'dd_pending' ? 'dd'
+        : (s === 'nominated' || s === 'endorsements_open') ? 'endorsements'
+          : s === 'dd_clear' ? 'record'
+            : 'overview';
+    if (target !== 'overview') setTab(target);
+  }, [autoTab, isOb, data]);
   const tabCls = (x: string) => (!isOb || tab === x ? 'space-y-4' : 'hidden');
   // Partner's disbursements for the Disbursements tab (OB-only — the
   // list endpoint 403s everyone else).
@@ -856,12 +872,17 @@ export default function ProximateEndorseWizardClient() {
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
               />
-              <VoiceQuestionInput
-                questionId="q1"
-                transcript={q1Transcript}
-                onTranscriptChange={setQ1Transcript}
-                language={isRtl ? 'ar' : 'en'}
-              />
+              {/* PF-UX-063: reveal the voice / reasoning input only after the
+                  Yes/No is answered, so three tall composers don't reserve
+                  height up front. */}
+              {q1 !== null && (
+                <VoiceQuestionInput
+                  questionId="q1"
+                  transcript={q1Transcript}
+                  onTranscriptChange={setQ1Transcript}
+                  language={isRtl ? 'ar' : 'en'}
+                />
+              )}
               <QuestionRow
                 num={2}
                 text={isRtl ? questions.q2.ar : questions.q2.en}
@@ -870,12 +891,14 @@ export default function ProximateEndorseWizardClient() {
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
               />
-              <VoiceQuestionInput
-                questionId="q2"
-                transcript={q2Transcript}
-                onTranscriptChange={setQ2Transcript}
-                language={isRtl ? 'ar' : 'en'}
-              />
+              {q2 !== null && (
+                <VoiceQuestionInput
+                  questionId="q2"
+                  transcript={q2Transcript}
+                  onTranscriptChange={setQ2Transcript}
+                  language={isRtl ? 'ar' : 'en'}
+                />
+              )}
               <QuestionRow
                 num={3}
                 text={isRtl ? questions.q3.ar : questions.q3.en}
@@ -884,12 +907,14 @@ export default function ProximateEndorseWizardClient() {
                 yesLabel={t('proximate.wizard.yes')}
                 noLabel={t('proximate.wizard.no')}
               />
-              <VoiceQuestionInput
-                questionId="q3"
-                transcript={q3Transcript}
-                onTranscriptChange={setQ3Transcript}
-                language={isRtl ? 'ar' : 'en'}
-              />
+              {q3 !== null && (
+                <VoiceQuestionInput
+                  questionId="q3"
+                  transcript={q3Transcript}
+                  onTranscriptChange={setQ3Transcript}
+                  language={isRtl ? 'ar' : 'en'}
+                />
+              )}
             </div>
           </div>
 
