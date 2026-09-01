@@ -165,6 +165,10 @@ export default function AuditChainPage() {
   // rule to drift from the server gate.
   const [accessDenied, setAccessDenied] = useState(false);
   const LIMIT = 25;
+  // PF-UX-122 — audit filters. The params are honoured only by the
+  // Proximate tenant endpoint, so the control is gated to isProx below;
+  // the generic /api/audit-chain/recent ignores them.
+  const [flt, setFlt] = useState<{ activity: string; from: string; to: string }>({ activity: '', from: '', to: '' });
 
   const loadVerify = async () => {
     // Proximate has no cryptographic verify endpoint — skip it (calling the
@@ -186,10 +190,19 @@ export default function AuditChainPage() {
     }
   };
 
-  const loadRecent = async (newOffset: number) => {
+  const loadRecent = async (
+    newOffset: number,
+    f: { activity: string; from: string; to: string } = flt,
+  ) => {
     setRecentLoading(true);
     try {
-      const r = await api.get<RecentResult>(`${recentUrl}?limit=${LIMIT}&offset=${newOffset}`);
+      const p = new URLSearchParams({ limit: String(LIMIT), offset: String(newOffset) });
+      if (isProx) {
+        if (f.activity) p.set('activity', f.activity);
+        if (f.from) p.set('from', f.from);
+        if (f.to) p.set('to', f.to);
+      }
+      const r = await api.get<RecentResult>(`${recentUrl}?${p.toString()}`);
       setRecent(r);
       setOffset(newOffset);
     } catch (e) {
@@ -202,6 +215,14 @@ export default function AuditChainPage() {
     } finally {
       setRecentLoading(false);
     }
+  };
+
+  // Set a filter and reload from the first page. Passes the merged filter
+  // explicitly so it doesn't race React's async state update.
+  const applyFilter = (patch: Partial<{ activity: string; from: string; to: string }>) => {
+    const next = { ...flt, ...patch };
+    setFlt(next);
+    void loadRecent(0, next);
   };
 
   useEffect(() => {
@@ -373,6 +394,57 @@ export default function AuditChainPage() {
             </button>
           </div>
         </div>
+
+        {/* PF-UX-122 — filters (Proximate endpoint only). "System" vs
+            "People" is the one that clears the cron-nudge noise (PF-UX-120). */}
+        {isProx && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
+              {([['', 'common.all'], ['human', 'audit_chain.filter_people'], ['system', 'audit_chain.filter_system']] as const).map(([v, k]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => applyFilter({ activity: v })}
+                  className={cn(
+                    'px-2.5 py-1 transition-colors',
+                    flt.activity === v
+                      ? 'bg-[hsl(var(--kuja-clay))] text-white'
+                      : 'hover:bg-[hsl(var(--kuja-sand-50))]',
+                  )}
+                >
+                  {t(k)}
+                </button>
+              ))}
+            </div>
+            <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
+              {t('audit_chain.filter_from')}
+              <input
+                type="date"
+                value={flt.from}
+                onChange={(e) => applyFilter({ from: e.target.value })}
+                className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
+              />
+            </label>
+            <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
+              {t('audit_chain.filter_to')}
+              <input
+                type="date"
+                value={flt.to}
+                onChange={(e) => applyFilter({ to: e.target.value })}
+                className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
+              />
+            </label>
+            {(flt.activity || flt.from || flt.to) && (
+              <button
+                type="button"
+                onClick={() => applyFilter({ activity: '', from: '', to: '' })}
+                className="underline text-[hsl(var(--kuja-ink-soft))] hover:text-foreground"
+              >
+                {t('audit_chain.filter_clear')}
+              </button>
+            )}
+          </div>
+        )}
 
         {recentLoading && !recent && (
           <div className="mt-4 space-y-2">

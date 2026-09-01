@@ -7081,13 +7081,49 @@ def api_proximate_audit_chain():
     limit = max(1, min(int(request.args.get('limit', 100) or 100), 500))
     offset = max(0, int(request.args.get('offset', 0) or 0))
 
+    # PF-UX-122 — optional server-side filters, applied to the WHOLE
+    # tenant-scoped chain (not a client-side subset of the page on screen,
+    # which would misreport). All optional; omitting them preserves the
+    # prior behaviour and the ?format=jsonl closing-pack export (which
+    # passes none).
     q = AuditChainEntry.query.filter(
         db.or_(
             AuditChainEntry.network_id == net.id,
             AuditChainEntry.subject_kind.like('proximate_%'),
             AuditChainEntry.action.like('proximate.%'),
         )
-    ).order_by(AuditChainEntry.seq.desc())
+    )
+    _fa = (request.args.get('actor') or '').strip()
+    if _fa:
+        q = q.filter(AuditChainEntry.actor_email.ilike(f'%{_fa}%'))
+    _fx = (request.args.get('action') or '').strip()
+    if _fx:
+        q = q.filter(AuditChainEntry.action.ilike(f'%{_fx}%'))
+    _fs = (request.args.get('subject') or '').strip()
+    if _fs:
+        q = q.filter(AuditChainEntry.subject_kind.ilike(f'%{_fs}%'))
+    # "human" = an @-address actor; "system" = cron / automation (a null
+    # actor or a non-email identity such as 'cron-monitoring'). This is the
+    # filter that lets an OB clear the cron-nudge noise (PF-UX-120).
+    _fact = (request.args.get('activity') or '').strip()
+    _human = AuditChainEntry.actor_email.like('%@%')
+    if _fact == 'human':
+        q = q.filter(_human)
+    elif _fact == 'system':
+        q = q.filter(db.or_(AuditChainEntry.actor_email.is_(None), ~_human))
+    for _raw, _ge in ((request.args.get('from'), True), (request.args.get('to'), False)):
+        _raw = (_raw or '').strip()
+        if not _raw:
+            continue
+        try:
+            _d = datetime.strptime(_raw[:10], '%Y-%m-%d')
+        except ValueError:
+            continue
+        if _ge:
+            q = q.filter(AuditChainEntry.created_at >= _d)
+        else:
+            q = q.filter(AuditChainEntry.created_at < _d + timedelta(days=1))
+    q = q.order_by(AuditChainEntry.seq.desc())
 
     total = q.count()
     rows = q.limit(limit).offset(offset).all()
