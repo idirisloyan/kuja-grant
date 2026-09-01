@@ -21,6 +21,8 @@ import { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/lib/hooks/use-translation';
+import { useNetworkStore } from '@/stores/network-store';
 
 const DISMISS_KEY = 'kuja_pwa_install_dismissed_v1';
 
@@ -32,6 +34,12 @@ type BeforeInstallPromptEvent = Event & {
 export function PWAInstallBanner() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
+  const { t } = useTranslation();
+  const network = useNetworkStore((s) => s.network);
+  // PF-UX-003: don't say "Kuja" inside another tenant's app. Name the product
+  // the user is actually in.
+  const productName =
+    network?.slug === 'proximate' ? 'Proximate Fund' : (network?.name || 'Kuja');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -93,7 +101,7 @@ export function PWAInstallBanner() {
     <div
       className="fixed bottom-4 left-4 right-4 z-50 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-sm"
       role="dialog"
-      aria-label="Install Kuja app"
+      aria-label={t('pwa.install.title', { product: productName })}
     >
       <Card className="p-3 sm:p-4 shadow-lg border-[hsl(var(--kuja-clay))]/30">
         <div className="flex items-start gap-3">
@@ -101,10 +109,9 @@ export function PWAInstallBanner() {
             <Download className="h-4 w-4 text-[hsl(var(--kuja-clay))]" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold">Install Kuja for faster access</div>
+            <div className="text-sm font-semibold">{t('pwa.install.title', { product: productName })}</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Adds an icon to your home screen. Opens straight to today&apos;s priorities,
-              works briefly offline.
+              {t('pwa.install.body')}
             </p>
             <div className="mt-2 flex items-center gap-2">
               <Button
@@ -112,7 +119,7 @@ export function PWAInstallBanner() {
                 onClick={install}
                 className="bg-[hsl(var(--kuja-clay))] hover:bg-[hsl(var(--kuja-clay))]/90 text-white h-8"
               >
-                Install
+                {t('pwa.install.cta')}
               </Button>
               <Button
                 size="sm"
@@ -120,7 +127,7 @@ export function PWAInstallBanner() {
                 onClick={dismiss}
                 className="text-muted-foreground h-8"
               >
-                Not now
+                {t('pwa.install.dismiss')}
               </Button>
             </div>
           </div>
