@@ -1887,7 +1887,13 @@ def run_browser(base):
     env["PYTHONIOENCODING"] = "utf-8"
     print(f"  running browser_test.py against {base} ...")
     proc = subprocess.run(
-        [sys.executable, "browser_test.py", "--base", base],
+        # The browser leg runs against `localhost`, not the raw 127.0.0.1 the API
+        # leg uses: WebAuthn refuses an IP literal as a Relying-Party ID
+        # ("SecurityError: This is an invalid domain"), which failed the
+        # end-to-end passkey test (33.2). `localhost` is a valid RP ID, and
+        # Chromium's loopback resolution falls back to the 127.0.0.1-bound
+        # server, so every other browser test is unaffected.
+        [sys.executable, "browser_test.py", "--base", base.replace("127.0.0.1", "localhost")],
         cwd=PROJECT_DIR, env=env, timeout=1800,
     )
     if proc.returncode == 0:

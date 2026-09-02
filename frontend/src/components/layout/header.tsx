@@ -96,7 +96,13 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-30 h-16 flex items-center bg-background border-b border-border px-3 sm:px-5"
+      // `overflow-x-clip` (not `hidden`): clips any horizontal spill so the
+      // header can never widen the document's scroll width on a phone, while
+      // — unlike `overflow-hidden` — leaving vertical overflow visible for the
+      // user/language dropdowns and not breaking `sticky`. On a 360px viewport
+      // the fixed-size control cluster plus the tenant pill exceeded the row
+      // by ~33px and put a horizontal scrollbar on every page (browser_test 13.4).
+      className="sticky top-0 z-30 h-16 flex items-center bg-background border-b border-border px-3 sm:px-5 overflow-x-clip"
     >
       {/* Mobile hamburger */}
       <button
@@ -111,7 +117,11 @@ export function Header() {
       {/* Tenant identity pill — visible to make multi-tenant obvious */}
       {network && (
         <div
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm"
+          // `min-w-0 shrink` + a truncating name: on a phone the pill is the
+          // one flexible item in the row (the right-hand controls are
+          // fixed-size icons), so it absorbs the squeeze and ellipsises
+          // instead of pushing the controls past the viewport edge.
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm min-w-0 shrink"
           style={{
             backgroundColor: network.brand_color_hex
               ? `${network.brand_color_hex}15`
@@ -122,18 +132,19 @@ export function Header() {
           title={`Tenant: ${network.name}`}
         >
           <span
-            className="inline-block w-2 h-2 rounded-full"
+            className="inline-block w-2 h-2 rounded-full shrink-0"
             style={{ backgroundColor: network.brand_color_hex || 'currentColor' }}
             aria-hidden="true"
           />
-          {network.name}
+          <span className="truncate">{network.name}</span>
         </div>
       )}
 
       <div className="flex-1" />
 
-      {/* Right-side actions */}
-      <div className="flex items-center gap-1.5 sm:gap-2">
+      {/* Right-side actions — `shrink-0`: these are fixed-size icon controls;
+          the tenant pill (min-w-0 shrink) is what gives way on narrow screens. */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Phase 4 — Low-bandwidth toggle. Persisted to localStorage; AI
             auto-calls + chart captions defer to manual when on. */}
         <button
