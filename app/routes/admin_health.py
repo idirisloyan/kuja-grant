@@ -26,6 +26,22 @@ from app.utils.api_errors import error_response
 admin_health_bp = Blueprint('admin_health', __name__, url_prefix='/api/admin')
 
 
+def _utc_cutoff(**delta):
+    """Naive-UTC `now - timedelta(**delta)`, for binding as a SQL parameter.
+
+    Replaces `NOW() - INTERVAL '<n> <unit>'` in the raw-SQL health/AI-spend
+    queries below. That interval literal is Postgres-only: on the SQLite
+    dev/test DB it raised `sqlite3.OperationalError: near "'14 days'"`, so
+    every one of these queries 500'd (or was silently swallowed) locally and
+    in the regression suite while working fine in production. A bound
+    datetime has no dialect issue on either side. Naive UTC is deliberate:
+    the `db.DateTime` columns are stored as naive UTC on both dialects, so an
+    aware value would mis-compare on SQLite.
+    """
+    from datetime import datetime, timedelta, timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(**delta)
+
+
 # Anthropic prices as of 2026-04 — update when the bill arrives.
 # Prices in USD per million tokens.
 _PRICING = {
@@ -112,8 +128,8 @@ def api_system_health():
               COUNT(*) FILTER (WHERE success = false) AS failures,
               COUNT(*) AS total
             FROM ai_call_logs
-            WHERE created_at >= NOW() - INTERVAL '24 hours'
-        """)).fetchone()
+            WHERE created_at >= :cutoff
+        """), {'cutoff': _utc_cutoff(hours=24)}).fetchone()
         failures = int(result[0] or 0) if result else 0
         total = int(result[1] or 0) if result else 0
         rate_pct = round((failures / total * 100), 1) if total else 0
@@ -146,8 +162,8 @@ def api_system_health():
         result = db.session.execute(text("""
             SELECT COUNT(*) FROM documents
             WHERE extraction_used_native_pdf = true
-              AND uploaded_at >= NOW() - INTERVAL '7 days'
-        """)).fetchone()
+              AND uploaded_at >= :cutoff
+        """), {'cutoff': _utc_cutoff(days=7)}).fetchone()
         native_count = int(result[0] or 0) if result else 0
         checks.append({'key': 'native_pdf_usage', 'status': 'ok' if native_count < 50 else 'warn',
                        'why': 'PDFs handled via OCR-via-vision fallback last 7 days',
@@ -161,8 +177,8 @@ def api_system_health():
         result = db.session.execute(text("""
             SELECT COUNT(*) FROM documents
             WHERE extraction_status = 'running'
-              AND extraction_started_at < NOW() - INTERVAL '10 minutes'
-        """)).fetchone()
+              AND extraction_started_at < :cutoff
+        """), {'cutoff': _utc_cutoff(minutes=10)}).fetchone()
         stuck = int(result[0] or 0) if result else 0
         if stuck > 0:
             checks.append({'key': 'stuck_extractions', 'status': 'warn',
@@ -317,17 +333,17 @@ def api_ai_spend():
         # Column names on ai_call_logs are tokens_in / tokens_out (NOT
         # input_tokens / output_tokens). Phase 13.10/35 fixed the
         # mismatch + COALESCE for null tokens.
-        rows = db.session.execute(text(f"""
+        rows = db.session.execute(text("""
             SELECT DATE(created_at) AS day,
                    endpoint,
                    COUNT(*) AS calls,
                    COALESCE(SUM(tokens_in), 0) AS in_tokens,
                    COALESCE(SUM(tokens_out), 0) AS out_tokens
             FROM ai_call_logs
-            WHERE created_at >= NOW() - INTERVAL '{days} days'
+            WHERE created_at >= :cutoff
             GROUP BY 1, 2
             ORDER BY 1 DESC, 2
-        """)).fetchall()
+        """), {'cutoff': _utc_cutoff(days=days)}).fetchall()
     except Exception as e:
         logging.getLogger('kuja').exception('ai-spend SQL failed')
         return error_response('admin.ai_spend_query_failed', 500, detail=str(e)[:200])
@@ -406,13 +422,20 @@ def api_ai_spend_forecast():
     except _BadIntArg as e:
         return error_response('validation.invalid_value', 400,
                               field=e.name, default=str(e))
+    # Compute the trailing-window cutoff in Python and bind it, rather than
+    # `NOW() - INTERVAL '<n> days'`: that interval literal is Postgres-only
+    # and raised `sqlite3.OperationalError: near "'14 days'"` on the SQLite
+    # dev/test DB (500 on every local admin dashboard load; prod was fine).
+    # Binding also removes the f-string interpolation into SQL.
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(days=trailing)
     try:
-        rows = db.session.execute(text(f"""
+        rows = db.session.execute(text("""
             SELECT COALESCE(SUM(tokens_in), 0) AS in_tokens,
                    COALESCE(SUM(tokens_out), 0) AS out_tokens
             FROM ai_call_logs
-            WHERE created_at >= NOW() - INTERVAL '{trailing} days'
-        """)).fetchone()
+            WHERE created_at >= :cutoff
+        """), {'cutoff': cutoff}).fetchone()
     except Exception as e:
         logging.getLogger('kuja').exception('ai-spend forecast SQL failed')
         return error_response('admin.ai_spend_forecast_failed', 500, detail=str(e)[:200])
@@ -542,16 +565,26 @@ def api_failed_logins():
     try:
         # users.last_failed_login + failed_login_count are the lockout
         # signals shipped earlier. Group by user-with-recent-failures.
-        rows = db.session.execute(text(f"""
+        rows = db.session.execute(text("""
             SELECT email, failed_login_count, last_failed_login, locked_until
             FROM users
-            WHERE last_failed_login >= NOW() - INTERVAL '{days} days'
+            WHERE last_failed_login >= :cutoff
               AND failed_login_count > 0
             ORDER BY failed_login_count DESC
             LIMIT 200
-        """)).fetchall()
+        """), {'cutoff': _utc_cutoff(days=days)}).fetchall()
     except Exception:
         rows = []
+
+    def _iso(v):
+        # Raw `text()` rows give datetime objects on Postgres but ISO STRINGS
+        # on SQLite (no SQLAlchemy type coercion on raw SQL). Before the
+        # cutoff fix above, the SQLite query always raised and this loop
+        # never ran, which hid the `.isoformat()` assumption; now it runs on
+        # both dialects, so serialise tolerantly.
+        if v is None:
+            return None
+        return v.isoformat() if hasattr(v, 'isoformat') else str(v)
 
     out = []
     high_count = 0
@@ -562,8 +595,8 @@ def api_failed_logins():
         out.append({
             'email': r[0],
             'failed_count': count,
-            'last_failed_at': r[2].isoformat() if r[2] else None,
-            'locked_until': r[3].isoformat() if r[3] else None,
+            'last_failed_at': _iso(r[2]),
+            'locked_until': _iso(r[3]),
         })
 
     return jsonify({
@@ -960,18 +993,19 @@ def api_reap_stuck_extractions():
     except (TypeError, ValueError):
         threshold_min = 10
 
-    # Use an inline interval to avoid driver-specific cast issues with
-    # parameterised intervals across Postgres + SQLite.
-    interval_sql = f"INTERVAL '{threshold_min} minutes'"
+    # Bind a datetime cutoff rather than an inline `INTERVAL '<n> minutes'`:
+    # the inline literal is exactly what SQLite cannot parse (it is
+    # Postgres-only), whereas a bound datetime has no cast issue on either
+    # dialect. `RETURNING` is supported by SQLite >= 3.35 as well.
     try:
-        result = db.session.execute(text(f"""
+        result = db.session.execute(text("""
             UPDATE documents
                SET extraction_status = 'timed_out',
                    extraction_started_at = NULL
              WHERE extraction_status = 'running'
-               AND extraction_started_at < NOW() - {interval_sql}
+               AND extraction_started_at < :cutoff
             RETURNING id
-        """))
+        """), {'cutoff': _utc_cutoff(minutes=threshold_min)})
         reaped_ids = [row[0] for row in result.fetchall()]
         db.session.commit()
     except Exception as e:

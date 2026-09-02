@@ -805,8 +805,12 @@ def _build_admin_stats():
     activity = []
     for i in range(13, -1, -1):
         dt = now - timedelta(days=i)
-        label = dt.strftime('%b %-d') if hasattr(dt, 'strftime') else dt.isoformat()[:10]
-        # Windows %-d isn't supported on every locale; fall back gracefully
+        # Day label like "Sep 2". `%-d` (no leading zero) is a glibc-only
+        # strftime directive: on Windows it raises `ValueError: Invalid format
+        # string`, and the previous code called it BEFORE the try/except meant
+        # to guard it, so GET /api/dashboard/stats 500'd on every Windows dev
+        # machine (prod/Linux was fine). Build the label from `.day` instead —
+        # identical output on every platform.
         try:
             label = dt.strftime('%b ') + str(dt.day)
         except Exception:
