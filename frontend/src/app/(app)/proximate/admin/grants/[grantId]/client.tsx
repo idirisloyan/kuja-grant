@@ -17,7 +17,7 @@ import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import {
-  PageShell, PageHeader, PageMain,
+  PageBack, PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 
 interface GrantResp {
@@ -322,6 +322,9 @@ export function ProximateGrantDetailClient() {
 
   return (
     <PageShell>
+      {/* Every detail shows its own way back to the register
+          (PFX-SEP02-GLOBAL-001 / NAV-001). */}
+      <PageBack href="/proximate/grants" label={t('proximate.grants.back_to_register')} />
       <PageHeader
         title={g.title}
         subtitle={`${g.donor_name || t('prox_grant.donor_tbd')}${g.donor_grant_ref ? ` · ${t('prox_grant.ref_label', { ref: g.donor_grant_ref })}` : ''}`}

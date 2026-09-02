@@ -17,7 +17,7 @@ import { supportedLanguages } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 import {
-  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow, Bell,
+  Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow, Bell, Palette,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
@@ -114,7 +114,10 @@ export function Header() {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Tenant identity pill — visible to make multi-tenant obvious */}
+      {/* Tenant identity pill — visible to make multi-tenant obvious. Centred
+          on a phone (left hamburger · centre identity · right controls,
+          PFX-SEP02-GLOBAL-002), left-aligned from sm up. */}
+      <div className="flex-1 min-w-0 flex justify-center sm:justify-start">
       {network && (
         <div
           // `min-w-0 shrink` + a truncating name: on a phone the pill is the
@@ -139,8 +142,7 @@ export function Header() {
           <span className="truncate">{network.name}</span>
         </div>
       )}
-
-      <div className="flex-1" />
+      </div>
 
       {/* Right-side actions — `shrink-0`: these are fixed-size icon controls;
           the tenant pill (min-w-0 shrink) is what gives way on narrow screens. */}
@@ -189,11 +191,14 @@ export function Header() {
         {/* Phase 13.16 — In-app changelog (sparkle + red dot when unread). */}
         <ChangelogButton />
 
-        {/* Phase 111 — App-wide theme toggle (system / light / dark). */}
-        <ThemeToggle />
+        {/* Phase 111 — App-wide theme toggle (system / light / dark). Below sm
+            it lives in the user menu instead (PFX-SEP02-GLOBAL-002): a phone
+            header carried seven controls, two of them sparkles. */}
+        <ThemeToggle className="hidden sm:inline-flex" />
 
-        {/* Language picker */}
-        <div className="relative" ref={langMenuRef}>
+        {/* Language picker — tablet/desktop; the user menu holds a native
+            <select> for phones. */}
+        <div className="relative hidden sm:block" ref={langMenuRef}>
           <button
             type="button"
             onClick={() => setLangMenuOpen((o) => !o)}
@@ -272,11 +277,62 @@ export function Header() {
           {userMenuOpen && (
             <div
               role="menu"
-              className="absolute right-0 mt-1 w-52 rounded-lg border border-border bg-popover shadow-lg overflow-hidden z-50"
+              // w-64 below sm: the phone-only preferences rows (label + native
+              // language select) did not fit the desktop menu's 13rem.
+              className="absolute right-0 mt-1 w-64 sm:w-52 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover shadow-lg overflow-hidden z-50"
             >
               <div className="px-3 py-2.5 border-b border-border">
                 <div className="text-sm font-medium text-foreground truncate">{displayedName}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
+              </div>
+              {/* Phone-only preferences (PFX-SEP02-GLOBAL-002): language, theme
+                  and low-bandwidth move here from the bar below sm, so the bar
+                  keeps one assistant control, notifications and the avatar. */}
+              <div className="sm:hidden border-b border-border py-1">
+                <div className="px-3 pt-1.5 pb-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                  {t('header.preferences')}
+                </div>
+                <label className="flex items-center gap-2 px-3 py-2 text-sm text-foreground">
+                  <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="flex-1">{t('header.language')}</span>
+                  <select
+                    value={currentLang.code}
+                    onChange={(e) => {
+                      setLanguage(e.target.value as typeof currentLang.code);
+                      setUserMenuOpen(false);
+                    }}
+                    className="max-w-[9.5rem] rounded-md border border-border bg-background px-2 py-1 text-sm"
+                  >
+                    {supportedLanguages.map((l) => (
+                      <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-foreground">
+                  <Palette className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="flex-1">{t('header.theme')}</span>
+                  <ThemeToggle />
+                </div>
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={lowBandwidth}
+                  onClick={toggleLowBandwidth}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                >
+                  {lowBandwidth
+                    ? <SignalLow className="h-4 w-4 text-muted-foreground shrink-0" />
+                    : <Signal className="h-4 w-4 text-muted-foreground shrink-0" />}
+                  <span className="flex-1 text-left">{t('header.low_bandwidth')}</span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    lowBandwidth
+                      ? 'bg-[hsl(var(--kuja-sun)/0.15)] text-[hsl(var(--kuja-sun))]'
+                      : 'bg-muted text-muted-foreground',
+                  )}>
+                    {lowBandwidth ? t('common.on') : t('common.off')}
+                  </span>
+                </button>
               </div>
               <a
                 href="/settings/notifications"

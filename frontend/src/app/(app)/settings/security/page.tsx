@@ -13,11 +13,17 @@ import { ShieldCheck, KeyRound, ChevronRight } from 'lucide-react';
 import { WebAuthnPanel } from '@/components/shared/webauthn-panel';
 import { ChangePasswordForm } from '@/components/shared/change-password-form';
 import { useAuthStore } from '@/stores/auth-store';
+import { PageBack } from '@/components/layout/page-shell';
+import { useTranslation } from '@/lib/hooks/use-translation';
 
 export default function SecuritySettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
   return (
     <div className="max-w-3xl mx-auto space-y-4">
+      {/* A sub-page must show its own way back; the sidebar was the only exit
+          (PFX-SEP02-SETTINGS-002). */}
+      <PageBack href="/settings" label={t('common.back_to_settings')} />
       <div>
         <h1 className="kuja-display text-2xl">Security</h1>
         <p className="text-sm text-muted-foreground">

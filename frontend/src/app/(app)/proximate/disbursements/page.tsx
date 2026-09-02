@@ -24,6 +24,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadError } from '@/components/proximate/load-error';
 import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { TestDataToggle } from '@/components/proximate/test-data-toggle';
+import { useUIStore } from '@/stores/ui-store';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -86,12 +88,15 @@ export default function ProximateDisbursementsPage() {
   const [copied, setCopied] = useState<number | null>(null);
   // Fixture rows are hidden by default so a live session does not open on a
   // list of QA Fixture / UAT records. Never removed — the count stays
-  // visible and one click brings them back.
-  const [showTest, setShowTest] = useState(false);
+  // visible and one click brings them back. ONE persisted flag shared by
+  // every register (PFX-SEP02-GLOBAL-004).
+  const showTest = useUIStore((s) => s.showTestData);
   // Redesign (PF-UX-090): the register groups into needs-action queues; the
   // completed (verified) history collapses so it never sits at the same
   // prominence as unresolved risk.
   const [showCompleted, setShowCompleted] = useState(false);
+  // Partner groups the operator has opened inside a queue (PFX-SEP02-DISB-002).
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const { real: realRows, test: testRows } = useMemo(
     () => splitTestRecords(rows ?? [], (d) => d.partner_name),
     [rows],
@@ -150,6 +155,9 @@ export default function ProximateDisbursementsPage() {
     const days = Math.round((due.getTime() - Date.now()) / 86_400_000);
     if (days < 0) return { text: t('proximate.disbursements.days_overdue', { n: Math.abs(days) }), late: true };
     if (days === 0) return { text: t('proximate.disbursements.due_today'), late: true };
+    // "Due tomorrow" is the one relative date people act on differently
+    // from "1 day left" (PFX-SEP02-DISB-003).
+    if (days === 1) return { text: t('proximate.disbursements.due_tomorrow'), late: false };
     return { text: t('proximate.disbursements.days_left', { n: days }), late: false };
   }
 
@@ -188,7 +196,7 @@ export default function ProximateDisbursementsPage() {
       <div key={d.id} className="prox-qrow" style={i === 0 ? { borderTop: 0 } : undefined}>
         <Link href={`/proximate/disbursements/${d.id}`} className="min-w-0 block">
           <div className="flex items-center gap-2 flex-wrap">
-            <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+            <strong className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
               {d.partner_name || `Partner #${d.partner_id}`}
             </strong>
             {/* One workflow badge per row; lateness is supporting text below,
@@ -220,19 +228,108 @@ export default function ProximateDisbursementsPage() {
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); copyReportUrl(d); }}
           >
             {copied === d.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied === d.id ? t('proximate.disbursements.copied') : t('proximate.disbursements.copy_report_link')}
+            {/* The full label ate the phone row's width and crushed the
+                partner name into three lines; the short form keeps the
+                name column (PFX-SEP02-MOBILE-001). */}
+            {copied === d.id
+              ? t('proximate.disbursements.copied')
+              : (
+                <>
+                  <span className="sm:hidden">{t('proximate.disbursements.copy_link_short')}</span>
+                  <span className="hidden sm:inline">{t('proximate.disbursements.copy_report_link')}</span>
+                </>
+              )}
           </button>
         ) : (
+          /* A real control, not a tiny text arrow (PFX-SEP02-NAV-002). */
           <Link
             href={`/proximate/disbursements/${d.id}`}
-            className="text-xs self-center whitespace-nowrap inline-flex items-center min-h-[24px]"
-            style={{ color: 'var(--prox-muted)' }}
+            className="prox-btn ghost whitespace-nowrap"
+            style={{ height: 32, fontSize: 12, padding: '0 11px' }}
           >
-            {t(actionKey(d.status))} →
+            {t(actionKey(d.status))}
           </Link>
         )}
       </div>
     );
+  };
+
+  // Consecutive rows for one partner inside a queue (three overdue reports
+  // for Khartoum Sisters) read as repetition on a phone. Collapse them into
+  // one partner line with the amounts and lateness inline; the individual
+  // rows — and their copy-link buttons — are one tap away
+  // (PFX-SEP02-DISB-002).
+  const renderGrouped = (list: Disbursement[], sectionKey: string) => {
+    const groups: { partnerId: number; name: string; rows: Disbursement[] }[] = [];
+    for (const d of list) {
+      const last = groups[groups.length - 1];
+      if (last && last.partnerId === d.partner_id) last.rows.push(d);
+      else groups.push({ partnerId: d.partner_id, name: d.partner_name || `Partner #${d.partner_id}`, rows: [d] });
+    }
+    let i = 0;
+    return groups.map((g) => {
+      if (g.rows.length === 1) return renderRow(g.rows[0], i++);
+      const gkey = `${sectionKey}:${g.partnerId}`;
+      const open = expandedGroups.has(gkey);
+      const total = g.rows.reduce((a, d) => a + (d.amount_usd || 0), 0);
+      const first = i++;
+      return (
+        <div key={gkey}>
+          <div className="prox-qrow" style={first === 0 ? { borderTop: 0 } : undefined}>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <strong className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+                  {g.name}
+                </strong>
+                <span className={`prox-pill ${proxPillForStatus(g.rows[0].status)}`}>
+                  {g.rows.length} × {labelForProximateStatus(g.rows[0].status, t)}
+                </span>
+              </div>
+              <small className="block" style={{ marginTop: 3 }}>
+                <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>${total.toLocaleString()}</span>
+                {g.rows.map((d) => {
+                  const age = d.status === 'pending_report' ? dueAge(d.report_due_at) : null;
+                  return age ? (
+                    <span key={d.id} style={age.late ? { color: 'var(--prox-danger)' } : undefined}>
+                      {' · '}<span className="prox-mono">${(d.amount_usd ?? 0).toLocaleString()}</span> {age.text}
+                    </span>
+                  ) : null;
+                })}
+              </small>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              <Link
+                href={`/proximate/endorse/${g.partnerId}`}
+                className="prox-btn ghost whitespace-nowrap"
+                style={{ height: 32, fontSize: 12, padding: '0 11px' }}
+              >
+                {t('proximate.disbursements.open_partner')}
+              </Link>
+              <button
+                type="button"
+                className="prox-btn ghost whitespace-nowrap"
+                style={{ height: 32, fontSize: 12, padding: '0 11px' }}
+                aria-expanded={open}
+                onClick={() => setExpandedGroups((s) => {
+                  const n = new Set(s);
+                  if (n.has(gkey)) n.delete(gkey); else n.add(gkey);
+                  return n;
+                })}
+              >
+                {open
+                  ? t('proximate.disbursements.hide_items')
+                  : t('proximate.disbursements.show_items', { n: g.rows.length })}
+              </button>
+            </div>
+          </div>
+          {open && (
+            <div style={{ background: 'var(--prox-inset, var(--prox-surface-2))' }}>
+              {g.rows.map((d, j) => renderRow(d, j + 1))}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -269,23 +366,7 @@ export default function ProximateDisbursementsPage() {
         )}
         {!loadError && rows !== null && rows.length > 0 && (
           <div className="space-y-4">
-            {testRows.length > 0 && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowTest((v) => !v)}
-                  className="text-xs px-3 py-1 rounded-full border border-dashed transition-colors"
-                  style={showTest
-                    ? { background: 'var(--prox-slate)', color: '#fff', borderColor: 'transparent' }
-                    : { background: 'var(--prox-surface)', color: 'var(--prox-muted)', borderColor: 'var(--prox-line-2)' }}
-                  title={t('proximate.disbursements.test_toggle_hint')}
-                >
-                  {showTest
-                    ? t('proximate.disbursements.hide_test', { n: testRows.length })
-                    : t('proximate.disbursements.show_test', { n: testRows.length })}
-                </button>
-              </div>
-            )}
+            <TestDataToggle count={testRows.length} />
 
             {/* Needs-action queues, most urgent first. */}
             {sectioned.map((s) => (
@@ -294,7 +375,7 @@ export default function ProximateDisbursementsPage() {
                   <h2>{t(`proximate.disbursements.section_${s.key}`)}</h2>
                   <span className={`prox-pill ${s.tone}`}>{s.rows.length}</span>
                 </div>
-                <div>{s.rows.map((d, i) => renderRow(d, i))}</div>
+                <div>{renderGrouped(s.rows, s.key)}</div>
               </div>
             ))}
 

@@ -10,6 +10,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { TestDataToggle } from '@/components/proximate/test-data-toggle';
+import { useUIStore } from '@/stores/ui-store';
 import Link from 'next/link';
 import {
   Loader2, Search, Users, ShieldCheck, AlertTriangle, Upload,
@@ -80,9 +82,10 @@ export default function ProximatePartnersPage() {
   const [sort, setSort] = useState<'name' | 'newest'>('name');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  // Fixtures hidden by default — see lib/test-records.ts. The count stays
-  // visible so nothing disappears without the user being told.
-  const [showTest, setShowTest] = useState(false);
+  // Fixtures hidden by default — see lib/test-records.ts. ONE persisted flag
+  // shared by every register (PFX-SEP02-GLOBAL-004); the count stays visible
+  // so nothing disappears without the user being told.
+  const showTest = useUIStore((s) => s.showTestData);
   // Redesign spec "saved filters where practical" — named search+status
   // combos persisted per-device in localStorage. Presentation only; the
   // saved entry just replays the same URL-backed filter state.
@@ -238,7 +241,37 @@ export default function ProximatePartnersPage() {
                 below to that group; the active tile carries a ring so it is
                 obvious which slice you are looking at. Total clears back to
                 everything. */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* Phone: the same four filters as one summary line, so search and
+                the register are reachable without scrolling past four tiles
+                (PFX-SEP02-PARTNERS-001). */}
+            <div className="sm:hidden flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]" style={{ color: 'var(--prox-muted)' }}>
+              {([
+                ['all', counts.all, t('proximate.partners.total'), undefined],
+                ['in_review', (counts.endorsements_open || 0) + (counts.dd_pending || 0), t('proximate.partners.in_review'), undefined],
+                ['dd_clear', counts.dd_clear || 0, t('proximate.partners.cleared'), 'var(--prox-good)'],
+                ['sanctions', withSanctionsFlag, t('proximate.partners.sanctions_flags'), withSanctionsFlag > 0 ? 'var(--prox-danger)' : undefined],
+              ] as [string, number, string, string | undefined][]).map(([key, n, label, color], i) => (
+                <span key={key} className="inline-flex items-center gap-1.5">
+                  {i > 0 && <span aria-hidden="true">·</span>}
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter(key)}
+                    aria-pressed={statusFilter === key}
+                    className="inline-flex items-center gap-1 rounded-md px-1 -mx-1"
+                    style={{
+                      minHeight: 36,
+                      ...(statusFilter === key
+                        ? { color: 'var(--prox-ink)', textDecoration: 'underline', textUnderlineOffset: 3 }
+                        : undefined),
+                    }}
+                  >
+                    <b className="prox-num" style={{ color: color ?? 'var(--prox-ink)' }}>{n}</b>
+                    <span>{label.toLowerCase()}</span>
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="hidden sm:grid sm:grid-cols-4 gap-2.5">
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
@@ -398,24 +431,7 @@ export default function ProximatePartnersPage() {
               </div>
             </Card>
 
-            {testPartners.length > 0 && (
-              <div className="mb-2">
-                <button
-                  type="button"
-                  onClick={() => setShowTest((v) => !v)}
-                  title={t('proximate.partners.test_toggle_hint')}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    showTest
-                      ? `bg-slate-700 text-white border-slate-700`
-                      : `bg-muted/50 text-muted-foreground border-dashed border-border hover:bg-muted`
-                  }`}
-                >
-                  {showTest
-                    ? t('proximate.partners.hide_test', { n: testPartners.length })
-                    : t('proximate.partners.show_test', { n: testPartners.length })}
-                </button>
-              </div>
-            )}
+            <TestDataToggle count={testPartners.length} className="mb-2" />
 
             {/* Partner list */}
             {filtered.length === 0 ? (
@@ -435,7 +451,9 @@ export default function ProximatePartnersPage() {
                     style={i === 0 ? { borderTop: 0 } : undefined}
                   >
                     <div className="min-w-0">
-                      <strong className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14 }}>
+                      {/* Two lines, not an ellipsis — the name is what
+                          distinguishes two partners (PFX-SEP02-PARTNERS-002). */}
+                      <strong className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14 }}>
                         {p.name}
                         {isTestRecord(p.name) && (
                           <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>

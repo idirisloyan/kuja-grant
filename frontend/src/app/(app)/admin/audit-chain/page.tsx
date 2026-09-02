@@ -14,7 +14,7 @@
  * verify endpoint walks the chain and surfaces the break point.
  */
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck, ShieldAlert, RefreshCw, Loader2, ChevronLeft, ChevronRight, Download,
@@ -116,6 +116,30 @@ function actionLabel(action: string, t: (key: string) => string): string {
   return humanise(action);
 }
 
+// PFX-SEP02-AUDIT-003 — presentation-layer aggregation. Consecutive entries
+// with the same action and actor (a cron sending ten overdue-report nudges)
+// collapse into one line with a count; expanding shows every hash-chain
+// record unchanged. Nothing about the chain, its verification or the export
+// changes.
+interface EntryGroup { lead: ChainEntry; rows: ChainEntry[] }
+
+function groupEntries(entries: ChainEntry[]): EntryGroup[] {
+  const out: EntryGroup[] = [];
+  for (const e of entries) {
+    const last = out[out.length - 1];
+    if (last && last.lead.action === e.action && last.lead.actor_email === e.actor_email) {
+      last.rows.push(e);
+    } else {
+      out.push({ lead: e, rows: [e] });
+    }
+  }
+  return out;
+}
+
+function isSystemActor(email: string | null): boolean {
+  return !email || /system|cron|scheduler|bot|noreply|no-reply/i.test(email);
+}
+
 export default function AuditChainPage() {
   // QA 2026-07-10: on the Proximate tenant the OB reaches its own
   // tenant-scoped chain at /api/proximate/audit-chain (read + jsonl export);
@@ -153,6 +177,13 @@ export default function AuditChainPage() {
   // and details payload needed for independent verification live in
   // an expandable row. Presentation only — chain/export logic untouched.
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
+  // Aggregated groups the reader has opened, keyed by the lead entry's seq.
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const toggleGroup = (seq: number) => setExpandedGroups((s) => {
+    const n = new Set(s);
+    if (n.has(seq)) n.delete(seq); else n.add(seq);
+    return n;
+  });
   const [error, setError] = useState<string | null>(null);
   // PRX-RBAC-024 (2026-07-27) — the audit chain is OB/admin-only server-side
   // (/api/proximate/audit-chain 403s non-OB; /api/audit-chain/* is
@@ -170,15 +201,28 @@ export default function AuditChainPage() {
   // the generic /api/audit-chain/recent ignores them.
   const [flt, setFlt] = useState<{ activity: string; from: string; to: string }>({ activity: '', from: '', to: '' });
 
+  // Generation counter for the tenant-dependent loads. The first render can
+  // resolve isProx=false (network store still empty, host without
+  // "proximate" in it — localhost, or a future custom domain) and fire the
+  // platform-admin endpoints; when the store loads, the effect below resets
+  // accessDenied and reloads — but the FIRST round's 403s land after that
+  // reset and re-latch "Access restricted" for an OB who is allowed in
+  // (seen on localhost, 2 Sep 2026). Responses from a superseded generation
+  // must not touch state.
+  const loadGen = useRef(0);
+
   const loadVerify = async () => {
+    const gen = loadGen.current;
     // Proximate has no cryptographic verify endpoint — skip it (calling the
     // platform one would 403 the OB and show a fake error).
     if (isProx) { setVerifyLoading(false); return; }
     setVerifyLoading(true);
     try {
       const r = await api.get<VerifyResult>('/api/audit-chain/verify');
+      if (gen !== loadGen.current) return;
       setVerify(r);
     } catch (e) {
+      if (gen !== loadGen.current) return;
       if (e instanceof ApiError && (e.status === 403 || e.status === 401)) {
         setAccessDenied(true);
         setError(null);
@@ -186,7 +230,7 @@ export default function AuditChainPage() {
         setError((e as Error).message);
       }
     } finally {
-      setVerifyLoading(false);
+      if (gen === loadGen.current) setVerifyLoading(false);
     }
   };
 
@@ -194,6 +238,7 @@ export default function AuditChainPage() {
     newOffset: number,
     f: { activity: string; from: string; to: string } = flt,
   ) => {
+    const gen = loadGen.current;
     setRecentLoading(true);
     try {
       const p = new URLSearchParams({ limit: String(LIMIT), offset: String(newOffset) });
@@ -203,9 +248,11 @@ export default function AuditChainPage() {
         if (f.to) p.set('to', f.to);
       }
       const r = await api.get<RecentResult>(`${recentUrl}?${p.toString()}`);
+      if (gen !== loadGen.current) return;
       setRecent(r);
       setOffset(newOffset);
     } catch (e) {
+      if (gen !== loadGen.current) return;
       if (e instanceof ApiError && (e.status === 403 || e.status === 401)) {
         setAccessDenied(true);
         setError(null);
@@ -213,7 +260,7 @@ export default function AuditChainPage() {
         setError((e as Error).message);
       }
     } finally {
-      setRecentLoading(false);
+      if (gen === loadGen.current) setRecentLoading(false);
     }
   };
 
@@ -230,6 +277,9 @@ export default function AuditChainPage() {
     // re-loading with the now-resolved tenant — a later 200 must not stay
     // masked by an earlier 403. The load handlers re-set it if THIS attempt
     // is genuinely refused.
+    // New generation: anything still in flight from the previous tenant
+    // resolution is stale and must not touch state when it lands.
+    loadGen.current += 1;
     setAccessDenied(false);
     loadVerify();
     loadRecent(0);
@@ -274,7 +324,15 @@ export default function AuditChainPage() {
         <PageHeader
           title={t('audit_chain.page_title')}
           icon={ShieldCheck}
-          subtitle={t('audit_chain.page_subtitle')}
+          // On Proximate the count and the mechanism used to be explained
+          // twice (title + subtitle, then a "Tenant audit chain · N entries"
+          // card saying it again). One header carries the facts; the
+          // mechanism sits behind a disclosure below (PFX-SEP02-AUDIT-002).
+          subtitle={isProx ? undefined : t('audit_chain.page_subtitle')}
+          meta={isProx && recent ? [
+            { label: t('audit_chain.entries_count', { n: recent.total.toLocaleString() }) },
+            { label: t('audit_chain.tenant_chain_eyebrow') },
+          ] : undefined}
           // Export control renders only once an authorized data load has
           // succeeded (recent !== null), so it never flashes for a user the
           // server will 403 — closing the "bare <a download> fires anyway" gap.
@@ -296,20 +354,16 @@ export default function AuditChainPage() {
       {/* Integrity card — on Proximate we can't run the platform verify, so
           show an honest tenant-scoped state (no fake "intact" claim). */}
       {isProx ? (
-        <Card className="p-4 sm:p-5 border-l-4 border-l-[hsl(var(--kuja-clay))]">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-6 h-6 text-[hsl(var(--kuja-clay))]" />
-            <div>
-              <div className="kuja-eyebrow">{t('audit_chain.tenant_chain_eyebrow')}</div>
-              <h2 className="kuja-display text-xl mt-0.5">
-                {recent ? t('audit_chain.entries_count', { n: recent.total.toLocaleString() }) : '…'}
-              </h2>
-              <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-2">
-                {t('audit_chain.tenant_chain_desc')}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <details className="rounded-lg border border-border bg-card group">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-[hsl(var(--kuja-clay))]" />
+            {t('audit_chain.how_it_works')}
+            <ChevronRight className="w-4 h-4 ms-auto text-muted-foreground transition-transform group-open:rotate-90" />
+          </summary>
+          <p className="px-4 pb-4 text-xs text-[hsl(var(--kuja-ink-soft))]">
+            {t('audit_chain.tenant_chain_desc')}
+          </p>
+        </details>
       ) : (
       <Card className={cn(
         'p-4 sm:p-5 border-l-4',
@@ -365,10 +419,11 @@ export default function AuditChainPage() {
           <div>
             <div className="kuja-eyebrow">{t('audit_chain.recent_entries')}</div>
             <h3 className="text-base font-semibold mt-0.5">
-              {recent ? t('audit_chain.total_count', { n: recent.total.toLocaleString() }) : '…'}
+              {/* The page header already states the total on Proximate. */}
+              {!isProx && (recent ? t('audit_chain.total_count', { n: recent.total.toLocaleString() }) : '…')}
               {recent && recent.entries.length > 0 && (
-                <span className="text-[hsl(var(--kuja-ink-soft))] font-normal">
-                  {' · '}{t('audit_chain.showing_range', { from: offset + 1, to: offset + recent.entries.length })}
+                <span className={cn('text-[hsl(var(--kuja-ink-soft))]', !isProx && 'font-normal')}>
+                  {!isProx && ' · '}{t('audit_chain.showing_range', { from: offset + 1, to: offset + recent.entries.length })}
                 </span>
               )}
             </h3>
@@ -398,15 +453,18 @@ export default function AuditChainPage() {
         {/* PF-UX-122 — filters (Proximate endpoint only). "System" vs
             "People" is the one that clears the cron-nudge noise (PF-UX-120). */}
         {isProx && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-            <div className="inline-flex rounded-md border border-[hsl(var(--border))] overflow-hidden">
+          <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 text-xs">
+            {/* Phone: the People/System selector on its own row and the date
+                range beneath it, instead of three controls fighting for one
+                line (PFX-SEP02-AUDIT-004). */}
+            <div className="inline-flex self-start rounded-md border border-[hsl(var(--border))] overflow-hidden">
               {([['', 'common.all'], ['human', 'audit_chain.filter_people'], ['system', 'audit_chain.filter_system']] as const).map(([v, k]) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => applyFilter({ activity: v })}
                   className={cn(
-                    'px-2.5 py-1 transition-colors',
+                    'px-3 py-2 sm:py-1 transition-colors',
                     flt.activity === v
                       ? 'bg-[hsl(var(--kuja-clay))] text-white'
                       : 'hover:bg-[hsl(var(--kuja-sand-50))]',
@@ -416,24 +474,26 @@ export default function AuditChainPage() {
                 </button>
               ))}
             </div>
-            <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
-              {t('audit_chain.filter_from')}
-              <input
-                type="date"
-                value={flt.from}
-                onChange={(e) => applyFilter({ from: e.target.value })}
-                className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
-              />
-            </label>
-            <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
-              {t('audit_chain.filter_to')}
-              <input
-                type="date"
-                value={flt.to}
-                onChange={(e) => applyFilter({ to: e.target.value })}
-                className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
-              />
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
+                {t('audit_chain.filter_from')}
+                <input
+                  type="date"
+                  value={flt.from}
+                  onChange={(e) => applyFilter({ from: e.target.value })}
+                  className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1 text-[hsl(var(--kuja-ink-soft))]">
+                {t('audit_chain.filter_to')}
+                <input
+                  type="date"
+                  value={flt.to}
+                  onChange={(e) => applyFilter({ to: e.target.value })}
+                  className="rounded border border-[hsl(var(--border))] px-1.5 py-1 bg-card"
+                />
+              </label>
+            </div>
             {(flt.activity || flt.from || flt.to) && (
               <button
                 type="button"
@@ -480,7 +540,8 @@ export default function AuditChainPage() {
                 </tr>
               </thead>
               <tbody>
-                {recent.entries.map((e) => (
+                {groupEntries(recent.entries).map((g) => {
+                  const entryRow = (e: ChainEntry) => (
                   <Fragment key={e.seq}>
                   <tr
                     className="border-b border-[hsl(var(--border))] last:border-b-0 hover:bg-[hsl(var(--kuja-sand-50))] cursor-pointer"
@@ -563,7 +624,45 @@ export default function AuditChainPage() {
                     </tr>
                   )}
                   </Fragment>
-                ))}
+                  );
+                  if (g.rows.length === 1) return entryRow(g.rows[0]);
+                  const gopen = expandedGroups.has(g.lead.seq);
+                  const lastSeq = g.rows[g.rows.length - 1].seq;
+                  return (
+                    <Fragment key={`g${g.lead.seq}`}>
+                      <tr
+                        className="border-b border-[hsl(var(--border))] hover:bg-[hsl(var(--kuja-sand-50))] cursor-pointer"
+                        onClick={() => toggleGroup(g.lead.seq)}
+                      >
+                        <td className="py-2 font-mono text-[hsl(var(--kuja-ink-soft))] whitespace-nowrap">
+                          {g.lead.seq}–{lastSeq}
+                        </td>
+                        <td className={cn('py-2 font-semibold', actionTone(g.lead.action))} colSpan={2}>
+                          {g.rows.length} × {actionLabel(g.lead.action, t)}
+                          <span className="ms-2 font-normal text-[hsl(var(--kuja-ink-soft))]">
+                            {isSystemActor(g.lead.actor_email) ? t('audit_chain.system_run') : g.lead.actor_email}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          <button
+                            type="button"
+                            className="text-[hsl(var(--kuja-clay))] font-semibold hover:underline"
+                            onClick={(ev) => { ev.stopPropagation(); toggleGroup(g.lead.seq); }}
+                          >
+                            {gopen ? t('audit_chain.collapse_group') : t('audit_chain.expand_n', { n: g.rows.length })}
+                          </button>
+                        </td>
+                        <td className="py-2 text-[hsl(var(--kuja-ink-soft))]">
+                          {new Date(g.lead.created_at).toLocaleString()}
+                        </td>
+                        <td className="py-2 text-[hsl(var(--kuja-ink-soft))]">
+                          <ChevronRight className={cn('w-3.5 h-3.5 transition-transform', gopen && 'rotate-90')} />
+                        </td>
+                      </tr>
+                      {gopen && g.rows.map(entryRow)}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -573,7 +672,8 @@ export default function AuditChainPage() {
             width (PF-MOB-015). Same fields, same expand-for-hashes. */}
         {recent && recent.entries.length > 0 && (
           <div className="md:hidden mt-4 space-y-2">
-            {recent.entries.map((e) => {
+            {groupEntries(recent.entries).map((g) => {
+              const entryCard = (e: ChainEntry) => {
               const href = subjectDrillHref(e.subject_kind, e.subject_id ?? null);
               const open = expandedSeq === e.seq;
               return (
@@ -628,6 +728,39 @@ export default function AuditChainPage() {
                           </Link>
                         )}
                       </div>
+                    </div>
+                  )}
+                </div>
+              );
+              };
+              if (g.rows.length === 1) return entryCard(g.rows[0]);
+              const gopen = expandedGroups.has(g.lead.seq);
+              return (
+                <div key={`g${g.lead.seq}`} className="rounded-lg border border-[hsl(var(--border))] overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(g.lead.seq)}
+                    className="w-full text-start p-3 hover:bg-[hsl(var(--kuja-sand-50))]"
+                    aria-expanded={gopen}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn('text-sm font-semibold', actionTone(g.lead.action))}>
+                        {g.rows.length} × {actionLabel(g.lead.action, t)}
+                      </span>
+                      <ChevronRight className={cn('w-3.5 h-3.5 shrink-0 transition-transform', gopen && 'rotate-90')} />
+                    </div>
+                    <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-1.5">
+                      {isSystemActor(g.lead.actor_email) ? t('audit_chain.system_run') : g.lead.actor_email}
+                      {' · '}{new Date(g.lead.created_at).toLocaleString()}
+                      {' · '}#{g.lead.seq}–#{g.rows[g.rows.length - 1].seq}
+                    </div>
+                    <div className="text-xs mt-1 font-semibold text-[hsl(var(--kuja-clay))]">
+                      {gopen ? t('audit_chain.collapse_group') : t('audit_chain.expand_n', { n: g.rows.length })}
+                    </div>
+                  </button>
+                  {gopen && (
+                    <div className="border-t border-[hsl(var(--border))] p-2 space-y-2 bg-[hsl(var(--kuja-sand-50))]/40">
+                      {g.rows.map(entryCard)}
                     </div>
                   )}
                 </div>

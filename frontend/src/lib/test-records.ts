@@ -20,24 +20,44 @@
  * must offer a way to show them again.
  */
 
-const TEST_NAME = /\b(uat|test|qa|codex|demo|fixture)\b/i;
+// `uat` also catches the hyphenated forms the 2 Sep QA round listed
+// ("RPT-UAT…", "LIVE-UAT…") because `-` is a word boundary. `verification`,
+// `e2e`, `smoke` and `sandbox` are the names our own end-to-end and
+// enforcement runs give the rounds they create ("verification round…").
+const TEST_NAME = /\b(uat|test|qa|codex|demo|fixture|verification|e2e|smoke|sandbox|dummy)\b/i;
 
-/** True when a record's name marks it as a fixture rather than real data. */
-export function isTestRecord(name: string | null | undefined): boolean {
-  return !!name && TEST_NAME.test(name);
+type MaybeName = string | null | undefined;
+
+/**
+ * True when ANY of the given names marks the record as a fixture.
+ *
+ * Takes several names because test data is inherited, not just self-declared:
+ * a grant titled "Sudan Rapid Shelter Support 2026" is real-looking, but if it
+ * belongs to "UAT Donor" it is a fixture — exactly the repeated grant rows the
+ * 2 Sep QA round flagged. So callers pass the record's own name AND the names
+ * of what it belongs to (donor, partner, round), and one rule classifies all
+ * five registers the same way (PFX-SEP02-GLOBAL-004).
+ */
+export function isTestRecord(...names: MaybeName[]): boolean {
+  return names.some((n) => !!n && TEST_NAME.test(n));
 }
 
 /**
  * Split a list into real records and fixtures in one pass, so callers can show
  * a count of what is hidden rather than hiding it silently. Something the user
  * cannot see must at least be something they are told about.
+ *
+ * `namesOf` may return one name or the record's own name plus its parents'.
  */
 export function splitTestRecords<T>(
   rows: T[],
-  nameOf: (row: T) => string | null | undefined,
+  namesOf: (row: T) => MaybeName | MaybeName[],
 ): { real: T[]; test: T[] } {
   const real: T[] = [];
   const test: T[] = [];
-  for (const row of rows) (isTestRecord(nameOf(row)) ? test : real).push(row);
+  for (const row of rows) {
+    const n = namesOf(row);
+    (isTestRecord(...(Array.isArray(n) ? n : [n])) ? test : real).push(row);
+  }
   return { real, test };
 }

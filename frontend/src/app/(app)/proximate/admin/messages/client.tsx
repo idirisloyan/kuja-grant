@@ -19,6 +19,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, MessagesSquare, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { splitTestRecords } from '@/lib/test-records';
+import { TestDataToggle } from '@/components/proximate/test-data-toggle';
+import { useUIStore } from '@/stores/ui-store';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Button } from '@/components/ui/button';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -54,8 +56,9 @@ export function ProximateMessagesClient() {
   const [error, setError] = useState<string | null>(null);
   // Test/UAT hygiene (PF-MOB-016 / PF-UX): fixtures are hidden by default and
   // revealed only on request. Keyed on the recipient name, the same heuristic
-  // the partners/disbursements registers use.
-  const [showTest, setShowTest] = useState(false);
+  // and the same persisted flag every other register uses
+  // (PFX-SEP02-GLOBAL-004).
+  const showTest = useUIStore((s) => s.showTestData);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -123,6 +126,14 @@ export function ProximateMessagesClient() {
     configState === 'unknown' ? null : stats.reduce((n, s) => n + s.sent, 0);
   const unsentCount =
     configState === 'unknown' ? 0 : stats.reduce((n, s) => n + s.unsent + s.failed, 0);
+  // Newest outbound row that actually went out — the "is anything getting
+  // through at all?" fact for the health strip (PFX-SEP02-MSG-002).
+  const lastSuccessAt = outbound
+    .filter((m) => ['sent', 'delivered', 'read', 'responded'].includes(m.status))
+    .reduce<string | null>(
+      (mx, m) => (m.created_at && (!mx || m.created_at > mx) ? m.created_at : mx),
+      null,
+    );
 
   const reply = async (
     msg: ProximateMessageRow,
@@ -198,6 +209,7 @@ export function ProximateMessagesClient() {
             state={configState}
             channels={channels}
             unsentCount={unsentCount}
+            lastSuccessAt={lastSuccessAt}
             onShowOutbound={() => setTab('outbound')}
           />
 
@@ -237,19 +249,8 @@ export function ProximateMessagesClient() {
             })}
           </div>
 
-          {tab !== 'delivery' && testCount > 0 && (
-            <div className="flex justify-end -mt-1">
-              <button
-                type="button"
-                onClick={() => setShowTest((v) => !v)}
-                className="text-xs px-2.5 py-1 rounded-full border border-dashed text-muted-foreground hover:text-foreground transition-colors"
-                style={{ borderColor: 'var(--prox-line)' }}
-              >
-                {showTest
-                  ? t('proximate.messaging.hide_test')
-                  : t('proximate.messaging.show_test', { n: testCount })}
-              </button>
-            </div>
+          {tab !== 'delivery' && (
+            <TestDataToggle count={testCount} className="-mt-1" />
           )}
 
           {loading ? (

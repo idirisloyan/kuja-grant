@@ -218,33 +218,38 @@ export default function LoginPage() {
         //   none/non-Proximate -> /dashboard/ (existing default)
         // A 404/error or any other status falls through to /dashboard.
         let target = '/dashboard/';
+        // Only ask about a Proximate persona when THIS login page is on the
+        // Proximate tenant — resolved from the host, or via the explicit
+        // ?network=proximate switch that NetworkProvider has already
+        // persisted. The previous probe ran on every tenant and FORCED
+        // `X-Network-Override: proximate`; the server honours that header
+        // for platform admins on any host, so every admin signing in on the
+        // Kuja hub resolved as a Proximate persona, had their session pinned
+        // to Proximate and landed on /proximate/admin instead of the Kuja
+        // admin dashboard (browser_test 24.3 — and live on fund.kuja.org).
+        // Which tenant a browser is on is decided by its host, never by the
+        // login page.
         try {
-          const apiBase = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
-          const r = await fetch(`${apiBase}/api/proximate/persona/me`, {
-            credentials: 'include',
-            headers: { 'X-Network-Override': 'proximate' },
-          });
-          if (r.ok) {
-            const body = await r.json();
-            const isProximatePersona =
-              body?.persona === 'donor' ||
-              body?.persona === 'ob' ||
-              body?.persona === 'admin';
-            if (body?.persona === 'donor') target = '/proximate/donor';
-            else if (body?.persona === 'ob' || body?.persona === 'admin') {
-              target = '/proximate/admin';
+          if (tenantSlug === 'proximate') {
+            const apiBase = (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, '');
+            // Mirror lib/api.ts: forward a persisted override if there is
+            // one; on the real Proximate host the header is unnecessary.
+            const headers: Record<string, string> = {};
+            try {
+              const override = window.localStorage.getItem('kuja_network_override');
+              if (override) headers['X-Network-Override'] = override;
+            } catch {
+              /* localStorage unavailable — the host resolves the tenant */
             }
-            // The bare /login clears any tenant override so it starts
-            // neutral (see NetworkProvider). If this user is in fact a
-            // Proximate persona, pin the override now so the destination
-            // /proximate/* pages carry X-Network-Override and resolve to
-            // the Proximate tenant — even when the user typed their email
-            // on the neutral login instead of clicking the switcher.
-            if (isProximatePersona) {
-              try {
-                window.localStorage.setItem('kuja_network_override', 'proximate');
-              } catch {
-                /* localStorage unavailable — proximate pages fall back to host */
+            const r = await fetch(`${apiBase}/api/proximate/persona/me`, {
+              credentials: 'include',
+              headers,
+            });
+            if (r.ok) {
+              const body = await r.json();
+              if (body?.persona === 'donor') target = '/proximate/donor';
+              else if (body?.persona === 'ob' || body?.persona === 'admin') {
+                target = '/proximate/admin';
               }
             }
           }

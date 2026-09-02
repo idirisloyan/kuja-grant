@@ -23,6 +23,7 @@ export function MessagingConfigBanner({
   state,
   channels,
   unsentCount = 0,
+  lastSuccessAt = null,
   onShowOutbound,
 }: {
   state: MessagingConfigState;
@@ -30,10 +31,12 @@ export function MessagingConfigBanner({
   channels?: string[];
   /** Outbound rows in the window that are 'unsent' or 'failed'. */
   unsentCount?: number;
+  /** ISO time of the newest outbound row that actually went out. */
+  lastSuccessAt?: string | null;
   /** Jumps to the outbound tab — the list of things needing a human. */
   onShowOutbound?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, formatDate } = useTranslation();
 
   if (state === 'not_configured') {
     return (
@@ -100,51 +103,70 @@ export function MessagingConfigBanner({
   const channelsLabel = (channels || [])
     .map((c) => (c === 'whatsapp' ? 'WhatsApp' : c === 'sms' ? 'SMS' : c.charAt(0).toUpperCase() + c.slice(1)))
     .join(' + ');
+  // ONE health component (PFX-SEP02-MSG-002): provider connectivity and
+  // delivery are separate facts with separate colours. A green "connected"
+  // line beside "16 outbound failed" used to read as "all fine". Green is
+  // reserved for the provider; delivery goes red the moment anything is stuck.
+  const stuck = unsentCount > 0;
   return (
-    <div className="space-y-3">
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--prox-good)' }}>
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span className="font-medium">
+    <div className="prox-panel" style={{ padding: '12px 16px' }} role={stuck ? 'alert' : undefined}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2
+          className="text-sm"
+          style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
+        >
+          {t('proximate.messaging.health_title')}
+        </h2>
+        {stuck && onShowOutbound && (
+          <button
+            type="button"
+            onClick={onShowOutbound}
+            className="prox-btn ghost"
+            style={{ height: 32, fontSize: 12, padding: '0 11px' }}
+          >
+            {t('proximate.messaging.review_delivery')}
+          </button>
+        )}
+      </div>
+      <dl className="mt-2 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        <div className="flex items-center justify-between gap-3 sm:block">
+          <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
+            {t('proximate.messaging.health_provider')}
+          </dt>
+          <dd className="inline-flex items-center gap-1.5 font-medium" style={{ color: 'var(--prox-good)' }}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
             {channelsLabel
               ? t('proximate.messaging.connected_label', { channels: channelsLabel })
               : t('proximate.messaging.configured_title')}
-          </span>
+          </dd>
         </div>
-        <p className="text-xs ps-6" style={{ color: 'var(--prox-muted)' }}>
-          {t('proximate.messaging.configured_body')}
-        </p>
-      </div>
-
-      {unsentCount > 0 && (
-        <div
-          role="alert"
-          className="prox-panel"
-          style={{ padding: '14px 16px', borderColor: 'var(--prox-warn)' }}
-        >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--prox-warn)' }} />
-            <div className="space-y-1 min-w-0">
-              <p className="font-medium text-sm" style={{ color: 'var(--prox-ink)' }}>
-                {t('proximate.messaging.unsent_warning_title', { count: unsentCount })}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--prox-ink-2)' }}>
-                {t('proximate.messaging.unsent_warning_body')}
-              </p>
-              {onShowOutbound && (
-                <button
-                  type="button"
-                  onClick={onShowOutbound}
-                  className="text-xs font-medium underline hover:no-underline"
-                  style={{ color: 'var(--prox-warn)' }}
-                >
-                  {t('proximate.messaging.review_delivery')}
-                </button>
-              )}
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-3 sm:block">
+          <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
+            {t('proximate.messaging.health_delivery')}
+          </dt>
+          <dd
+            className="inline-flex items-center gap-1.5 font-medium"
+            style={{ color: stuck ? 'var(--prox-danger)' : 'var(--prox-ink)' }}
+          >
+            {stuck
+              ? <AlertTriangle className="w-4 h-4 shrink-0" />
+              : <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--prox-good)' }} />}
+            {stuck
+              ? t('proximate.messaging.health_attention_n', { n: unsentCount })
+              : t('proximate.messaging.health_all_delivered')}
+          </dd>
         </div>
-      )}
+        <div className="flex items-center justify-between gap-3 sm:block">
+          <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
+            {t('proximate.messaging.health_last_success')}
+          </dt>
+          <dd className="font-medium" style={{ color: 'var(--prox-ink)' }}>
+            {lastSuccessAt
+              ? formatDate(lastSuccessAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : t('proximate.messaging.health_none_yet')}
+          </dd>
+        </div>
+      </dl>
     </div>
   );
 }

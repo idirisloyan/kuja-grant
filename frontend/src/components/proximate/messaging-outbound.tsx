@@ -29,6 +29,19 @@ import {
   type ProximateMessageRow,
 } from './messaging-shared';
 
+// Map a provider error string to an operator-readable reason key. The raw
+// string stays available under "Technical details" (PFX-SEP02-MSG-003).
+function deliveryReasonKey(error: string): string {
+  const e = error.toLowerCase();
+  if (/not configured|no provider|no channel/.test(e)) return 'proximate.messaging.reason_not_configured';
+  if (/opt.?out|unsubscrib|blocked|blacklist/.test(e)) return 'proximate.messaging.reason_opted_out';
+  if (/\b(401|403)\b|auth|credential|unauthori[sz]ed|forbidden/.test(e)) return 'proximate.messaging.reason_auth';
+  if (/\b429\b|rate.?limit|too many/.test(e)) return 'proximate.messaging.reason_rate_limited';
+  if (/\b5\d\d\b|timeout|timed out|unavailable|unreachable|connection/.test(e)) return 'proximate.messaging.reason_unavailable';
+  if (/\b4\d\d\b|invalid|malformed|rejected|bad request|template/.test(e)) return 'proximate.messaging.reason_rejected';
+  return 'proximate.messaging.reason_failed';
+}
+
 export function MessagingOutbound({
   rows,
   configState,
@@ -68,6 +81,7 @@ export function MessagingOutbound({
     rows: gr,
     // Anything not delivered is the OB's problem — surface those groups first.
     stuck: gr.some((m) => m.status === 'unsent' || m.status === 'failed'),
+    stuckCount: gr.filter((m) => m.status === 'unsent' || m.status === 'failed').length,
     latest: gr.reduce(
       (mx, m) => Math.max(mx, m.created_at ? Date.parse(m.created_at) : 0),
       0,
@@ -80,11 +94,10 @@ export function MessagingOutbound({
   return (
     <div className="space-y-3">
       {groups.map((g) => (
-        <div
-          key={g.name}
-          className="prox-panel"
-          style={{ padding: 0, ...(g.stuck ? { borderColor: 'var(--prox-danger)' } : {}) }}
-        >
+        // Neutral panel even when delivery is stuck: red belongs on the failed
+        // badge, the reason and the count — not around a whole recipient
+        // (PFX-SEP02-MSG-004).
+        <div key={g.name} className="prox-panel" style={{ padding: 0 }}>
           <div
             className="flex items-center justify-between gap-3 px-4 py-2.5"
             style={{ borderBottom: '1px solid var(--prox-line)' }}
@@ -105,7 +118,7 @@ export function MessagingOutbound({
             </div>
             {g.stuck && (
               <span className="prox-pill danger shrink-0">
-                {t('proximate.messaging.review_delivery')}
+                {g.stuckCount} · {t('proximate.messaging.review_delivery')}
               </span>
             )}
           </div>
@@ -137,15 +150,13 @@ export function MessagingOutbound({
                           </span>
                         )}
                       </div>
-                      {m.body && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap" dir="auto">
-                          {m.body}
-                        </p>
-                      )}
+                      {/* Operator view: a plain-language reason. The provider's
+                          HTTP status, attempt count, tokenised links and the
+                          raw payload are engineering detail and live behind
+                          "Technical details" below (PFX-SEP02-MSG-003). */}
                       {m.error && (
-                        <p className="text-[11px]" style={{ color: 'var(--prox-danger)' }}>
-                          {m.error}
-                          {m.attempts > 0 && ` · ${m.attempts} ${t('proximate.messaging.attempts')}`}
+                        <p className="text-[12px] font-medium" style={{ color: 'var(--prox-danger)' }}>
+                          {t(deliveryReasonKey(m.error))}
                         </p>
                       )}
                       <div className="flex items-center gap-2.5 flex-wrap text-[11px] text-muted-foreground">
@@ -173,6 +184,30 @@ export function MessagingOutbound({
                     </div>
                     <MessageStatusChip status={m.status} label={statusLabel(m.status, t)} />
                   </div>
+                  {(m.error || m.body) && (
+                    <details className="mt-1.5 text-[11px]">
+                      <summary className="cursor-pointer select-none" style={{ color: 'var(--prox-muted)' }}>
+                        {t('proximate.messaging.technical_details')}
+                      </summary>
+                      <div
+                        className="mt-1.5 space-y-1 rounded-md px-2.5 py-2"
+                        style={{ background: 'var(--prox-inset, var(--prox-surface-2))' }}
+                      >
+                        {m.error && (
+                          <p className="prox-mono break-all" dir="ltr">{m.error}</p>
+                        )}
+                        <p style={{ color: 'var(--prox-muted)' }}>
+                          {m.attempts > 0 && `${m.attempts} ${t('proximate.messaging.attempts')} · `}
+                          {m.channel} · #{m.id}
+                        </p>
+                        {m.body && (
+                          <p className="whitespace-pre-wrap break-words" dir="auto" style={{ color: 'var(--prox-muted)' }}>
+                            {m.body}
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  )}
                 </div>
               );
             })}

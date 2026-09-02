@@ -13,7 +13,7 @@
 // broken pipeline shows up in the same table that measures copy quality.
 // ============================================================================
 
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ChevronRight } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { EmptyState } from './empty-state';
 import {
@@ -81,9 +81,73 @@ export function MessagingStats({
           }
         />
       ) : (
-        // Narrow screens scroll the table rather than the page — the
-        // console is used on phones in the field.
-        <div className="overflow-x-auto -mx-4 px-4">
+        <>
+        {/* Phone: an overview strip and one expandable row per template —
+            not a ten-column table squeezed into 375px (PFX-SEP02-MSG-004).
+            The table stays the right form for a desktop ledger. */}
+        <div className="md:hidden space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              [t('proximate.messaging.attempted'), totals.total, undefined],
+              [t('proximate.messaging.col_sent'), totals.sent, undefined],
+              [t('proximate.messaging.col_delivered'), totals.delivered, undefined],
+              [t('proximate.messaging.col_responded'), totals.responded, undefined],
+              [
+                t('proximate.messaging.require_attention'),
+                totals.unsent + totals.failed,
+                totals.unsent + totals.failed > 0 ? 'var(--prox-danger)' : undefined,
+              ],
+            ] as [string, number, string | undefined][]).map(([label, n, color]) => (
+              <div key={label} className="rounded-md px-3 py-2" style={{ background: 'var(--prox-inset, var(--prox-surface-2))' }}>
+                <div className="text-[11px]" style={{ color: 'var(--prox-muted)' }}>{label}</div>
+                <div className="prox-num text-lg font-bold" style={{ color: color ?? 'var(--prox-ink)' }}>{n}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="prox-eyebrow mb-1">{t('proximate.messaging.by_template')}</div>
+            <div style={{ borderTop: '1px solid var(--prox-line)' }}>
+              {stats.map((s) => {
+                const attention = s.unsent + s.failed;
+                return (
+                  <details key={s.template} className="group" style={{ borderBottom: '1px solid var(--prox-line)' }}>
+                    <summary className="list-none cursor-pointer flex items-center gap-2 py-2.5" style={{ minHeight: 44 }}>
+                      <span className="flex-1 min-w-0 text-sm font-medium line-clamp-2">
+                        {templateLabel(s.template, t)}
+                      </span>
+                      <span className="text-xs tabular-nums shrink-0" style={{ color: 'var(--prox-muted)' }}>
+                        {t('proximate.messaging.sent_of', { sent: s.sent, total: s.total })}
+                      </span>
+                      {attention > 0 && <span className="prox-pill danger shrink-0">{attention}</span>}
+                      <ChevronRight
+                        className="w-4 h-4 shrink-0 transition-transform group-open:rotate-90"
+                        style={{ color: 'var(--prox-muted)' }}
+                      />
+                    </summary>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 pb-3 text-xs">
+                      {([
+                        [t('proximate.messaging.col_delivered'), String(s.delivered)],
+                        [t('proximate.messaging.col_read'), String(s.read)],
+                        [t('proximate.messaging.col_responded'), String(s.responded)],
+                        [t('proximate.messaging.col_rate'), pct(s.response_rate)],
+                        [t('proximate.messaging.col_unsent'), String(s.unsent)],
+                        [t('proximate.messaging.col_failed'), String(s.failed)],
+                        [t('proximate.messaging.col_cost'), money(s.cost_usd)],
+                      ] as [string, string][]).map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-2">
+                          <dt style={{ color: 'var(--prox-muted)' }}>{k}</dt>
+                          <dd className="tabular-nums font-medium">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        {/* Wider screens scroll the table rather than the page. */}
+        <div className="overflow-x-auto -mx-4 px-4 hidden md:block">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-xs text-muted-foreground border-b border-border">
@@ -184,6 +248,7 @@ export function MessagingStats({
             </tfoot>
           </table>
         </div>
+        </>
       )}
     </div>
   );

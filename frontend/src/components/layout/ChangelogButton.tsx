@@ -3,13 +3,17 @@
 /**
  * ChangelogButton — Phase 13.16
  *
- * Sparkle button in the header. Red dot when there's an unread entry
+ * Bell button in the header. Red dot when there's an unread entry
  * (stored in localStorage by latest-seen ISO date). Click opens a
  * dialog with the curated RECENT_RELEASES list.
+ *
+ * It was a sparkle until the 2 Sep 2026 QA round: sitting next to the Ask AI
+ * sparkle it read as a second, ambiguous assistant control on a phone
+ * (PFX-SEP02-GLOBAL-002). "What's new" is product notification, so a bell.
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import { Bell, Sparkles, X } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { RECENT_RELEASES, type ChangelogEntry } from '@/lib/changelog';
 import { cn } from '@/lib/utils';
@@ -61,7 +65,7 @@ export function ChangelogButton() {
         className="relative rounded-md p-1.5 hover:bg-muted"
         aria-label={t('changelog.open')}
       >
-        <Sparkles className="h-4 w-4 text-[hsl(var(--kuja-spark))]" />
+        <Bell className="h-4 w-4 text-[hsl(var(--kuja-spark))]" />
         {hasUnread && (
           <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-[hsl(var(--kuja-flag))]" />
         )}

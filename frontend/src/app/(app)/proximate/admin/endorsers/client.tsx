@@ -16,10 +16,10 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Loader2, Check, X, Mail, MapPin } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/proximate/empty-state';
 import {
@@ -137,13 +137,29 @@ export function ProximateEndorserQueueClient() {
           </div>
         )}
         {rows !== null && rows.length === 0 && !loading && (
-          <Card>
+          // Compact, with somewhere to go next — an empty queue is a normal
+          // state, not a dead end (PFX-SEP02-ENDORSER-001).
+          <div className="prox-panel" style={{ padding: '4px 8px' }}>
             <EmptyState
               compact
               title={t('proximate.endorser_queue.empty_title')}
               hint={t('proximate.endorser_queue.empty_body')}
+              action={
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <Link
+                    href="/proximate/admin/partners"
+                    className="prox-btn ghost"
+                    style={{ height: 36, fontSize: 12.5, padding: '0 14px' }}
+                  >
+                    {t('proximate.endorser_queue.empty_view_partners')}
+                  </Link>
+                  <Link href="/proximate/admin" className="prox-link" style={{ fontSize: 12.5 }}>
+                    {t('proximate.endorser_queue.empty_back_dashboard')}
+                  </Link>
+                </div>
+              }
             />
-          </Card>
+          </div>
         )}
         {rows !== null && rows.length > 0 && (
           <ul className="space-y-3">

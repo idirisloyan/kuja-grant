@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { PageBack } from '@/components/layout/page-shell';
 
 interface PrefRow {
   category: string;
@@ -82,6 +83,18 @@ export default function NotificationSettingsPage() {
   // individual channels. Keeps the page short on mobile without
   // hiding whether a category is enabled.
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  // PFX-SEP02-SETTINGS-003: the page is long, so the save control must stay
+  // reachable and must say whether there is anything to save. Compare the
+  // current state against the last-saved snapshot instead of tracking every
+  // input individually.
+  const [savedSnapshot, setSavedSnapshot] = useState('');
+  const snapshotOf = (p: PrefsResponse | null, ph: string, wa: string) =>
+    JSON.stringify({
+      c: (p?.categories ?? []).map((c) => [c.category, [...c.channels].sort()]),
+      ph,
+      wa,
+    });
+  const dirty = prefs !== null && snapshotOf(prefs, phone, whatsapp) !== savedSnapshot;
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +106,7 @@ export default function NotificationSettingsPage() {
         const firstWa = d.categories.find(c => c.whatsapp_e164)?.whatsapp_e164 ?? '';
         setPhone(firstPhone);
         setWhatsapp(firstWa);
+        setSavedSnapshot(snapshotOf(d, firstPhone, firstWa));
       })
       .catch((e) => { if (!cancelled) setError((e as Error).message); });
     return () => { cancelled = true; };
@@ -126,6 +140,13 @@ export default function NotificationSettingsPage() {
       };
       const resp = await api.put<PrefsResponse>('/api/notification-preferences', body);
       setPrefs(resp);
+      // Re-read the contact numbers from the server's copy: it may normalise
+      // them, and the snapshot must match what is now actually stored.
+      const savedPhone = resp.categories.find(c => c.phone_e164)?.phone_e164 ?? '';
+      const savedWa = resp.categories.find(c => c.whatsapp_e164)?.whatsapp_e164 ?? '';
+      setPhone(savedPhone);
+      setWhatsapp(savedWa);
+      setSavedSnapshot(snapshotOf(resp, savedPhone, savedWa));
       setSavedAt(Date.now());
     } catch (e) {
       setError((e as Error).message);
@@ -171,6 +192,9 @@ export default function NotificationSettingsPage() {
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
+      {/* A sub-page must show its own way back; the sidebar was the only exit
+          (PFX-SEP02-SETTINGS-002). */}
+      <PageBack href="/settings" label={t('common.back_to_settings')} />
       <div>
         <div className="kuja-eyebrow">{t('notif_prefs.eyebrow')}</div>
         <h1 className="kuja-display text-3xl mt-1">{t('notif_prefs.title')}</h1>
@@ -300,8 +324,25 @@ export default function NotificationSettingsPage() {
         </div>
       </Card>
 
-      <div className="flex items-center justify-end gap-3">
-        {savedAt && (
+      {/* Sticky once there is something to save — the category list is long
+          and the control used to sit below it (PFX-SEP02-SETTINGS-003). The
+          state is spelled out (unsaved / saving / saved) so the reader never
+          has to guess whether a change landed. */}
+      <div
+        className={cn(
+          'flex items-center justify-end gap-3 flex-wrap',
+          // `prox-above-nav`: on the Proximate tenant a fixed tab bar owns the
+          // bottom 54px of a phone screen; the scoped rule lifts the bar
+          // above it (no-op on tenants without a bottom nav).
+          dirty && 'sticky bottom-0 z-10 -mx-4 px-4 py-3 border-t border-border bg-background/95 backdrop-blur prox-above-nav',
+        )}
+      >
+        {dirty && !saving && (
+          <span className="text-xs font-medium text-[hsl(var(--kuja-sun))] me-auto">
+            {t('notif_prefs.unsaved_changes')}
+          </span>
+        )}
+        {savedAt && !dirty && (
           <span className="text-xs text-[hsl(var(--kuja-grow))]">
             <Check className="w-3 h-3 inline" /> {t('notif_prefs.saved')}
           </span>
@@ -311,11 +352,12 @@ export default function NotificationSettingsPage() {
         <button
           type="button"
           onClick={save}
-          disabled={saving}
-          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+          disabled={saving || !dirty}
+          className="inline-flex items-center gap-1.5 rounded-md bg-[hsl(var(--kuja-clay))] px-4 text-sm font-semibold text-white hover:bg-[hsl(var(--kuja-clay-dark))] disabled:opacity-50"
+          style={{ minHeight: 40 }}
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          {t('notif_prefs.save_preferences')}
+          {t('notif_prefs.save_changes')}
         </button>
       </div>
     </div>

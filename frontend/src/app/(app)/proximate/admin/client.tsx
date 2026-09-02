@@ -189,8 +189,27 @@ export function ProximateAdminClient() {
     <div className="space-y-6">
       {head}
 
-      {/* DECISION STRIP */}
-      <div className="grid gap-3.5 md:grid-cols-3">
+      {/* DECISION STRIP — three cards from md up. Below md each card took a
+          full viewport row before the pipeline was even visible
+          (PFX-SEP02-DASH-002), so on a phone the same three decisions render
+          as one compact "Needs action" list: label · count · chevron, colour
+          only where the count means something. */}
+      <div className="md:hidden prox-panel overflow-hidden">
+        <div className="prox-phead">
+          <h2>{t('proximate.admin.needs_action')}</h2>
+        </div>
+        {decisions.map((d, i) => (
+          <Link key={i} href={d.href} className="prox-qrow" style={i === 0 ? { borderTop: 0 } : undefined}>
+            <div style={{ minWidth: 0 }}>
+              <strong>{d.kind}</strong>
+              <small>{d.pill.tx}</small>
+            </div>
+            <span className={`prox-pill ${d.count > 0 ? d.tone : 'slate'}`}>{d.count}</span>
+            <ArrowRight className="h-4 w-4" style={{ color: 'var(--prox-muted)' }} />
+          </Link>
+        ))}
+      </div>
+      <div className="hidden md:grid gap-3.5 md:grid-cols-3">
         {decisions.map((d, i) => (
           <Link key={i} href={d.href} className={`prox-decision ${d.tone}`}>
             <span className="kind">{d.kind}</span>
@@ -238,8 +257,11 @@ export function ProximateAdminClient() {
         </div>
       </div>
 
-      {/* QUEUE + AUDIT */}
-      <div className="grid gap-4 items-start" style={{ gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)' }}>
+      {/* QUEUE + AUDIT — side by side from md up; ONE full-width column below
+          it. The inline two-column template applied at every width and left
+          "Needs attention" and the audit chain sharing a phone screen in two
+          narrow columns (PFX-SEP02-DASH-001). */}
+      <div className="grid gap-4 items-start md:[grid-template-columns:minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="prox-panel">
           <div className="prox-phead">
             <h2>{t('proximate.admin.needs_attention')}</h2>
@@ -272,10 +294,14 @@ export function ProximateAdminClient() {
           <div style={{ padding: '6px 18px 12px' }}>
             {data.recent_audit.length === 0 ? (
               <p className="text-[12.5px] py-3" style={{ color: 'var(--prox-muted)' }}>{t('proximate.admin.no_activity')}</p>
-            ) : auditGroups.slice(0, 6).map((row) => {
+            ) : auditGroups.slice(0, 6).map((row, i) => {
               const tone = auditTone(row.action);
+              // Six groups on a desktop column; a phone shows the latest three
+              // and "View all" carries the rest (PFX-SEP02-DASH-001). The
+              // scoped helper, not `max-md:hidden`: the tenant-scoped
+              // `.prox-aitem{display:grid}` rule outranks a bare utility.
               return (
-                <div key={row.seq} className={`prox-aitem ${tone}`}>
+                <div key={row.seq} className={`prox-aitem ${tone}${i >= 3 ? ' prox-desktop-only' : ''}`}>
                   <div className="node"><span className="d" /><span className="l" /></div>
                   <div>
                     <p>{row.count > 1 ? `${row.count} × ` : ''}{labelForProximateAction(row.action, t)}</p>

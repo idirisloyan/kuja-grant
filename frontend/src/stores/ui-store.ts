@@ -50,6 +50,28 @@ interface UIState {
 
   /** Toggle low-bandwidth mode + persist to localStorage. */
   toggleLowBandwidth: () => void;
+
+  /** Whether QA/UAT/fixture records are shown in registers. ONE flag for
+   *  every module (rounds, grants, partners, messages, disbursements) so
+   *  "Show test data" means the same thing everywhere and survives
+   *  navigation — the 2 Sep QA round found three independent, unpersisted
+   *  per-page toggles and two registers with no separation at all
+   *  (PFX-SEP02-GLOBAL-004). Classification itself lives in
+   *  lib/test-records.ts. Persists. */
+  showTestData: boolean;
+
+  /** Toggle test-data visibility + persist to localStorage. */
+  toggleShowTestData: () => void;
+}
+
+const TEST_DATA_KEY = 'kuja.showTestData';
+function readShowTestData(): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return localStorage.getItem(TEST_DATA_KEY) === '1'; } catch { return false; }
+}
+function writeShowTestData(value: boolean) {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(TEST_DATA_KEY, value ? '1' : '0'); } catch { /* ignore */ }
 }
 
 // Read the persisted low-bandwidth preference on initial state setup
@@ -88,6 +110,14 @@ export const useUIStore = create<UIState>((set) => ({
   aiPanelOpen: false,
   lowBandwidth: readLowBandwidth(),
   langOverride: readLangOverride(),
+  showTestData: readShowTestData(),
+
+  toggleShowTestData: () =>
+    set((s) => {
+      const next = !s.showTestData;
+      writeShowTestData(next);
+      return { showTestData: next };
+    }),
 
   setLangOverride: (lang) => {
     writeLangOverride(lang);

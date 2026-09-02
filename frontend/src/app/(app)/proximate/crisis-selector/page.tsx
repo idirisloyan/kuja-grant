@@ -326,14 +326,22 @@ export default function CrisisSelectorPage() {
                       style={{ padding: '10px 12px' }}
                       aria-expanded={open}
                     >
+                      {/* Stacked, not one line: status · type · place on top,
+                          the description on its own lines, date and Review
+                          last (PFX-SEP02-CRISIS-002). */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`prox-pill ${sig.status === 'pending' ? 'warn' : sig.status === 'triaged' ? 'good' : 'slate'}`}>
                           {labelForProximateStatus(sig.status, t)}
                         </span>
-                        <span className="prox-mono text-xs" style={{ color: 'var(--prox-muted)' }}>{sig.country}</span>
-                        {sig.event_type && <span className="text-xs text-muted-foreground">· {sig.event_type}</span>}
-                        <span className="text-xs flex-1 line-clamp-1 min-w-0">{sig.description}</span>
-                        <span className="text-[11px] inline-flex items-center gap-1 whitespace-nowrap" style={{ color: 'var(--prox-accent)', fontWeight: 600 }}>
+                        {sig.event_type && <span className="text-xs font-medium">{sig.event_type}</span>}
+                        <span className="prox-mono text-xs" style={{ color: 'var(--prox-muted)' }}>· {sig.country}</span>
+                      </div>
+                      <p className="text-sm mt-1.5 line-clamp-2" dir="auto">{sig.description}</p>
+                      <div className="flex items-center justify-between gap-2 mt-1.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          {sig.submitted_at ? new Date(sig.submitted_at).toLocaleDateString() : ''}
+                        </span>
+                        <span className="text-[12px] inline-flex items-center gap-1 whitespace-nowrap" style={{ color: 'var(--prox-accent)', fontWeight: 600 }}>
                           {t('proximate.crisis_signal.review')}
                           <ArrowRight className={`w-3 h-3 rtl:rotate-180 transition-transform ${open ? 'rotate-90' : ''}`} />
                         </span>

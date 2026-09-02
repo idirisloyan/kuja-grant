@@ -3092,7 +3092,7 @@ def main():
         # ------------------------------------------------------------------
         global current_cat
 
-        for cat_name, tests in categories:
+        for cat_idx, (cat_name, tests) in enumerate(categories):
             print(f"\n{'-' * 60}")
             print(f"  {cat_name}")
             print(f"{'-' * 60}")
@@ -3110,6 +3110,17 @@ def main():
             context = browser.new_context(
                 viewport={"width": 1280, "height": 800},
                 service_workers="block",
+                # One client IP per category. The endpoint rate limiter in
+                # app/middleware.py keys on X-Forwarded-For (Railway sets it)
+                # and caps AI generations at 40/min PER IP; the whole suite
+                # ran from 127.0.0.1, so 32.7 ("reviewer dashboard: no 429
+                # noise") shared a 60 s window with every AI call the
+                # preceding categories made as OTHER users and failed on
+                # timing alone (2026-09-02). On production each user has
+                # their own IP; this mirrors that. 32.7 still asserts the
+                # real property: one reviewer's dashboard load stays under
+                # the cap.
+                extra_http_headers={"X-Forwarded-For": f"10.99.{cat_idx}.1"},
             )
             # The onboarding tour (components/onboarding/tour-provider.tsx) fires
             # on /dashboard whenever localStorage lacks
@@ -3132,10 +3143,22 @@ def main():
             ctx = {"base": base, "csp_errors": [], "js_errors": []}
             setup_console_listeners(page, ctx)
 
-            for test_name, test_fn in tests:
+            for test_idx, (test_name, test_fn) in enumerate(tests):
                 # Clear CSP/JS errors per test
                 ctx["csp_errors"] = []
                 ctx["js_errors"] = []
+                # One client IP per TEST, not just per category. Each test
+                # signs in as its own user, and on production each user has
+                # their own IP; here every test in a category shared one
+                # limiter bucket, so 32.7 ("reviewer dashboard: no 429
+                # noise") failed on the quiet 2026-09-02 run once platform
+                # admins started reaching the real admin dashboard (its AI
+                # cards added 55 calls to the same 60 s windows). 32.7 still
+                # asserts the real property — one reviewer's own dashboard
+                # load stays under the 40/min AI cap.
+                context.set_extra_http_headers(
+                    {"X-Forwarded-For": f"10.99.{cat_idx}.{test_idx + 1}"},
+                )
                 run(test_name, test_fn, page, ctx)
 
             context.close()

@@ -603,3 +603,27 @@ button { word-break: keep-all; overflow-wrap: anywhere; }
   display: none !important;
   visibility: hidden !important;
 }
+
+/* PFX-SEP02 — responsive visibility helpers for Proximate-scoped elements.
+   Tailwind's `hidden` / `max-md:hidden` utilities carry specificity (0,1,0)
+   and LOSE to the tenant-scoped component rules above — e.g.
+   `[data-tenant="proximate"] .prox-aitem{display:grid}` is (0,2,0) — so a
+   `.prox-aitem.max-md:hidden` still rendered on phones (found in the 2 Sep
+   QA verification). These helpers carry the same scope and win. Use them,
+   not the bare utilities, on any `.prox-*` element that sets `display`. */
+@media (max-width: 767.98px){
+  [data-tenant="proximate"] .prox-desktop-only{ display:none !important; }
+}
+@media (min-width: 768px){
+  [data-tenant="proximate"] .prox-mobile-only{ display:none !important; }
+}
+
+/* PFX-SEP02-SETTINGS-003 — a sticky control that must stay above the OB's
+   fixed bottom tab bar on phones (components/proximate/bottom-nav.tsx:
+   54px + the safe-area inset, rendered only below `sm` and only for the OB
+   persona — hence gated on the nav's presence, not just the tenant). */
+@media (max-width: 639.98px){
+  [data-tenant="proximate"]:has(nav[aria-label="Primary"]) .prox-above-nav{
+    bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+}

@@ -7,7 +7,7 @@
  * Donor view: only their own grants (scoped server-side).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileText, Loader2, Plus, DollarSign } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -17,6 +17,9 @@ import { EmptyState } from '@/components/proximate/empty-state';
 import { LoadError } from '@/components/proximate/load-error';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
+import { TestDataToggle } from '@/components/proximate/test-data-toggle';
+import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { useUIStore } from '@/stores/ui-store';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
@@ -66,11 +69,22 @@ export default function ProximateGrantsListPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const totalCommitted = grants.reduce(
+  // System-wide test-data classification (PFX-SEP02-GLOBAL-004). A grant
+  // inherits fixture status from its donor: the repeated "Sudan Rapid Shelter
+  // Support 2026" rows QA saw were UAT-donor copies of one real agreement.
+  // The funding overview sums the SAME set the register shows, so fixture
+  // money never inflates the fund's real position.
+  const showTest = useUIStore((s) => s.showTestData);
+  const { real: realGrants, test: testGrants } = useMemo(
+    () => splitTestRecords(grants, (g) => [g.title, g.donor_name]),
+    [grants],
+  );
+  const shown = showTest ? grants : realGrants;
+  const totalCommitted = shown.reduce(
     (a, g) => a + (g.amount_committed_usd || 0), 0,
   );
-  const totalAllocated = grants.reduce((a, g) => a + g.amount_allocated_usd, 0);
-  const totalRemaining = grants.reduce((a, g) => a + g.amount_remaining_usd, 0);
+  const totalAllocated = shown.reduce((a, g) => a + g.amount_allocated_usd, 0);
+  const totalRemaining = shown.reduce((a, g) => a + g.amount_remaining_usd, 0);
 
   return (
     <PageShell>
@@ -95,12 +109,44 @@ export default function ProximateGrantsListPage() {
           <div className="space-y-4">
             {/* Rollup — compact stat row (Stage 4): summary strip, not
                 oversized cards, matching the partners register. */}
-            {grants.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {/* Phone: one compact overview instead of 2+1 tiles with an empty
+                fourth cell (PFX-SEP02-GRANTS-001). The three tiles stay from
+                sm up. */}
+            {shown.length > 0 && (
+              <div className="prox-panel sm:hidden" style={{ padding: '12px 14px' }}>
+                <div className="prox-eyebrow">{t('proximate.grants.overview_title')}</div>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {([
+                    [t('proximate.grants.committed'), totalCommitted],
+                    [t('proximate.grants.allocated'), totalAllocated],
+                    [t('proximate.grants.uncommitted'), totalRemaining],
+                  ] as [string, number][]).map(([label, v]) => (
+                    <div key={label} className="min-w-0">
+                      <div className="text-[11px] truncate" style={{ color: 'var(--prox-muted)' }}>{label}</div>
+                      <div className="prox-num font-bold" style={{ fontSize: 16 }}>{fmtUsd(v)}</div>
+                    </div>
+                  ))}
+                </div>
+                {totalCommitted > 0 && (
+                  <>
+                    <div className="prox-bar" style={{ marginTop: 10 }}>
+                      <i style={{ width: `${Math.min(100, (totalAllocated / totalCommitted) * 100)}%` }} />
+                    </div>
+                    <div className="text-[11px] mt-1" style={{ color: 'var(--prox-muted)' }}>
+                      {t('proximate.grants.pct_of_committed', { pct: ((totalAllocated / totalCommitted) * 100).toFixed(0) })}
+                      {' · '}
+                      {t('proximate.grants.across_n', { n: shown.length })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {shown.length > 0 && (
+              <div className="hidden sm:grid sm:grid-cols-3 gap-2.5">
                 <div className="prox-stat">
                   <div className="lab"><DollarSign className="w-3.5 h-3.5" /> {t('proximate.grants.committed')}</div>
                   <div className="val prox-num">{fmtUsd(totalCommitted)}</div>
-                  <div className="meta">{t('proximate.grants.across_n', { n: grants.length })}</div>
+                  <div className="meta">{t('proximate.grants.across_n', { n: shown.length })}</div>
                 </div>
                 <div className="prox-stat">
                   <div className="lab"><DollarSign className="w-3.5 h-3.5" /> {t('proximate.grants.allocated_to_rounds')}</div>
@@ -119,12 +165,14 @@ export default function ProximateGrantsListPage() {
               </div>
             )}
 
+            <TestDataToggle count={testGrants.length} />
+
             {/* Grant list */}
             <div className="prox-panel overflow-hidden">
               <div className="prox-phead">
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FileText className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />
-                  {t('proximate.grants.register_n', { n: grants.length })}
+                  {t('proximate.grants.register_n', { n: shown.length })}
                 </h2>
                 {isOb && (
                   <Link
@@ -137,7 +185,7 @@ export default function ProximateGrantsListPage() {
                   </Link>
                 )}
               </div>
-              {grants.length === 0 && (
+              {shown.length === 0 && (
                 <div style={{ padding: '18px' }}>
                   <EmptyState
                     compact
@@ -149,7 +197,7 @@ export default function ProximateGrantsListPage() {
                   />
                 </div>
               )}
-              {grants.map((g, i) => {
+              {shown.map((g, i) => {
                 const pctAllocated =
                   g.amount_committed_usd
                     ? Math.min(100, (g.amount_allocated_usd / g.amount_committed_usd) * 100)
@@ -163,8 +211,13 @@ export default function ProximateGrantsListPage() {
                   >
                     <div className="flex items-start justify-between flex-wrap gap-2" style={{ marginBottom: 11 }}>
                       <div className="flex-1 min-w-0">
-                        <p className="truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
+                        <p className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
                           {g.title}
+                          {isTestRecord(g.title, g.donor_name) && (
+                            <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>
+                              {t('common.test_record')}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs truncate" style={{ color: 'var(--prox-muted)' }}>
                           {g.donor_name || t('proximate.grants.donor_tbd')}
