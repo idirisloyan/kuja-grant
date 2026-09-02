@@ -3857,6 +3857,13 @@
   "ai_telemetry.label_code": "kood:",
   "ai_telemetry.label_model": "model:",
   "audit_chain.page_title": "Diiwaanka hantidhawrka silsilad-hash ah",
+  "audit_label.proximate.message.sent_manually": "Fariinta gacanta ayaa lagu diray",
+  "audit_label.proximate.message.retried": "Fariinta dib ayaa loo isku dayay",
+  "audit_chain.test_event": "Diiwaan tijaabo",
+  "audit_chain.integrity_unknown": "Sugnaanta silsiladda: lama hubin karin",
+  "audit_chain.integrity_checking": "Sugnaanta silsiladda: la hubinayaa…",
+  "audit_chain.integrity_breaks": "Sugnaanta silsiladda: {n} jabis",
+  "audit_chain.integrity_healthy": "Sugnaanta silsiladda: caafimaad qabta",
   "audit_chain.system_run": "Socodka nidaamka",
   "audit_chain.collapse_group": "Laab",
   "audit_chain.expand_n": "Fidi {n} dhacdo",
@@ -4536,5 +4543,9 @@
   "proximate.messaging.by_template": "Qaab ahaan",
   "proximate.messaging.sent_of": "{sent}/{total} la diray",
   "proximate.grants.overview_title": "Guudmar maalgelinta",
-  "proximate.grants.back_to_register": "Ku noqo deeqaha"
+  "proximate.grants.back_to_register": "Ku noqo deeqaha",
+  "proximate.messaging.retry": "Isku day mar kale",
+  "proximate.messaging.mark_sent_manually": "Calaamadee inay gacanta lagu diray",
+  "proximate.messaging.retry_done": "Dib ayaa loo isku dayay — eeg xaaladda cusub",
+  "proximate.messaging.marked_sent": "Waxaa loo calaamadeeyey in gacanta lagu diray"
 }

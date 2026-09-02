@@ -3857,6 +3857,13 @@
   "ai_telemetry.label_code": "código:",
   "ai_telemetry.label_model": "modelo:",
   "audit_chain.page_title": "Registro de auditoría encadenado por hash",
+  "audit_label.proximate.message.sent_manually": "Mensaje enviado manualmente",
+  "audit_label.proximate.message.retried": "Mensaje reintentado",
+  "audit_chain.test_event": "Registro de prueba",
+  "audit_chain.integrity_unknown": "Integridad de la cadena: no se pudo comprobar",
+  "audit_chain.integrity_checking": "Integridad de la cadena: comprobando…",
+  "audit_chain.integrity_breaks": "Integridad de la cadena: {n} roturas",
+  "audit_chain.integrity_healthy": "Integridad de la cadena: correcta",
   "audit_chain.system_run": "Ejecución del sistema",
   "audit_chain.collapse_group": "Contraer",
   "audit_chain.expand_n": "Expandir {n} eventos",
@@ -4536,5 +4543,9 @@
   "proximate.messaging.by_template": "Por plantilla",
   "proximate.messaging.sent_of": "{sent}/{total} enviados",
   "proximate.grants.overview_title": "Resumen de financiación",
-  "proximate.grants.back_to_register": "Volver a las subvenciones"
+  "proximate.grants.back_to_register": "Volver a las subvenciones",
+  "proximate.messaging.retry": "Reintentar",
+  "proximate.messaging.mark_sent_manually": "Marcar como enviado manualmente",
+  "proximate.messaging.retry_done": "Reintentado — vea el nuevo estado",
+  "proximate.messaging.marked_sent": "Marcado como enviado manualmente"
 }

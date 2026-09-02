@@ -572,6 +572,88 @@ def api_mark_message_handled(message_id):
     return jsonify({'success': True, 'message': msg.to_dict()})
 
 
+_WENT_OUT = ('sent', 'delivered', 'read', 'responded')
+
+
+@proximate_messaging_bp.route('/messages/<int:message_id>/retry',
+                              methods=['POST'])
+@ob_required
+def api_retry_message(message_id):
+    """Re-run the transport ladder for an outbound message that did not go
+    out (2 Sep 2026 QA, MSG-003 [Retry]). Same path the cron sweep uses.
+    With no provider configured the row stays 'unsent' and the reason says
+    so — an honest no-op, not a fake success."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    msg = ProximateMessage.query.filter_by(
+        id=message_id, network_id=net.id,
+    ).first()
+    if not msg:
+        return jsonify({'success': False, 'error': 'Message not found'}), 404
+    if msg.direction != 'out':
+        return jsonify({'success': False, 'error': 'Only outbound messages can be retried'}), 400
+    if msg.status in _WENT_OUT:
+        return jsonify({'success': False, 'error': 'Message already went out'}), 409
+
+    from app.services.proximate_messaging import ProximateMessaging
+    before = msg.status
+    ProximateMessaging.retry(msg)
+    db.session.commit()
+
+    _audit(
+        'proximate.message.retried',
+        actor=current_user.email,
+        subject_kind='proximate_message',
+        subject_id=msg.id,
+        details={
+            'from_status': before, 'to_status': msg.status,
+            'attempts': msg.attempts, 'channel': msg.channel,
+        },
+    )
+    return jsonify({'success': True, 'message': msg.to_dict()})
+
+
+@proximate_messaging_bp.route('/messages/<int:message_id>/sent-manually',
+                              methods=['POST'])
+@ob_required
+def api_mark_message_sent_manually(message_id):
+    """The OB delivered the text by hand (their own phone, a wa.me copy) —
+    record that so the log stops listing it as undelivered (MSG-003 [Send
+    manually]). No provider call; the audit row carries who, when and the
+    optional note."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    msg = ProximateMessage.query.filter_by(
+        id=message_id, network_id=net.id,
+    ).first()
+    if not msg:
+        return jsonify({'success': False, 'error': 'Message not found'}), 404
+    if msg.direction != 'out':
+        return jsonify({'success': False, 'error': 'Only outbound messages can be marked'}), 400
+    if msg.status in _WENT_OUT:
+        return jsonify({'success': False, 'error': 'Message already went out'}), 409
+
+    payload = request.get_json(silent=True) or {}
+    note = (payload.get('note') or '').strip()[:500]
+    msg.status = 'sent'
+    msg.channel = 'manual'
+    msg.sent_at = datetime.now(timezone.utc)
+    msg.error = None
+    msg.next_attempt_at = None
+    db.session.commit()
+
+    _audit(
+        'proximate.message.sent_manually',
+        actor=current_user.email,
+        subject_kind='proximate_message',
+        subject_id=msg.id,
+        details={'note': note, 'attempts': msg.attempts},
+    )
+    return jsonify({'success': True, 'message': msg.to_dict()})
+
+
 @proximate_messaging_bp.route('/messages/reply', methods=['POST'])
 @ob_required
 def api_reply():

@@ -412,9 +412,11 @@ export function ProximateGrantDetailClient() {
                                 style={{ background: 'var(--prox-surface)', border: '1px solid var(--prox-line-2)' }}
                                 autoFocus
                               />
+                              {/* Secondary: "Submit to donor" in the report editor is
+                                  this page's one filled action (PFX-SEP02-GLOBAL-001). */}
                               <button
                                 onClick={() => saveProgress(d.index)}
-                                className="prox-btn primary"
+                                className="prox-btn ghost"
                                 style={{ height: 28, fontSize: 12, padding: '0 10px' }}
                               >
                                 {t('common.save')}

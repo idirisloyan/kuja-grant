@@ -29,7 +29,7 @@ import { useOrigin } from '@/components/proximate/token-page-support';
 import { ProximateAttachmentsPanel } from '@/components/proximate/dd-evidence';
 import { Button } from '@/components/ui/button';
 import {
-  PageShell, PageHeader, PageMain,
+  PageBack, PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 
 interface ReportPayload {
@@ -330,6 +330,9 @@ export function ProximateDisbursementDetailClient() {
 
   return (
     <PageShell>
+      {/* Return path at the top as a plain link — navigation, not an action
+          (PFX-SEP02-GLOBAL-001 / NAV-001). */}
+      <PageBack href="/proximate/disbursements" label={t('proximate.disbursements.back_to_list')} />
       <PageHeader
         title={data.partner_name || `Partner #${data.partner_id}`}
         subtitle={data.purpose || undefined}
@@ -731,7 +734,9 @@ export function ProximateDisbursementDetailClient() {
                   style={{ background: 'var(--prox-surface)', borderColor: 'var(--prox-line)', color: 'var(--prox-ink)' }}
                   placeholder={t('proximate.disbursement.ack_placeholder')}
                 />
-                <Button size="sm" onClick={sendAck} disabled={ackSending || !ackText.trim()}>
+                {/* Secondary: the verdict (Verify) is this page's primary while a
+                    report awaits it (PFX-SEP02-GLOBAL-001). */}
+                <Button size="sm" variant="outline" onClick={sendAck} disabled={ackSending || !ackText.trim()}>
                   {ackSending ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : null}
                   {t('proximate.disbursement.ack_send')}
                 </Button>
@@ -930,6 +935,7 @@ export function ProximateDisbursementDetailClient() {
                     />
                     <Button
                       size="sm"
+                      variant="outline"
                       className="mt-2"
                       onClick={sendOutcomeAck}
                       disabled={outcomeActing || !outcomeAckText.trim()}
@@ -978,14 +984,6 @@ export function ProximateDisbursementDetailClient() {
           )}
         </div>
 
-        <div>
-          <Link href="/proximate/disbursements">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="w-3.5 h-3.5 me-1" />
-              {t('proximate.disbursements.back_to_list')}
-            </Button>
-          </Link>
-        </div>
       </PageMain>
     </PageShell>
   );

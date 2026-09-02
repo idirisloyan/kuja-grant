@@ -14,8 +14,9 @@
 // is a compact row (preview + muted meta) rather than a full-height card.
 // ============================================================================
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, SendHorizontal } from 'lucide-react';
+import { CheckCheck, ExternalLink, Loader2, RotateCcw, SendHorizontal } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { isTestRecord } from '@/lib/test-records';
 import { EmptyState } from './empty-state';
@@ -42,14 +43,35 @@ function deliveryReasonKey(error: string): string {
   return 'proximate.messaging.reason_failed';
 }
 
+const STUCK = new Set(['unsent', 'failed', 'queued']);
+
 export function MessagingOutbound({
   rows,
   configState,
+  onRetry,
+  onSentManually,
 }: {
   rows: ProximateMessageRow[];
   configState: MessagingConfigState;
+  /** Re-run the transport ladder for one stuck row (MSG-003 [Retry]). */
+  onRetry?: (m: ProximateMessageRow) => Promise<void>;
+  /** The OB delivered it by hand — record that (MSG-003 [Send manually]). */
+  onSentManually?: (m: ProximateMessageRow) => Promise<void>;
 }) {
   const { t, formatDate } = useTranslation();
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [rowError, setRowError] = useState<Record<number, string>>({});
+  const runRowAction = async (m: ProximateMessageRow, fn: (m: ProximateMessageRow) => Promise<void>) => {
+    setBusyId(m.id);
+    setRowError((e) => ({ ...e, [m.id]: '' }));
+    try {
+      await fn(m);
+    } catch (err) {
+      setRowError((e) => ({ ...e, [m.id]: err instanceof Error ? err.message : t('proximate.messaging.load_failed') }));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (rows.length === 0) {
     return (
@@ -207,6 +229,43 @@ export function MessagingOutbound({
                         )}
                       </div>
                     </details>
+                  )}
+                  {/* Operator actions for a row that did not go out
+                      (PFX-SEP02-MSG-003): Retry re-runs the same transport
+                      ladder; Mark as sent manually records a by-hand
+                      delivery. Both write an audit entry server-side. */}
+                  {STUCK.has(m.status) && (onRetry || onSentManually) && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      {onRetry && (
+                        <button
+                          type="button"
+                          className="prox-btn ghost"
+                          style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+                          disabled={busyId === m.id}
+                          onClick={() => runRowAction(m, onRetry)}
+                        >
+                          {busyId === m.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <RotateCcw className="w-3.5 h-3.5" />}
+                          {t('proximate.messaging.retry')}
+                        </button>
+                      )}
+                      {onSentManually && (
+                        <button
+                          type="button"
+                          className="prox-btn ghost"
+                          style={{ height: 30, fontSize: 12, padding: '0 10px' }}
+                          disabled={busyId === m.id}
+                          onClick={() => runRowAction(m, onSentManually)}
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          {t('proximate.messaging.mark_sent_manually')}
+                        </button>
+                      )}
+                      {rowError[m.id] && (
+                        <span className="text-[11px]" style={{ color: 'var(--prox-danger)' }}>{rowError[m.id]}</span>
+                      )}
+                    </div>
                   )}
                 </div>
               );

@@ -3857,6 +3857,13 @@
   "ai_telemetry.label_code": "code :",
   "ai_telemetry.label_model": "modèle :",
   "audit_chain.page_title": "Journal d'audit en chaîne de hachage",
+  "audit_label.proximate.message.sent_manually": "Message envoyé manuellement",
+  "audit_label.proximate.message.retried": "Message renvoyé",
+  "audit_chain.test_event": "Enregistrement de test",
+  "audit_chain.integrity_unknown": "Intégrité de la chaîne : vérification impossible",
+  "audit_chain.integrity_checking": "Intégrité de la chaîne : vérification…",
+  "audit_chain.integrity_breaks": "Intégrité de la chaîne : {n} ruptures",
+  "audit_chain.integrity_healthy": "Intégrité de la chaîne : saine",
   "audit_chain.system_run": "Exécution système",
   "audit_chain.collapse_group": "Réduire",
   "audit_chain.expand_n": "Développer {n} événements",
@@ -4536,5 +4543,9 @@
   "proximate.messaging.by_template": "Par modèle",
   "proximate.messaging.sent_of": "{sent}/{total} envoyés",
   "proximate.grants.overview_title": "Aperçu du financement",
-  "proximate.grants.back_to_register": "Retour aux subventions"
+  "proximate.grants.back_to_register": "Retour aux subventions",
+  "proximate.messaging.retry": "Réessayer",
+  "proximate.messaging.mark_sent_manually": "Marquer comme envoyé manuellement",
+  "proximate.messaging.retry_done": "Nouvel essai effectué — voir le nouveau statut",
+  "proximate.messaging.marked_sent": "Marqué comme envoyé manuellement"
 }

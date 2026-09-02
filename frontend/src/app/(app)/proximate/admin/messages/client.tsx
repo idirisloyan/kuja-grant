@@ -154,6 +154,18 @@ export function ProximateMessagesClient() {
     return res.message || null;
   };
 
+  // PFX-SEP02-MSG-003 — the two operator actions on a stuck outbound row.
+  // Both endpoints refuse rows that already went out and write an audit
+  // entry; the list refreshes so the chip shows the real new status.
+  const retryMessage = async (msg: ProximateMessageRow) => {
+    await api.post(`/api/proximate/messages/${msg.id}/retry`);
+    await refresh();
+  };
+  const markSentManually = async (msg: ProximateMessageRow) => {
+    await api.post(`/api/proximate/messages/${msg.id}/sent-manually`);
+    await refresh();
+  };
+
   const markHandled = async (msg: ProximateMessageRow) => {
     const res = await api.post<{ message?: ProximateMessageRow }>(
       `/api/proximate/messages/${msg.id}/handled`,
@@ -270,7 +282,12 @@ export function ProximateMessagesClient() {
                 />
               )}
               {tab === 'outbound' && (
-                <MessagingOutbound rows={outboundRows} configState={configState} />
+                <MessagingOutbound
+                  rows={outboundRows}
+                  configState={configState}
+                  onRetry={retryMessage}
+                  onSentManually={markSentManually}
+                />
               )}
               {tab === 'delivery' && (
                 <MessagingStats

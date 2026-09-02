@@ -224,6 +224,14 @@ class ProximateMessaging:
             mins = BACKOFF_MINUTES[min(msg.attempts - 1, len(BACKOFF_MINUTES) - 1)]
             msg.next_attempt_at = datetime.now(timezone.utc) + timedelta(minutes=mins)
 
+    @classmethod
+    def retry(cls, msg: ProximateMessage) -> None:
+        """One more pass down the same transport ladder, on demand (the
+        OB's [Retry] on a failed row, 2 Sep 2026 QA MSG-003). Deliberately
+        the same code path as the cron sweep so a manual retry can never be
+        a second, different kind of send. Mutates; caller commits."""
+        cls._attempt(msg)
+
     # ---------------- retry sweep (cron) ----------------
 
     @classmethod

@@ -171,6 +171,60 @@ class AuditChainEntry(db.Model):
         return None
 
     @classmethod
+    def verify_tenant(cls, network_id: int) -> dict:
+        """Tenant-scoped integrity result for the Oversight Body (2 Sep 2026
+        QA, AUDIT-002 "Chain integrity: Healthy").
+
+        The chain is ONE global sequence (per-tenant chains would invalidate
+        every existing anchor — see append()), so an honest per-tenant answer
+        has two parts: (1) every one of THIS tenant's entries still hashes to
+        its recorded payload_hash — its content is untampered; (2) the global
+        linkage (prev_hash / seq) walks clean — nothing was removed or
+        reordered around them. Only the tenant's own seqs are reported; a
+        linkage break elsewhere surfaces as a count, never as another
+        tenant's row.
+        """
+        rows = cls.query.order_by(cls.seq.asc()).all()
+        payload_breaks: list[dict] = []
+        link_breaks = 0
+        checked = 0
+        prev = None
+        for r in rows:
+            if prev is not None and (
+                r.prev_hash != prev.payload_hash or r.seq != prev.seq + 1
+            ):
+                link_breaks += 1
+            if r.network_id == network_id:
+                checked += 1
+                try:
+                    details = json.loads(r.details_json or '{}')
+                except Exception:
+                    details = {}
+                payload = {
+                    'seq': r.seq,
+                    'prev_hash': r.prev_hash,
+                    'action': r.action,
+                    'actor_email': r.actor_email,
+                    'subject_kind': r.subject_kind,
+                    'subject_id': r.subject_id,
+                    'details': details,
+                }
+                recomputed = hashlib.sha256(
+                    cls._canonical(payload).encode('utf-8')
+                ).hexdigest()
+                if recomputed != r.payload_hash:
+                    payload_breaks.append({'seq': r.seq, 'kind': 'payload_hash_mismatch'})
+            prev = r
+        return {
+            'ok': not payload_breaks and link_breaks == 0,
+            'total_checked': checked,
+            'breaks': payload_breaks,
+            'chain_ok': link_breaks == 0,
+            'chain_break_count': link_breaks,
+            'chain_length': len(rows),
+        }
+
+    @classmethod
     def verify(cls, *, limit: int | None = None) -> dict:
         """Walk the chain, return {ok, total, breaks: [{seq, kind, ...}]}.
 

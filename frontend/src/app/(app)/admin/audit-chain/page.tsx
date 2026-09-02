@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
+import { isTestRecord } from '@/lib/test-records';
 
 /**
  * Phase 61 — map an audit chain row's subject_kind to its detail page
@@ -64,7 +65,13 @@ interface VerifyResult {
   ok: boolean;
   total_checked: number;
   breaks: { seq: number; kind: string; expected?: string; got?: string }[];
-  limit: number | null;
+  limit?: number | null;
+  // Tenant-scoped verify (Proximate): the global linkage walked clean, and
+  // how many linkage breaks exist anywhere (count only — never another
+  // tenant's rows).
+  chain_ok?: boolean;
+  chain_break_count?: number;
+  chain_length?: number;
 }
 
 interface ChainEntry {
@@ -140,6 +147,18 @@ function isSystemActor(email: string | null): boolean {
   return !email || /system|cron|scheduler|bot|noreply|no-reply/i.test(email);
 }
 
+// PFX-SEP02-GLOBAL-004 "audit where appropriate": the chain is never
+// filtered by a name heuristic — hiding evidence from the oversight body is
+// the wrong kind of tidy — but an event whose details name a fixture
+// record is BADGED, so a cron nudge to "QA Fixture Partner" reads as what
+// it is. Only rows that carry a name can be classified; the rest stay
+// unbadged, which claims nothing.
+const NAME_KEYS = ['partner_name', 'name', 'title', 'grant_title', 'screened_name', 'recipient_name', 'round_title'];
+function entryIsTest(e: ChainEntry): boolean {
+  const d = e.details || {};
+  return isTestRecord(...NAME_KEYS.map((k) => (typeof d[k] === 'string' ? (d[k] as string) : null)));
+}
+
 export default function AuditChainPage() {
   // QA 2026-07-10: on the Proximate tenant the OB reaches its own
   // tenant-scoped chain at /api/proximate/audit-chain (read + jsonl export);
@@ -213,12 +232,13 @@ export default function AuditChainPage() {
 
   const loadVerify = async () => {
     const gen = loadGen.current;
-    // Proximate has no cryptographic verify endpoint — skip it (calling the
-    // platform one would 403 the OB and show a fake error).
-    if (isProx) { setVerifyLoading(false); return; }
+    // Proximate gets its tenant-scoped check (every Proximate entry re-hashed
+    // + the global linkage walked; AuditChainEntry.verify_tenant). The
+    // platform endpoint is admin-only and would 403 the OB.
+    const verifyUrl = isProx ? '/api/proximate/audit-chain/verify' : '/api/audit-chain/verify';
     setVerifyLoading(true);
     try {
-      const r = await api.get<VerifyResult>('/api/audit-chain/verify');
+      const r = await api.get<VerifyResult>(verifyUrl);
       if (gen !== loadGen.current) return;
       setVerify(r);
     } catch (e) {
@@ -331,7 +351,18 @@ export default function AuditChainPage() {
           subtitle={isProx ? undefined : t('audit_chain.page_subtitle')}
           meta={isProx && recent ? [
             { label: t('audit_chain.entries_count', { n: recent.total.toLocaleString() }) },
-            { label: t('audit_chain.tenant_chain_eyebrow') },
+            {
+              icon: verifyLoading || !verify ? undefined : (verify.ok ? ShieldCheck : ShieldAlert),
+              label: verifyLoading
+                ? t('audit_chain.integrity_checking')
+                : verify
+                  ? (verify.ok
+                    ? t('audit_chain.integrity_healthy')
+                    : t('audit_chain.integrity_breaks', {
+                      n: verify.breaks.length + (verify.chain_break_count ?? 0),
+                    }))
+                  : t('audit_chain.integrity_unknown'),
+            },
           ] : undefined}
           // Export control renders only once an authorized data load has
           // succeeded (recent !== null), so it never flashes for a user the
@@ -360,9 +391,30 @@ export default function AuditChainPage() {
             {t('audit_chain.how_it_works')}
             <ChevronRight className="w-4 h-4 ms-auto text-muted-foreground transition-transform group-open:rotate-90" />
           </summary>
-          <p className="px-4 pb-4 text-xs text-[hsl(var(--kuja-ink-soft))]">
+          <p className="px-4 pb-3 text-xs text-[hsl(var(--kuja-ink-soft))]">
             {t('audit_chain.tenant_chain_desc')}
           </p>
+          <div className="px-4 pb-4 flex items-center gap-3 flex-wrap text-xs">
+            {verify && (
+              <span className={verify.ok ? 'text-[hsl(var(--kuja-grow))]' : 'text-[hsl(var(--kuja-flag))]'}>
+                {verify.ok
+                  ? t('audit_chain.intact_rows', { n: verify.total_checked.toLocaleString() })
+                  : t('audit_chain.breaks_detected', {
+                    breaks: verify.breaks.length + (verify.chain_break_count ?? 0),
+                    rows: verify.total_checked,
+                  })}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={loadVerify}
+              disabled={verifyLoading}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[hsl(var(--border))] px-3 py-1.5 font-semibold hover:bg-[hsl(var(--kuja-sand-50))] disabled:opacity-50"
+            >
+              {verifyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {t('audit_chain.re_verify')}
+            </button>
+          </div>
         </details>
       ) : (
       <Card className={cn(
@@ -550,6 +602,11 @@ export default function AuditChainPage() {
                     <td className="py-2 font-mono text-[hsl(var(--kuja-ink-soft))]">{e.seq}</td>
                     <td className={cn('py-2 font-semibold', actionTone(e.action))}>
                       {actionLabel(e.action, t)}
+                      {entryIsTest(e) && (
+                        <Badge variant="outline" className="ms-2 text-[9px] uppercase tracking-wide font-normal">
+                          {t('audit_chain.test_event')}
+                        </Badge>
+                      )}
                     </td>
                     <td className="py-2">
                       {e.actor_email ? (
@@ -686,6 +743,11 @@ export default function AuditChainPage() {
                     <div className="flex items-center justify-between gap-2">
                       <span className={cn('text-sm font-semibold', actionTone(e.action))}>
                         {actionLabel(e.action, t)}
+                        {entryIsTest(e) && (
+                          <Badge variant="outline" className="ms-2 text-[9px] uppercase tracking-wide font-normal">
+                            {t('audit_chain.test_event')}
+                          </Badge>
+                        )}
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[hsl(var(--kuja-ink-soft))] shrink-0">
                         #{e.seq}

@@ -742,9 +742,11 @@ export default function ProximateEndorseWizardClient() {
                       rows={3}
                     />
                     <div className="flex gap-2">
+                      {/* Destructive, so red — not the page's orange primary
+                          (PFX-SEP02-GLOBAL-001 button hierarchy). */}
                       <Button
                         type="button"
-                        variant="default"
+                        variant="destructive"
                         size="sm"
                         onClick={handleSuspend}
                         disabled={adminBusy || !suspendReason.trim()}
@@ -975,22 +977,27 @@ function QuestionRow({
         <p className="text-sm font-medium">{text}</p>
       </div>
       <div className="flex gap-2 ps-7">
+        {/* Selected state is a neutral filled toggle, not the orange primary:
+            the one primary on this tab is the Submit button
+            (PFX-SEP02-GLOBAL-001). */}
         <Button
           type="button"
-          variant={value === true ? 'default' : 'outline'}
+          variant={value === true ? 'secondary' : 'outline'}
           size="sm"
           onClick={() => onChange(true)}
           className="flex-1"
+          aria-pressed={value === true}
         >
           <Check className="w-4 h-4 me-1" />
           {yesLabel}
         </Button>
         <Button
           type="button"
-          variant={value === false ? 'default' : 'outline'}
+          variant={value === false ? 'secondary' : 'outline'}
           size="sm"
           onClick={() => onChange(false)}
           className="flex-1"
+          aria-pressed={value === false}
         >
           <X className="w-4 h-4 me-1" />
           {noLabel}

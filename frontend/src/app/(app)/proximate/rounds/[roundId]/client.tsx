@@ -598,7 +598,7 @@ export function ProximateRoundDetailClient() {
                           });
                         }, 50);
                       }}
-                      className="text-[11px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 shrink-0"
+                      className="text-[11px] inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border bg-background hover:bg-muted shrink-0"
                     >
                       {bottleneck <= 1
                         ? (t('proximate.rounds.journey_start_endorsements') || 'Start endorsements')
@@ -665,11 +665,16 @@ export function ProximateRoundDetailClient() {
             <div className="prox-panel space-y-3" style={{ padding: '16px 18px' }}>
               <p className="text-sm font-medium">{t('proximate.rounds.actions')}</p>
 
+              {/* PFX-SEP02-GLOBAL-001: the stage banner's "What's next" CTA is
+                  the page's ONE filled primary; the same actions here are
+                  secondary so the page never shows two orange buttons for
+                  one decision. */}
               {round.status === 'draft' && (
                 <Button
                   onClick={() => callAction('submit')}
                   disabled={busy}
                   size="sm"
+                  variant="outline"
                 >
                   {busy && <Loader2 className="w-3.5 h-3.5 animate-spin me-1" />}
                   {t('proximate.rounds.submit_for_review')}
@@ -682,6 +687,7 @@ export function ProximateRoundDetailClient() {
                     onClick={() => callAction('sign', { declared_no_coi: true })}
                     disabled={busy}
                     size="sm"
+                    variant="outline"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 me-1" />
                     {t('proximate.rounds.sign_no_coi')}
@@ -1022,7 +1028,7 @@ export function ProximateRoundDetailClient() {
                     <button
                       type="button"
                       onClick={openAddPartner}
-                      className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                      className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border bg-background text-foreground hover:bg-muted"
                     >
                       <UserPlus className="w-3 h-3" />
                       {t('proximate.rounds.add_partner')}
@@ -1093,7 +1099,7 @@ export function ProximateRoundDetailClient() {
                         <button
                           type="button"
                           onClick={() => openInviteEndorser(p.partner_id, p.partner_name || `Partner #${p.partner_id}`)}
-                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+                          className="text-[10px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border bg-background text-foreground hover:bg-muted"
                         >
                           {t('proximate.rounds.invite_endorser')}
                         </button>
@@ -1233,7 +1239,7 @@ export function ProximateRoundDetailClient() {
                               type="button"
                               disabled={addingId === p.id}
                               onClick={() => addPartnerToRound(p.id)}
-                              className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                              className="text-[11px] inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border bg-background text-foreground hover:bg-muted disabled:opacity-50"
                             >
                               {addingId === p.id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />

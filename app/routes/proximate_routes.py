@@ -7048,6 +7048,24 @@ def api_issue_endorser_portal_link(endorser_id):
 # Proximate auditor walks only Proximate's rows. Read-only.
 
 
+@proximate_bp.route('/audit-chain/verify', methods=['GET'])
+@login_required
+def api_proximate_audit_chain_verify():
+    """Tenant-scoped integrity check for the Oversight Body (2 Sep 2026 QA,
+    AUDIT-002 "Chain integrity: Healthy"). Same gate as the chain read
+    below. See AuditChainEntry.verify_tenant for what "ok" means on a
+    global chain: every Proximate entry re-hashes to its recorded hash AND
+    the global linkage walks clean. Only this tenant's seqs are reported."""
+    net, err = _require_proximate_tenant()
+    if err:
+        return err
+    gate = _proximate_ob_or_403(net)
+    if gate:
+        return gate
+    from app.models import AuditChainEntry
+    return jsonify({'success': True, **AuditChainEntry.verify_tenant(net.id)})
+
+
 @proximate_bp.route('/audit-chain', methods=['GET'])
 @login_required
 def api_proximate_audit_chain():

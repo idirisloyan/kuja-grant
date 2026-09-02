@@ -3857,6 +3857,13 @@
   "ai_telemetry.label_code": "msimbo:",
   "ai_telemetry.label_model": "modeli:",
   "audit_chain.page_title": "Kumbukumbu ya ukaguzi iliyofungwa kwa heshi",
+  "audit_label.proximate.message.sent_manually": "Ujumbe umetumwa kwa mkono",
+  "audit_label.proximate.message.retried": "Ujumbe umejaribiwa tena",
+  "audit_chain.test_event": "Rekodi ya majaribio",
+  "audit_chain.integrity_unknown": "Uadilifu wa mnyororo: haikuweza kukaguliwa",
+  "audit_chain.integrity_checking": "Uadilifu wa mnyororo: inakaguliwa…",
+  "audit_chain.integrity_breaks": "Uadilifu wa mnyororo: mivunjiko {n}",
+  "audit_chain.integrity_healthy": "Uadilifu wa mnyororo: mzima",
   "audit_chain.system_run": "Uendeshaji wa mfumo",
   "audit_chain.collapse_group": "Kunja",
   "audit_chain.expand_n": "Panua matukio {n}",
@@ -4536,5 +4543,9 @@
   "proximate.messaging.by_template": "Kwa kiolezo",
   "proximate.messaging.sent_of": "{sent}/{total} zimetumwa",
   "proximate.grants.overview_title": "Muhtasari wa ufadhili",
-  "proximate.grants.back_to_register": "Rudi kwenye ruzuku"
+  "proximate.grants.back_to_register": "Rudi kwenye ruzuku",
+  "proximate.messaging.retry": "Jaribu tena",
+  "proximate.messaging.mark_sent_manually": "Weka alama kuwa imetumwa kwa mkono",
+  "proximate.messaging.retry_done": "Imejaribiwa tena — angalia hali mpya",
+  "proximate.messaging.marked_sent": "Imewekwa alama kuwa imetumwa kwa mkono"
 }
