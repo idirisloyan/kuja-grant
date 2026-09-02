@@ -13,6 +13,7 @@ import {
   Target, Sparkles,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import {
@@ -142,14 +143,6 @@ function fmtUsd(v: number | null | undefined): string {
 }
 
 // Report status → design-system pill tone (sky→acc, emerald→good, rose→danger).
-const reportStatusTone: Record<string, string> = {
-  pending: 'slate',
-  drafting: 'warn',
-  submitted: 'acc',
-  accepted: 'good',
-  // PF-UX-008: a requested revision needs action but is not a risk → amber.
-  revision_requested: 'warn',
-};
 
 export function ProximateGrantDetailClient() {
   // Phase 725 — useParams() returns the pre-generated static stub ('0')
@@ -575,7 +568,7 @@ export function ProximateGrantDetailClient() {
                           onEdit={openEditor}
                         />
                       )}
-                      <span className={`prox-pill ${reportStatusTone[r.status] || 'slate'}`}>
+                      <span className={`prox-pill ${proxPillForStatus(r.status)}`}>
                         {enumLabel('prox_grant.report_status', r.status)}
                       </span>
                     </li>
@@ -684,7 +677,7 @@ export function ProximateGrantDetailClient() {
                               {avg !== null ? t('prox_grant.re_score') : t('prox_grant.score_with_ai')}
                             </button>
                           )}
-                          <span className={`prox-pill ${reportStatusTone[r.status] || 'slate'}`}>
+                          <span className={`prox-pill ${proxPillForStatus(r.status)}`}>
                             {enumLabel('prox_grant.report_status', r.status)}
                           </span>
                         </div>

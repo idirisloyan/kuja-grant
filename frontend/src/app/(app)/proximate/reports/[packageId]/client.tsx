@@ -20,6 +20,7 @@ import {
 import { api } from '@/lib/api';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 interface BudgetLine { label: string; amount: number }
@@ -60,16 +61,6 @@ interface PkgView {
   error?: string;
 }
 
-// Package status → design-system pill tone.
-const STATUS_PILL: Record<string, string> = {
-  draft: 'slate',
-  submitted: 'warn',
-  // PF-UX-008: "changes requested" is a routine revision ask, not a risk —
-  // amber (attention), not red. Matches status-badge.tsx (changes_requested
-  // = 'attention'). Red is reserved for true risk.
-  changes_requested: 'warn',
-  published: 'good',
-};
 
 export function ProximateReportPackageClient() {
   const { t } = useTranslation();
@@ -191,7 +182,7 @@ export function ProximateReportPackageClient() {
           </h1>
           <p className="text-xs" style={{ color: 'var(--prox-muted)' }}>{data.round?.title}</p>
         </div>
-        <span className={`prox-pill ${STATUS_PILL[pkg.status] || 'slate'}`}>
+        <span className={`prox-pill ${proxPillForStatus(pkg.status)}`}>
           {labelForProximateStatus(pkg.status, t) || pkg.status.replace(/_/g, ' ')}
         </span>
         <a href={`/api/proximate/report-packages/${pkg.id}/pdf`}

@@ -26,6 +26,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -86,16 +87,8 @@ const CONTRACT_STATUSES = [
 ];
 
 // Panel decision → design-system pill tone.
-const DECISION_PILL: Record<string, string> = {
-  awarded: 'good', not_awarded: 'slate', pending: 'warn',
-  clarification: 'warn', deferred: 'slate',
-};
 
 // Contract lifecycle → pill tone.
-const CONTRACT_PILL: Record<string, string> = {
-  drafting: 'slate', sent: 'warn', partner_signed: 'acc',
-  adeso_signed: 'acc', completed: 'good', void: 'danger',
-};
 
 function usd(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—';
@@ -310,7 +303,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
             {!a.decision_is_attributable && a.decision === 'awarded' && (
               <AlertTriangle className="w-4 h-4" style={{ color: 'var(--prox-warn)' }} />
             )}
-            <span className={`prox-pill ${DECISION_PILL[a.decision] || 'slate'}`}>
+            <span className={`prox-pill ${proxPillForStatus(a.decision)}`}>
               {(() => { const d = DECISIONS.find((x) => x.key === a.decision);
                 if (d) return t(d.k) || d.label;
                 return a.decision === 'pending'
@@ -405,7 +398,7 @@ function AwardRow({ a, canEdit, open, onToggle, onChanged }: {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`prox-pill ${CONTRACT_PILL[a.contract.status] || 'slate'}`}>{a.contract.status}</span>
+                    <span className={`prox-pill ${proxPillForStatus(a.contract.status)}`}>{a.contract.status}</span>
                     {a.contract.pandadoc_url && (
                       <a
                         href={a.contract.pandadoc_url}

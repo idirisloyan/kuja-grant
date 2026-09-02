@@ -23,7 +23,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { toneForProximateStatus } from '@/components/proximate/status-badge';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { NextStep, disbursementNextStep } from '@/components/proximate/next-step';
 import { useOrigin } from '@/components/proximate/token-page-support';
 import { ProximateAttachmentsPanel } from '@/components/proximate/dd-evidence';
@@ -111,9 +111,6 @@ interface OutcomeAttestation {
 
 // Redesign — map the shared Proximate status tone to a design-system
 // pill tone (own leading dot; good|warn|danger|slate|acc).
-const PILL_TONE: Record<string, string> = {
-  positive: 'good', attention: 'warn', critical: 'danger', active: 'acc', neutral: 'slate',
-};
 
 export function ProximateDisbursementDetailClient() {
   const { t } = useTranslation();
@@ -776,7 +773,7 @@ export function ProximateDisbursementDetailClient() {
                   )}
                 </p>
               </div>
-              <span className={`prox-pill ${PILL_TONE[toneForProximateStatus(data.outcome.status)] || 'slate'}`}>
+              <span className={`prox-pill ${proxPillForStatus(data.outcome.status)}`}>
                 {t(`proximate.outcome.status_${data.outcome.status}`)}
               </span>
             </div>

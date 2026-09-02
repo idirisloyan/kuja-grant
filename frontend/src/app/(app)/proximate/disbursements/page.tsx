@@ -15,6 +15,7 @@ import { Loader2, Plus, Copy, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatComplianceDate } from '@/lib/format-date';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -27,10 +28,6 @@ import {
 } from '@/components/layout/page-shell';
 
 // Disbursement status → design-system pill tone.
-const DISB_PILL: Record<string, string> = {
-  draft: 'slate', pending_cosign: 'warn', disbursed: 'acc', pending_report: 'warn',
-  reported: 'warn', verified: 'good', flagged: 'danger',
-};
 
 interface Disbursement {
   id: number;
@@ -195,7 +192,7 @@ export default function ProximateDisbursementsPage() {
             </strong>
             {/* One workflow badge per row; lateness is supporting text below,
                 not a competing pill (PF-UX-005 / PF-MOB-017). */}
-            <span className={`prox-pill ${DISB_PILL[d.status] || 'slate'}`}>
+            <span className={`prox-pill ${proxPillForStatus(d.status)}`}>
               {labelForProximateStatus(d.status, t)}
             </span>
             {showTest && isTestRecord(d.partner_name) && (

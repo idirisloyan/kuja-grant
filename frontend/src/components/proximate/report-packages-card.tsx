@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useOrigin } from '@/components/proximate/token-page-support';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -23,14 +24,6 @@ interface Pkg {
   status: string; package_token: string; item_count: number;
 }
 interface Participant { partner_id: number; partner_name: string | null; stage: string }
-
-const STATUS_PILL: Record<string, string> = {
-  draft: 'slate',
-  submitted: 'warn',
-  // PF-UX-008: routine revision ask → amber, not red (red is for true risk).
-  changes_requested: 'warn',
-  published: 'good',
-};
 
 export function ReportPackagesCard({
   roundId, participants, isOperator,
@@ -102,7 +95,7 @@ export function ReportPackagesCard({
               </span>
               {pkg ? (
                 <>
-                  <span className={`prox-pill ${STATUS_PILL[pkg.status] || 'slate'}`}>
+                  <span className={`prox-pill ${proxPillForStatus(pkg.status)}`}>
                     {labelForProximateStatus(pkg.status) || pkg.status}
                     {pkg.item_count > 0 && ` · ${pkg.item_count} items`}
                   </span>

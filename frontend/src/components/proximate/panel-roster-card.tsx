@@ -22,6 +22,7 @@ import {
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/hooks/use-translation';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 
 interface Member {
   id: number;
@@ -68,10 +69,6 @@ const STATUS_LABEL: Record<string, { en: string; k: string }> = {
 };
 
 // Member lifecycle → design-system pill tone.
-const MEMBER_PILL: Record<string, string> = {
-  candidate: 'slate', dd_in_progress: 'warn', dd_passed: 'good',
-  dd_failed: 'danger', confirmed: 'good', stood_down: 'slate',
-};
 
 // DD verdict → pill tone.
 const VERDICT_PILL: Record<string, string> = {
@@ -240,7 +237,7 @@ function MemberRow({ m, canEdit, open, onToggle, onChanged }: {
               {m.network_represented && <span>· {m.network_represented}</span>}
             </p>
           </div>
-          <span className={`prox-pill ${MEMBER_PILL[m.status] || 'slate'} whitespace-nowrap`}>
+          <span className={`prox-pill ${proxPillForStatus(m.status)} whitespace-nowrap`}>
             {STATUS_LABEL[m.status]
               ? (t(STATUS_LABEL[m.status].k) || STATUS_LABEL[m.status].en)
               : m.status}

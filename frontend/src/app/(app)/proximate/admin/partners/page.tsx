@@ -19,16 +19,13 @@ import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 
 // Partner workflow status → design-system pill tone.
-const PARTNER_PILL: Record<string, string> = {
-  nominated: 'slate', endorsements_open: 'warn', dd_pending: 'warn',
-  dd_clear: 'good', suspended: 'danger',
-};
 
 interface Partner {
   id: number;
@@ -454,7 +451,7 @@ export default function ProximatePartnersPage() {
                       {p.sanctions_flag && (
                         <span className="prox-pill danger">{t('proximate.partners.sanctions_flag_badge')}</span>
                       )}
-                      <span className={`prox-pill ${PARTNER_PILL[p.status] || 'slate'}`}>
+                      <span className={`prox-pill ${proxPillForStatus(p.status)}`}>
                         {labelForProximateStatus(p.status, t)}
                       </span>
                     </div>

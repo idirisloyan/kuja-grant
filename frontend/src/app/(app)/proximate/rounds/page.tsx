@@ -14,6 +14,7 @@ import { LoadError } from '@/components/proximate/load-error';
 import Link from 'next/link';
 import { Loader2, Plus, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -25,9 +26,6 @@ import {
 } from '@/components/layout/page-shell';
 
 // Round lifecycle → design-system pill tone.
-const ROUND_PILL: Record<string, string> = {
-  draft: 'slate', in_review: 'warn', active: 'good', closed: 'slate', cancelled: 'danger',
-};
 
 interface Round {
   id: number;
@@ -193,7 +191,7 @@ export default function ProximateRoundsPage() {
                     )}
                   </small>
                 </div>
-                <span className={`prox-pill ${ROUND_PILL[r.status] || 'slate'}`}>
+                <span className={`prox-pill ${proxPillForStatus(r.status)}`}>
                   {labelForProximateStatus(r.status, t)}
                 </span>
                 <ChevronRight className="w-4 h-4" style={{ color: 'var(--prox-muted)' }} />

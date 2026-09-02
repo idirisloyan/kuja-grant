@@ -23,6 +23,7 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { SelectionVoteCard } from '@/components/proximate/selection-vote-card';
 import { ReportPackagesCard } from '@/components/proximate/report-packages-card';
 import { ApprovedActivitiesCard } from '@/components/proximate/approved-activities-card';
@@ -130,9 +131,6 @@ const ROUND_TABS = [
 ];
 
 // Round lifecycle → design-system pill tone.
-const ROUND_PILL: Record<string, string> = {
-  draft: 'slate', in_review: 'warn', active: 'good', closed: 'slate', cancelled: 'danger',
-};
 
 export function ProximateRoundDetailClient() {
   const [tab, setTab] = useState('overview');
@@ -616,7 +614,7 @@ export function ProximateRoundDetailClient() {
           {/* Status + meta */}
           <div className="prox-panel" style={{ padding: '16px 18px' }}>
             <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 14 }}>
-              <span className={`prox-pill ${ROUND_PILL[round.status] || 'slate'}`}>
+              <span className={`prox-pill ${proxPillForStatus(round.status)}`}>
                 {labelForProximateStatus(round.status, t)}
               </span>
               {round.status === 'in_review' && (
@@ -1046,21 +1044,10 @@ export function ProximateRoundDetailClient() {
               )}
               <ul className="space-y-1.5">
                 {participants.map((p) => {
-                  const STAGE_TONE: Record<string, string> = {
-                    planned: 'slate',
-                    awarded: 'acc',
-                    endorsement_open: 'warn',
-                    endorsed: 'acc',
-                    bank_verified: 'acc',
-                    disbursed: 'good',
-                    reported: 'good',
-                    attested: 'good',
-                    verified: 'good',
-                    // PF-UX-008: a withdrawn participant is an inert end-state,
-                    // not a risk → neutral (slate), matching status-badge.tsx.
-                    withdrawn: 'slate',
-                  };
-                  const stageTone = STAGE_TONE[p.stage] || 'slate';
+                  // PF-UX-017: participant stage colours come from the one
+                  // shared status→pill system, so a stage reads the same colour
+                  // here as it does in the disbursement queue and elsewhere.
+                  const stageTone = proxPillForStatus(p.stage);
                   const partnerHref = `/proximate/admin?partner=${p.partner_id}`;
                   return (
                     <li

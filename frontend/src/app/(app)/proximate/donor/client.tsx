@@ -18,6 +18,7 @@ import { Loader2, ExternalLink, FileText, AlertTriangle, MessageCircle, Send, Sh
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
 import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
 import { DonorExplainer } from '@/components/proximate/donor-explainer';
@@ -103,12 +104,6 @@ function usd(n: number | null | undefined) {
 }
 
 // Map a Proximate status to a design-system pill tone.
-function statusPill(s: string): string {
-  if (/clear|verified|complete|closed|active|approved/.test(s)) return 'good';
-  if (/pending|review|report|draft|intake/.test(s)) return 'warn';
-  if (/flag|suspend|reject|block|expired/.test(s)) return 'danger';
-  return 'slate';
-}
 
 export function ProximateDonorClient() {
   const { t } = useTranslation();
@@ -358,7 +353,7 @@ export function ProximateDonorClient() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="kuja-display" style={{ fontSize: 16, fontWeight: 700 }}>{r.title}</h3>
-                    <span className={`prox-pill ${statusPill(r.status)}`}>
+                    <span className={`prox-pill ${proxPillForStatus(r.status)}`}>
                       {labelForProximateStatus(r.status, t)}
                     </span>
                   </div>
@@ -439,7 +434,7 @@ export function ProximateDonorClient() {
               {Object.keys(r.status_counts).length > 0 && (
                 <div className="flex gap-2 flex-wrap">
                   {Object.entries(r.status_counts).map(([s, n]) => (
-                    <span key={s} className={`prox-pill ${statusPill(s)}`}>
+                    <span key={s} className={`prox-pill ${proxPillForStatus(s)}`}>
                       {n} {labelForProximateStatus(s, t)}
                     </span>
                   ))}
@@ -528,7 +523,7 @@ function DonorGrants({ grants }: { grants: DonorGrant[] | null }) {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="kuja-display" style={{ fontSize: 16, fontWeight: 700 }}>{g.title}</h3>
-                <span className={`prox-pill ${statusPill(g.status)}`}>
+                <span className={`prox-pill ${proxPillForStatus(g.status)}`}>
                   {labelForProximateStatus(g.status, t)}
                 </span>
               </div>

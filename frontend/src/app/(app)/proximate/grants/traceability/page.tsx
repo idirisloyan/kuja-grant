@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
@@ -40,21 +41,6 @@ const money = (n: number | null | undefined) =>
   n == null ? '—' : `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 // Disbursement status → design-system pill tone.
-const STATUS_PILL: Record<string, string> = {
-  verified: 'good',
-  flagged: 'danger',
-  reported: 'acc',
-  pending_report: 'warn',
-  pending_cosign: 'warn',
-};
-
-// Heuristic tone for free-form statuses without an explicit mapping.
-function pillTone(s: string): string {
-  if (/active|open|current|verified|approved|complete|closed|confirmed/.test(s)) return 'good';
-  if (/pending|review|report|draft|cosign|due/.test(s)) return 'warn';
-  if (/flag|suspend|reject|block|overdue|breach/.test(s)) return 'danger';
-  return 'slate';
-}
 
 export default function TraceabilityPage() {
   const { t } = useTranslation();
@@ -126,7 +112,7 @@ export default function TraceabilityPage() {
                       {row.round.title}
                     </Link>
                     {row.round.status && (
-                      <span className={`prox-pill ${pillTone(row.round.status)}`}>{labelForProximateStatus(row.round.status, t)}</span>
+                      <span className={`prox-pill ${proxPillForStatus(row.round.status)}`}>{labelForProximateStatus(row.round.status, t)}</span>
                     )}
                   </div>
                   <p className="text-sm">
@@ -160,7 +146,7 @@ export default function TraceabilityPage() {
                             </td>
                             <td className="py-2 pe-3 prox-mono">{money(d.amount_usd)}</td>
                             <td className="py-2 pe-3">
-                              <span className={`prox-pill ${STATUS_PILL[d.status] || pillTone(d.status)}`}>
+                              <span className={`prox-pill ${proxPillForStatus(d.status)}`}>
                                 {labelForProximateStatus(d.status, t)}
                               </span>
                             </td>

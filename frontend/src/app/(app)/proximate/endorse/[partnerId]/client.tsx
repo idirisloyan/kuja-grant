@@ -39,7 +39,7 @@ import {
 } from '@/components/proximate/dd-evidence';
 import { PartnerJourney, NextStep } from '@/components/proximate/next-step';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
-import { toneForProximateStatus } from '@/components/proximate/status-badge';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -69,9 +69,6 @@ const PROX_DISPLAY = {
 } as const;
 
 // Canonical status→tone (status-badge.tsx) mapped to design-system pill tones.
-const DISB_PILL: Record<string, string> = {
-  positive: 'good', attention: 'warn', critical: 'danger', active: 'acc', neutral: 'slate',
-};
 
 interface PartnerDisbursement {
   id: number;
@@ -838,7 +835,7 @@ export default function ProximateEndorseWizardClient() {
                         <span className="text-sm font-medium prox-mono">
                           {d.amount_usd ? `$${d.amount_usd.toLocaleString()}` : '—'}
                         </span>
-                        <span className={`prox-pill ${DISB_PILL[toneForProximateStatus(d.status)]}`}>
+                        <span className={`prox-pill ${proxPillForStatus(d.status)}`}>
                           {labelForProximateStatus(d.status, t)}
                         </span>
                         <span className="text-xs truncate flex-1" style={{ color: 'var(--prox-muted)' }}>

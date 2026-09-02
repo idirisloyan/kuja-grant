@@ -16,17 +16,12 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { EmptyState } from '@/components/proximate/empty-state';
 import { LoadError } from '@/components/proximate/load-error';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
+import { proxPillForStatus } from '@/components/proximate/status-badge';
 import {
   PageShell, PageHeader, PageMain,
 } from '@/components/layout/page-shell';
 
 // Grant status → design-system pill tone (heuristic over free-form status).
-function grantPill(s: string): string {
-  if (/active|current|open|received|allocated/.test(s)) return 'good';
-  if (/pending|draft|review|due|reporting/.test(s)) return 'warn';
-  if (/flag|overdue|breach|suspend/.test(s)) return 'danger';
-  return 'slate';
-}
 
 interface Grant {
   id: number;
@@ -178,7 +173,7 @@ export default function ProximateGrantsListPage() {
                             : ''}
                         </p>
                       </div>
-                      <span className={`prox-pill ${grantPill(g.status)}`}>
+                      <span className={`prox-pill ${proxPillForStatus(g.status)}`}>
                         {labelForProximateStatus(g.status, t)}
                       </span>
                     </div>
