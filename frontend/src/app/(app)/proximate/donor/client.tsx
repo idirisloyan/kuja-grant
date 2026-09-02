@@ -19,6 +19,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { api } from '@/lib/api';
 import { labelForProximateStatus, labelForRoundType } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { computeFunnelTotals } from '@/components/proximate/donor-money-funnel';
 import { AssurancePackButton } from '@/components/proximate/donor-assurance-pack';
 import { DonorExplainer } from '@/components/proximate/donor-explainer';
@@ -343,8 +344,8 @@ export function ProximateDonorClient() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">{t('proximate.donor.rounds_title')}</h2>
         {rounds.length === 0 ? (
-          <div className="prox-panel text-center text-sm" style={{ padding: '24px', color: 'var(--prox-muted)' }}>
-            {t('proximate.donor.no_rounds')}
+          <div className="prox-panel">
+            <EmptyState compact icon={FileText} title={t('proximate.donor.no_rounds')} />
           </div>
         ) : (
           rounds.map((r) => (

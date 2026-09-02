@@ -20,6 +20,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { Button } from '@/components/ui/button';
 import {
   PageShell, PageHeader, PageMain,
@@ -418,10 +419,8 @@ export default function ProximatePartnersPage() {
 
             {/* Partner list */}
             {filtered.length === 0 ? (
-              <Card className="p-4">
-                <p className="text-sm text-muted-foreground italic py-8 text-center">
-                  {t('proximate.partners.no_match')}
-                </p>
+              <Card>
+                <EmptyState compact icon={Search} title={t('proximate.partners.no_match')} />
               </Card>
             ) : (
               <div className="prox-panel overflow-hidden">

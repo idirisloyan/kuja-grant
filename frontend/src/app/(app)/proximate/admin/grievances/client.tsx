@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import {
   Loader2, ShieldAlert, CheckCircle2, XCircle,
 } from 'lucide-react';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
@@ -145,8 +146,8 @@ export function ProximateGrievanceQueueClient() {
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : (rows || []).length === 0 ? (
-            <Card className="p-8 text-sm text-center text-muted-foreground">
-              {t('proximate.grievance_queue.empty')}
+            <Card>
+              <EmptyState compact icon={CheckCircle2} title={t('proximate.grievance_queue.empty')} />
             </Card>
           ) : (
             (rows || []).map((g) => (

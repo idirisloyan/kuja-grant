@@ -36,7 +36,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUIStore } from '@/stores/ui-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNetworkStore } from '@/stores/network-store';
@@ -107,6 +107,31 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname, setMobileSidebarOpen]);
+
+  // PF-MOB-005 — the mobile nav drawer behaves like a proper dialog: lock the
+  // background from scrolling while it is open, close on Escape, move focus to
+  // the close control on open, and restore focus to whatever opened it on
+  // close. (Left-anchored for now; an RTL side-swap belongs to the dedicated
+  // RTL pass.)
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
+  const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!sidebarMobileOpen) return;
+    drawerReturnFocusRef.current = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileSidebarOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusId = window.setTimeout(() => drawerCloseRef.current?.focus(), 0);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      window.clearTimeout(focusId);
+      drawerReturnFocusRef.current?.focus?.();
+    };
+  }, [sidebarMobileOpen, setMobileSidebarOpen]);
 
   // Phase 709 — when inside the Proximate tenant, ALWAYS use the
   // Proximate nav — no marketplace fallback. Prior logic fell through
@@ -256,21 +281,24 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
 
       {/* Mobile overlay */}
       {sidebarMobileOpen && (
-        <div
-          className="fixed inset-0 z-50 lg:hidden"
-          aria-label="Sidebar"
-        >
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-black/60 animate-drawer-backdrop"
             onClick={() => setMobileSidebarOpen(false)}
             aria-hidden
           />
-          <aside className="absolute top-0 left-0 bottom-0 w-72 shadow-2xl animate-slide-in-right">
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            className="absolute top-0 left-0 bottom-0 w-72 max-w-[85vw] shadow-2xl animate-drawer-left overflow-y-auto"
+          >
             <button
               type="button"
+              ref={drawerCloseRef}
               onClick={() => setMobileSidebarOpen(false)}
-              className="absolute top-3 right-3 z-10 rounded-md p-1 text-white/70 hover:text-white hover:bg-white/10"
-              aria-label="Close sidebar"
+              className="absolute top-3 right-3 z-10 rounded-md p-1 text-white/70 hover:text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              aria-label="Close navigation"
             >
               <X className="h-5 w-5" />
             </button>

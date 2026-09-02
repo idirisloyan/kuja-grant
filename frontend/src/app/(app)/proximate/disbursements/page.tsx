@@ -11,11 +11,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2, Plus, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, Copy, Check, Inbox } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatComplianceDate } from '@/lib/format-date';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { useAuthStore } from '@/stores/auth-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -262,10 +263,8 @@ export default function ProximateDisbursementsPage() {
           <LoadError error={loadError} onRetry={load} />
         )}
         {!loadError && rows !== null && rows.length === 0 && !loading && (
-          <Card className="p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              {t('proximate.disbursements.empty')}
-            </p>
+          <Card>
+            <EmptyState compact icon={Inbox} title={t('proximate.disbursements.empty')} />
           </Card>
         )}
         {!loadError && rows !== null && rows.length > 0 && (

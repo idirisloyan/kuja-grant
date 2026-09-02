@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Banknote, Plus, ArrowLeft } from 'lucide-react';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
@@ -61,12 +62,16 @@ export default function FspListPage() {
         {loading && <p className="text-sm text-muted-foreground">…</p>}
 
         {fsps && fsps.length === 0 && (
-          <div className="prox-panel text-center" style={{ padding: '28px 18px' }}>
-            <Banknote className="w-6 h-6 mx-auto mb-2" style={{ color: 'var(--prox-muted)' }} />
-            <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>{t('proximate.fsps.empty')}</p>
-            <Link href="/proximate/admin/fsps/new" className="prox-btn primary" style={{ height: 36, marginTop: 12 }}>
-              <Plus className="w-4 h-4" /> {t('proximate.fsps.register')}
-            </Link>
+          <div className="prox-panel">
+            <EmptyState
+              icon={Banknote}
+              title={t('proximate.fsps.empty')}
+              action={(
+                <Link href="/proximate/admin/fsps/new" className="prox-btn primary" style={{ height: 36 }}>
+                  <Plus className="w-4 h-4" /> {t('proximate.fsps.register')}
+                </Link>
+              )}
+            />
           </div>
         )}
 

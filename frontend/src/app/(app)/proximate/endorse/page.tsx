@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Users, Loader2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import {
@@ -101,16 +102,22 @@ export default function ProximateInboxPage() {
         )}
 
         {!loading && visible.length === 0 && (
-          <div className="prox-panel text-center space-y-3" style={{ padding: '24px' }}>
-            <p className="text-sm" style={{ color: 'var(--prox-muted)' }}>{t('proximate.inbox.empty')}</p>
-            <Link
-              href="/proximate/endorse/register"
-              className="inline-flex items-center gap-1.5 text-xs hover:underline"
-              style={{ color: 'var(--prox-accent)', fontWeight: 600 }}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              {t('proximate.inbox.become_endorser')}
-            </Link>
+          <div className="prox-panel">
+            <EmptyState
+              compact
+              icon={Users}
+              title={t('proximate.inbox.empty')}
+              action={(
+                <Link
+                  href="/proximate/endorse/register"
+                  className="inline-flex items-center gap-1.5 text-xs hover:underline"
+                  style={{ color: 'var(--prox-accent)', fontWeight: 600 }}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  {t('proximate.inbox.become_endorser')}
+                </Link>
+              )}
+            />
           </div>
         )}
 

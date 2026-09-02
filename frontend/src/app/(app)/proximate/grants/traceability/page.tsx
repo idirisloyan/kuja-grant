@@ -15,6 +15,7 @@ import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
+import { EmptyState } from '@/components/proximate/empty-state';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
 
@@ -97,9 +98,9 @@ export default function TraceabilityPage() {
             </div>
 
             {data.chain.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                {t('proximate.traceability.no_rounds')}
-              </p>
+              <div className="prox-panel">
+                <EmptyState compact icon={Link2} title={t('proximate.traceability.no_rounds')} />
+              </div>
             )}
 
             {/* Per-round → disbursements chain */}
