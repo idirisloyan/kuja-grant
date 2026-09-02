@@ -1056,7 +1056,9 @@ export function ProximateRoundDetailClient() {
                     reported: 'good',
                     attested: 'good',
                     verified: 'good',
-                    withdrawn: 'danger',
+                    // PF-UX-008: a withdrawn participant is an inert end-state,
+                    // not a risk → neutral (slate), matching status-badge.tsx.
+                    withdrawn: 'slate',
                   };
                   const stageTone = STAGE_TONE[p.stage] || 'slate';
                   const partnerHref = `/proximate/admin?partner=${p.partner_id}`;
