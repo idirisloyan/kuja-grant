@@ -121,7 +121,7 @@ export function PanelRosterCard({ roundId, canEdit }: { roundId: number; canEdit
           </div>
           {canEdit && (
             <button type="button" className="prox-btn primary" style={{ height: 34 }} onClick={() => setAdding(true)}>
-              <UserPlus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.add_member') || 'Add member'}
+              <UserPlus className="w-3.5 h-3.5 me-1.5" /> {t('proximate.cycle.add_member') || 'Add member'}
             </button>
           )}
         </div>

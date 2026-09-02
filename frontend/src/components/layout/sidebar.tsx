@@ -291,13 +291,13 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="absolute top-0 left-0 bottom-0 w-72 max-w-[85vw] shadow-2xl animate-drawer-left overflow-y-auto"
+            className="absolute top-0 start-0 bottom-0 w-72 max-w-[85vw] shadow-2xl animate-drawer-left overflow-y-auto"
           >
             <button
               type="button"
               ref={drawerCloseRef}
               onClick={() => setMobileSidebarOpen(false)}
-              className="absolute top-3 right-3 z-10 rounded-md p-1 text-white/70 hover:text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className="absolute top-3 end-3 z-10 rounded-md p-1 text-white/70 hover:text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               aria-label="Close navigation"
             >
               <X className="h-5 w-5" />

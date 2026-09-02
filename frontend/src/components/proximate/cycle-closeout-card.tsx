@@ -97,7 +97,7 @@ export function CycleCloseoutCard({ roundId }: { roundId: number }) {
                 `/api/proximate/rounds/${roundId}/closeout.pdf`;
             }}
           >
-            <Printer className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.download_pdf') || 'Download PDF'}
+            <Printer className="w-3.5 h-3.5 me-1.5" /> {t('proximate.cycle.download_pdf') || 'Download PDF'}
           </Button>
         </div>
       </div>

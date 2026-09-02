@@ -141,7 +141,7 @@ export function AwardRegisterCard({ roundId, canEdit }: { roundId: number; canEd
           </div>
           {canEdit && (
             <button type="button" className="prox-btn primary" style={{ height: 34 }} onClick={() => setAdding(true)}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.add_partner') || 'Add partner'}
+              <Plus className="w-3.5 h-3.5 me-1.5" /> {t('proximate.cycle.add_partner') || 'Add partner'}
             </button>
           )}
         </div>

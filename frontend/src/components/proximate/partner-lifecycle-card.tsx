@@ -166,7 +166,7 @@ export function PartnerLifecycleCard({ partnerId, roundId, canEdit }: {
                             s.fields.map((f) => [f.key, f.value || ''])));
                         }}
                       >
-                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.edit') || 'Edit'}
+                        <Pencil className="w-3.5 h-3.5 me-1.5" /> {t('proximate.cycle.edit') || 'Edit'}
                       </Button>
                     )}
                   </>

@@ -318,7 +318,7 @@ export default function ProximatePartnersPage() {
                   <span className="text-xs text-muted-foreground">{importNote}</span>
                 )}
                 <div className="relative flex-1 min-w-[180px]">
-                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="w-3.5 h-3.5 absolute start-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder={t('proximate.partners.filter_placeholder')}

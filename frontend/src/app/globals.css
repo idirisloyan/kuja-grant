@@ -295,6 +295,10 @@
    as a pop, not a drawer). Reduced-motion users get no animation. */
 @keyframes drawer-in-left { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 .animate-drawer-left { animation: drawer-in-left 0.26s cubic-bezier(0.4, 0, 0.2, 1) both; }
+/* RTL: the drawer anchors to the start edge (the right), so it slides in from
+   the right instead of the left. */
+@keyframes drawer-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+[dir="rtl"] .animate-drawer-left { animation-name: drawer-in-right; }
 @keyframes drawer-backdrop { from { opacity: 0; } to { opacity: 1; } }
 .animate-drawer-backdrop { animation: drawer-backdrop 0.26s ease both; }
 @media (prefers-reduced-motion: reduce) {

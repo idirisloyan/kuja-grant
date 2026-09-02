@@ -95,7 +95,7 @@ export function EvidenceInboxCard({ partnerId, roundId, canEdit }: {
           </div>
           {canEdit && (
             <Button size="sm" onClick={() => setAdding(true)}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> {t('proximate.cycle.log_something') || 'Log something'}
+              <Plus className="w-3.5 h-3.5 me-1.5" /> {t('proximate.cycle.log_something') || 'Log something'}
             </Button>
           )}
         </div>
@@ -328,7 +328,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
           <input
             type="file"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="mt-1 w-full text-sm file:mr-2 file:rounded-md file:border file:border-border file:bg-background file:px-2 file:py-1 file:text-xs"
+            className="mt-1 w-full text-sm file:me-2 file:rounded-md file:border file:border-border file:bg-background file:px-2 file:py-1 file:text-xs"
           />
         </label>
 
@@ -350,7 +350,7 @@ function AddEvidenceDialog({ partnerId, roundId, onClose, onAdded }: {
           <Button size="sm" variant="outline" onClick={onClose}>{t('proximate.cycle.cancel') || 'Cancel'}</Button>
           <Button size="sm" onClick={submit} disabled={busy || !summary.trim()}>
             {busy || uploading
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin me-1.5" />
                   {uploading ? (t('proximate.cycle.uploading') || 'Uploading…') : ''}</>
               : (t('proximate.cycle.log_it') || 'Log it')}
           </Button>
@@ -570,7 +570,7 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
                 {t('proximate.history.profile_events') === 'proximate.history.profile_events'
                   ? 'Partner profile' : t('proximate.history.profile_events')}
               </p>
-              <ul className="ml-0.5">
+              <ul className="ms-0.5">
                 {partnerTimeline.map((ev, i) => (
                   <TimelineRow key={`p-${i}`} ev={ev} t={t}
                     last={i === partnerTimeline.length - 1} />
@@ -596,7 +596,7 @@ export function PartnerHistoryCard({ partnerId }: { partnerId: number }) {
                 )}
               </div>
               {rd.timeline.length > 0 ? (
-                <ul className="ml-0.5">
+                <ul className="ms-0.5">
                   {rd.timeline.map((ev, i) => (
                     <TimelineRow key={`${rd.round_id}-${i}`} ev={ev} t={t}
                       last={i === rd.timeline.length - 1} />
