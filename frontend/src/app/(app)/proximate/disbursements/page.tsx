@@ -225,7 +225,7 @@ export default function ProximateDisbursementsPage() {
         ) : (
           <Link
             href={`/proximate/disbursements/${d.id}`}
-            className="text-xs self-center whitespace-nowrap"
+            className="text-xs self-center whitespace-nowrap inline-flex items-center min-h-[24px]"
             style={{ color: 'var(--prox-muted)' }}
           >
             {t(actionKey(d.status))} →

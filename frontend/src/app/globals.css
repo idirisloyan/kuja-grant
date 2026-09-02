@@ -381,9 +381,12 @@
 [data-tenant="proximate"]{
   --kuja-quartz:30 22% 95%;  /* warm the app ground for the whole tenant */
   --prox-ground:#F4F1EE; --prox-surface:#FFFFFF; --prox-surface-2:#FBF9F7; --prox-inset:#F1ECE7;
-  --prox-ink:#1C1714; --prox-ink-2:#57504A; --prox-muted:#8B827A;
+  /* PF-UX-141: --prox-muted darkened #8B827A->#726960 so secondary text clears 4.5:1 on both white panels and the ground */
+  --prox-ink:#1C1714; --prox-ink-2:#57504A; --prox-muted:#726960;
   --prox-line:#EAE3DC; --prox-line-2:#DBD2C9;
   --prox-accent:#FC5810; --prox-accent-deep:#C2410C; --prox-accent-tint:rgba(252,88,16,.10); --prox-accent-ink:#7A2E0A;
+  /* PF-UX-141: the PRIMARY BUTTON fill needs 4.5:1 with its white label. The brand accent #FC5810 is only 3.2:1, so the button uses the deepest-still-bright orange that passes (#D24204 = 4.64:1); hover goes deeper. The accent stays #FC5810 everywhere it is not behind white text. */
+  --prox-btn-primary:#D24204; --prox-btn-primary-h:#C2410C;
   --prox-link:#C2410C; /* PF-UX-141: link text needs 4.5:1 on the light ground — the bright accent is ~3.3:1, the deep accent is 5.16:1 */
   --prox-good:#137A48; --prox-good-tint:rgba(19,122,72,.11);
   --prox-warn:#A85A0B; --prox-warn-tint:rgba(168,90,11,.13);
@@ -397,6 +400,8 @@
   --prox-ink:#F6EFE8; --prox-ink-2:#C7BDB2; --prox-muted:#968B7F;
   --prox-line:#302820; --prox-line-2:#3D3327;
   --prox-accent:#FF6E33; --prox-accent-deep:#FC5810; --prox-accent-tint:rgba(255,110,51,.15); --prox-accent-ink:#FFB68F;
+  /* PF-UX-141: dark-mode primary button — the dark accent #FF6E33 is a light orange, so white-on-it fails; use the same passing fill + deeper hover */
+  --prox-btn-primary:#D24204; --prox-btn-primary-h:#B23A03;
   --prox-link:#FF8A5C; /* PF-UX-141: on the dark ground a lighter accent reads better than the deep one */
   --prox-good:#3ED08A; --prox-good-tint:rgba(62,208,138,.14);
   --prox-warn:#F1B24B; --prox-warn-tint:rgba(241,178,75,.15);
@@ -418,7 +423,22 @@
 [data-tenant="proximate"] .prox-panel{ background:var(--prox-surface); border:1px solid var(--prox-line); border-radius:14px; box-shadow:var(--prox-shadow); }
 [data-tenant="proximate"] .prox-phead{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; border-bottom:1px solid var(--prox-line); }
 [data-tenant="proximate"] .prox-phead h2{ font-family:var(--font-prox-display),"Bricolage Grotesque",sans-serif; font-weight:700; font-size:15px; margin:0; letter-spacing:-.01em; color:var(--prox-ink); }
-[data-tenant="proximate"] .prox-link{ font-size:12.5px; font-weight:600; color:var(--prox-link); text-decoration:none; }
+/* PF-UX-141: scope the shared secondary-text grey a touch darker for Proximate
+   in LIGHT only (dark already clears 4.5:1) so helper/description text passes
+   contrast on the warm ground. */
+[data-tenant="proximate"]:not(.dark){ --muted-foreground: 215 16% 43%; }
+/* PF-UX-141: the shadcn primary Button (bg-primary + white label) also needs
+   4.5:1. The per-tenant branding injects the brand hex as --primary INLINE on
+   <html> (#FC5810 = 3.2:1), so only an !important custom property can correct
+   it. Pin --primary + its focus ring to the passing orange for Proximate in
+   both modes (18 96% 42% = #D24204 = 4.64:1 with white); this also matches
+   .prox-btn.primary, so both primary-button styles share one accessible shade.
+   The bright brand hex stays available via --network-brand-hex / --prox-accent
+   for every decorative (non-white-text) use. */
+[data-tenant="proximate"]{ --primary: 18 96% 42% !important; --ring: 18 96% 42% !important; }
+/* PF-UX-141: standalone "View all / Review" links get a 24px min tap height
+   (inline-flex, text size unchanged) to meet the touch-target minimum. */
+[data-tenant="proximate"] .prox-link{ font-size:12.5px; font-weight:600; color:var(--prox-link); text-decoration:none; display:inline-flex; align-items:center; gap:2px; min-height:24px; white-space:nowrap; flex-shrink:0; }
 [data-tenant="proximate"] .prox-link:hover{ text-decoration:underline; }
 
 /* Pills */
@@ -432,8 +452,8 @@
 
 /* Buttons */
 [data-tenant="proximate"] .prox-btn{ display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 16px; border-radius:10px; border:0; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap; text-decoration:none; }
-[data-tenant="proximate"] .prox-btn.primary{ background:var(--prox-accent); color:#fff; box-shadow:0 8px 18px -8px rgba(252,88,16,.7); }
-[data-tenant="proximate"] .prox-btn.primary:hover{ background:var(--prox-accent-deep); }
+[data-tenant="proximate"] .prox-btn.primary{ background:var(--prox-btn-primary); color:#fff; box-shadow:0 8px 18px -8px rgba(252,88,16,.7); }
+[data-tenant="proximate"] .prox-btn.primary:hover{ background:var(--prox-btn-primary-h); }
 [data-tenant="proximate"] .prox-btn.ghost{ background:var(--prox-surface); border:1px solid var(--prox-line-2); color:var(--prox-ink); }
 
 /* PF-UX-141 — one consistent, visible keyboard focus ring for Proximate's
