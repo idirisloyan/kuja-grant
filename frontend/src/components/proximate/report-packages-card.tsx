@@ -27,7 +27,8 @@ interface Participant { partner_id: number; partner_name: string | null; stage: 
 const STATUS_PILL: Record<string, string> = {
   draft: 'slate',
   submitted: 'warn',
-  changes_requested: 'danger',
+  // PF-UX-008: routine revision ask → amber, not red (red is for true risk).
+  changes_requested: 'warn',
   published: 'good',
 };
 

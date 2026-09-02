@@ -147,7 +147,8 @@ const reportStatusTone: Record<string, string> = {
   drafting: 'warn',
   submitted: 'acc',
   accepted: 'good',
-  revision_requested: 'danger',
+  // PF-UX-008: a requested revision needs action but is not a risk → amber.
+  revision_requested: 'warn',
 };
 
 export function ProximateGrantDetailClient() {

@@ -64,7 +64,10 @@ interface PkgView {
 const STATUS_PILL: Record<string, string> = {
   draft: 'slate',
   submitted: 'warn',
-  changes_requested: 'danger',
+  // PF-UX-008: "changes requested" is a routine revision ask, not a risk —
+  // amber (attention), not red. Matches status-badge.tsx (changes_requested
+  // = 'attention'). Red is reserved for true risk.
+  changes_requested: 'warn',
   published: 'good',
 };
 
