@@ -3111,6 +3111,22 @@ def main():
                 viewport={"width": 1280, "height": 800},
                 service_workers="block",
             )
+            # The onboarding tour (components/onboarding/tour-provider.tsx) fires
+            # on /dashboard whenever localStorage lacks
+            # `kuja_onboarded_<role>_<id>[_<slug>]` == 'done' — i.e. on EVERY run
+            # in a fresh Playwright context — and its full-screen backdrop swallowed
+            # the header clicks in 12.2/12.3/12.4 (elementFromPoint at the language
+            # trigger resolved to the tour backdrop, so Locator.click timed out
+            # waiting for the button to receive events). A human dismisses it once
+            # (skipForever/close both write 'done'); start every test user in that
+            # post-first-visit state. The tour itself is not under test.
+            context.add_init_script(
+                "const _kujaGetItem = Storage.prototype.getItem;"
+                "Storage.prototype.getItem = function (k) {"
+                "  if (typeof k === 'string' && k.startsWith('kuja_onboarded_')) return 'done';"
+                "  return _kujaGetItem.call(this, k);"
+                "};"
+            )
             page = context.new_page()
 
             ctx = {"base": base, "csp_errors": [], "js_errors": []}

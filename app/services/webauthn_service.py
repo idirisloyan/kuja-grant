@@ -101,12 +101,19 @@ class WebAuthnService:
         from webauthn import generate_registration_options
         from webauthn.helpers.structs import (
             AuthenticatorSelectionCriteria,
+            PublicKeyCredentialDescriptor,
             UserVerificationRequirement,
         )
         from flask import session
 
+        # py_webauthn expects PublicKeyCredentialDescriptor objects here, not
+        # plain dicts — options_to_json() reads `descriptor.id`, so a dict
+        # raises `'dict' object has no attribute 'id'`. This only ever ran
+        # for a user who already had a passkey (an empty list never iterates),
+        # which is why first registrations "worked". Ids are stored b64url;
+        # the descriptor wants raw bytes.
         existing = [
-            {'id': c.credential_id, 'transports': []}
+            PublicKeyCredentialDescriptor(id=_b64url_decode(c.credential_id))
             for c in user.webauthn_credentials.all()
         ]
         opts = generate_registration_options(
@@ -118,10 +125,10 @@ class WebAuthnService:
             authenticator_selection=AuthenticatorSelectionCriteria(
                 user_verification=UserVerificationRequirement.PREFERRED,
             ),
-            exclude_credentials=[
-                {'id': _b64url_decode(e['id']), 'transports': []}
-                for e in existing
-            ],
+            # `existing` is already a list of PublicKeyCredentialDescriptor
+            # (bytes ids) — pass it through; the old re-wrap into dicts here
+            # was the second half of the dict-descriptor bug.
+            exclude_credentials=existing,
         )
         session['webauthn_register_challenge'] = _b64url(opts.challenge)
         # Serialise for the browser. The webauthn lib has a helper.
@@ -169,17 +176,26 @@ class WebAuthnService:
     @classmethod
     def begin_authentication(cls, *, user: User) -> dict:
         from webauthn import generate_authentication_options
-        from webauthn.helpers.structs import UserVerificationRequirement
+        from webauthn.helpers.structs import (
+            PublicKeyCredentialDescriptor,
+            UserVerificationRequirement,
+        )
         from webauthn.helpers import options_to_json
         from flask import session
 
         creds = user.webauthn_credentials.all()
         if not creds:
             return {'success': False, 'reason': 'no_credentials'}
+        # Descriptor objects, not dicts — see begin_registration. With a
+        # registered passkey this list is non-empty, so the dict form raised
+        # `'dict' object has no attribute 'id'` on EVERY authentication
+        # (POST /api/auth/webauthn/authenticate/begin -> 500 server.unexpected);
+        # it was masked in the browser suite until the RP-ID fix let test 33.2
+        # get past registration.
         opts = generate_authentication_options(
             rp_id=_rp_id(),
             allow_credentials=[
-                {'id': _b64url_decode(c.credential_id), 'transports': []}
+                PublicKeyCredentialDescriptor(id=_b64url_decode(c.credential_id))
                 for c in creds
             ],
             user_verification=UserVerificationRequirement.PREFERRED,
