@@ -616,6 +616,8 @@ function AskBox() {
           disabled={busy || !q.trim()}
           className="prox-btn primary disabled:opacity-50"
           style={{ height: 40, padding: '0 14px' }}
+          aria-label={t('proximate.donor.ask_title')}
+          title={t('proximate.donor.ask_title')}
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
