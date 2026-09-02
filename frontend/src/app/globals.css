@@ -380,6 +380,7 @@
   --prox-ink:#1C1714; --prox-ink-2:#57504A; --prox-muted:#8B827A;
   --prox-line:#EAE3DC; --prox-line-2:#DBD2C9;
   --prox-accent:#FC5810; --prox-accent-deep:#C2410C; --prox-accent-tint:rgba(252,88,16,.10); --prox-accent-ink:#7A2E0A;
+  --prox-link:#C2410C; /* PF-UX-141: link text needs 4.5:1 on the light ground — the bright accent is ~3.3:1, the deep accent is 5.16:1 */
   --prox-good:#137A48; --prox-good-tint:rgba(19,122,72,.11);
   --prox-warn:#A85A0B; --prox-warn-tint:rgba(168,90,11,.13);
   --prox-danger:#B4241E; --prox-danger-tint:rgba(180,36,30,.10);
@@ -392,6 +393,7 @@
   --prox-ink:#F6EFE8; --prox-ink-2:#C7BDB2; --prox-muted:#968B7F;
   --prox-line:#302820; --prox-line-2:#3D3327;
   --prox-accent:#FF6E33; --prox-accent-deep:#FC5810; --prox-accent-tint:rgba(255,110,51,.15); --prox-accent-ink:#FFB68F;
+  --prox-link:#FF8A5C; /* PF-UX-141: on the dark ground a lighter accent reads better than the deep one */
   --prox-good:#3ED08A; --prox-good-tint:rgba(62,208,138,.14);
   --prox-warn:#F1B24B; --prox-warn-tint:rgba(241,178,75,.15);
   --prox-danger:#F4796F; --prox-danger-tint:rgba(244,121,111,.14);
@@ -412,7 +414,7 @@
 [data-tenant="proximate"] .prox-panel{ background:var(--prox-surface); border:1px solid var(--prox-line); border-radius:14px; box-shadow:var(--prox-shadow); }
 [data-tenant="proximate"] .prox-phead{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; border-bottom:1px solid var(--prox-line); }
 [data-tenant="proximate"] .prox-phead h2{ font-family:var(--font-prox-display),"Bricolage Grotesque",sans-serif; font-weight:700; font-size:15px; margin:0; letter-spacing:-.01em; color:var(--prox-ink); }
-[data-tenant="proximate"] .prox-link{ font-size:12.5px; font-weight:600; color:var(--prox-accent); text-decoration:none; }
+[data-tenant="proximate"] .prox-link{ font-size:12.5px; font-weight:600; color:var(--prox-link); text-decoration:none; }
 [data-tenant="proximate"] .prox-link:hover{ text-decoration:underline; }
 
 /* Pills */
@@ -429,6 +431,22 @@
 [data-tenant="proximate"] .prox-btn.primary{ background:var(--prox-accent); color:#fff; box-shadow:0 8px 18px -8px rgba(252,88,16,.7); }
 [data-tenant="proximate"] .prox-btn.primary:hover{ background:var(--prox-accent-deep); }
 [data-tenant="proximate"] .prox-btn.ghost{ background:var(--prox-surface); border:1px solid var(--prox-line-2); color:var(--prox-ink); }
+
+/* PF-UX-141 — one consistent, visible keyboard focus ring for Proximate's
+   custom interactive surfaces (buttons, links, clickable rows and decision
+   cards). They set border:0 / text-decoration:none, so the UA focus ring is
+   faint or inconsistent; this gives keyboard users a clear accent ring.
+   :focus-visible keeps it off for pointer users; `outline` (not box-shadow)
+   so it also shows in forced-colors / high-contrast mode. */
+[data-tenant="proximate"] .prox-btn:focus-visible,
+[data-tenant="proximate"] .prox-link:focus-visible,
+[data-tenant="proximate"] .prox-qrow:focus-visible,
+[data-tenant="proximate"] .prox-decision:focus-visible,
+[data-tenant="proximate"] a.prox-pill:focus-visible,
+[data-tenant="proximate"] button.prox-pill:focus-visible {
+  outline: 2px solid var(--prox-accent);
+  outline-offset: 2px;
+}
 
 /* Decision card */
 [data-tenant="proximate"] .prox-decision{ background:var(--prox-surface); border:1px solid var(--prox-line); border-radius:14px; padding:16px 17px; box-shadow:var(--prox-shadow); display:flex; flex-direction:column; gap:10px; position:relative; overflow:hidden; text-decoration:none; color:inherit; }
