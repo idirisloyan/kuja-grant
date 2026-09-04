@@ -36,7 +36,7 @@ import {
 } from '@/components/proximate/dd-evidence';
 import { Button } from '@/components/ui/button';
 import {
-  PageShell, PageHeader, PageMain,
+  PageShell, PageHeader, PageMain, PageBack,
 } from '@/components/layout/page-shell';
 
 interface Signature {
@@ -385,6 +385,8 @@ export function ProximateRoundDetailClient() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: the shared back component on every nested route. */}
+      <PageBack href="/proximate/rounds" label={t('proximate.nav.back_to_rounds')} />
       <PageHeader
         title={round.title}
         subtitle={round.title_ar || ''}

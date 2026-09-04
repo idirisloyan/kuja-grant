@@ -29,6 +29,7 @@ import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell'
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { labelForProximateAction, labelForAuditSubject } from '@/lib/proximate-audit-labels';
 import { isTestRecord } from '@/lib/test-records';
+import { BottomSheet } from '@/components/proximate/bottom-sheet';
 
 /**
  * Phase 61 — map an audit chain row's subject_kind to its detail page
@@ -196,6 +197,10 @@ export default function AuditChainPage() {
   // and details payload needed for independent verification live in
   // an expandable row. Presentation only — chain/export logic untouched.
   const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
+  // Phone-only: the entry whose hashes/details are open in the bottom sheet
+  // (PFX-04SEP-MOBILE-011). Separate from expandedSeq so a desktop row
+  // expansion never mounts the (hidden) sheet and locks body scroll.
+  const [sheetSeq, setSheetSeq] = useState<number | null>(null);
   // Aggregated groups the reader has opened, keyed by the lead entry's seq.
   const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
   const toggleGroup = (seq: number) => setExpandedGroups((s) => {
@@ -730,14 +735,23 @@ export default function AuditChainPage() {
         {recent && recent.entries.length > 0 && (
           <div className="md:hidden mt-4 space-y-2">
             {groupEntries(recent.entries).map((g) => {
-              const entryCard = (e: ChainEntry) => {
-              const href = subjectDrillHref(e.subject_kind, e.subject_id ?? null);
-              const open = expandedSeq === e.seq;
+              // `nested`: rendered inside an open group — no second border, so
+              // a phone never shows more than two surface levels
+              // (PFX-04SEP-MOBILE-012): the card, then the rows in it.
+              const entryCard = (e: ChainEntry, nested = false) => {
+              const open = sheetSeq === e.seq;
               return (
-                <div key={e.seq} className="rounded-lg border border-[hsl(var(--border))] overflow-hidden">
+                <div
+                  key={e.seq}
+                  className={cn('overflow-hidden', !nested && 'rounded-lg border border-[hsl(var(--border))]')}
+                >
+                  {/* PFX-04SEP-MOBILE-011: tapping an entry opens its hashes
+                      and details in a bottom sheet instead of growing the
+                      card in place — the list keeps its rhythm. */}
                   <button
                     type="button"
-                    onClick={() => setExpandedSeq(open ? null : e.seq)}
+                    onClick={() => setSheetSeq(e.seq)}
+                    aria-haspopup="dialog"
                     className="w-full text-start p-3 hover:bg-[hsl(var(--kuja-sand-50))]"
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -766,32 +780,6 @@ export default function AuditChainPage() {
                       <span>{new Date(e.created_at).toLocaleString()}</span>
                     </div>
                   </button>
-                  {open && (
-                    <div className="px-3 pb-3 bg-[hsl(var(--kuja-sand-50))]/50">
-                      <div className="grid gap-1.5 text-[10px] font-mono pt-2 border-t border-[hsl(var(--border))]">
-                        <div>
-                          <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.prev_hash')}</span>
-                          <span className="break-all">{e.prev_hash || t('audit_chain.genesis')}</span>
-                        </div>
-                        <div>
-                          <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.payload_hash')}</span>
-                          <span className="break-all">{e.payload_hash}</span>
-                        </div>
-                        {e.details && Object.keys(e.details).length > 0 && (
-                          <div>
-                            <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('common.details')}</span>
-                            <pre className="whitespace-pre-wrap break-all inline">{JSON.stringify(e.details)}</pre>
-                          </div>
-                        )}
-                        {href && (
-                          <Link href={href} className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))] font-sans font-semibold mt-1">
-                            {t('audit_chain.open_subject', { kind: e.subject_kind ?? '', id: e.subject_id ?? '' })}
-                            <ArrowUpRight className="w-2.5 h-2.5" />
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
               };
@@ -799,9 +787,12 @@ export default function AuditChainPage() {
               const gopen = expandedGroups.has(g.lead.seq);
               return (
                 <div key={`g${g.lead.seq}`} className="rounded-lg border border-[hsl(var(--border))] overflow-hidden">
+                  {/* One group open at a time on a phone (MOBILE-011): opening
+                      this one closes any other, so the list never becomes
+                      three expanded stacks deep. */}
                   <button
                     type="button"
-                    onClick={() => toggleGroup(g.lead.seq)}
+                    onClick={() => setExpandedGroups(new Set(gopen ? [] : [g.lead.seq]))}
                     className="w-full text-start p-3 hover:bg-[hsl(var(--kuja-sand-50))]"
                     aria-expanded={gopen}
                   >
@@ -821,13 +812,60 @@ export default function AuditChainPage() {
                     </div>
                   </button>
                   {gopen && (
-                    <div className="border-t border-[hsl(var(--border))] p-2 space-y-2 bg-[hsl(var(--kuja-sand-50))]/40">
-                      {g.rows.map(entryCard)}
+                    <div className="border-t border-[hsl(var(--border))] divide-y divide-[hsl(var(--border))] bg-[hsl(var(--kuja-sand-50))]/40">
+                      {g.rows.map((r) => entryCard(r, true))}
                     </div>
                   )}
                 </div>
               );
             })}
+            {(() => {
+              const e = recent.entries.find((x) => x.seq === sheetSeq) ?? null;
+              const href = e ? subjectDrillHref(e.subject_kind, e.subject_id ?? null) : null;
+              return (
+                <BottomSheet
+                  open={e !== null}
+                  onClose={() => setSheetSeq(null)}
+                  title={e ? `${actionLabel(e.action, t)} · #${e.seq}` : ''}
+                >
+                  {e && (
+                    <div className="grid gap-2 text-[11px] font-mono px-2 pb-2">
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-sans text-[hsl(var(--kuja-ink-soft))]">
+                        {e.actor_email && (
+                          <span className="inline-flex items-center gap-1">
+                            <UserIcon className="w-3 h-3" />{e.actor_email}
+                          </span>
+                        )}
+                        {e.subject_kind && (
+                          <span>{labelForAuditSubject(e.subject_kind, t)} #{e.subject_id}</span>
+                        )}
+                        <span>{new Date(e.created_at).toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.prev_hash')}</span>
+                        <span className="break-all">{e.prev_hash || t('audit_chain.genesis')}</span>
+                      </div>
+                      <div>
+                        <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('audit_chain.payload_hash')}</span>
+                        <span className="break-all">{e.payload_hash}</span>
+                      </div>
+                      {e.details && Object.keys(e.details).length > 0 && (
+                        <div>
+                          <span className="uppercase tracking-wide font-sans font-semibold text-[hsl(var(--kuja-ink-soft))] me-2">{t('common.details')}</span>
+                          <pre className="whitespace-pre-wrap break-all inline">{JSON.stringify(e.details)}</pre>
+                        </div>
+                      )}
+                      {href && (
+                        <Link href={href} className="inline-flex items-center gap-1 text-[hsl(var(--kuja-clay))] font-sans font-semibold mt-1 min-h-[40px]">
+                          {t('audit_chain.open_subject', { kind: e.subject_kind ?? '', id: e.subject_id ?? '' })}
+                          <ArrowUpRight className="w-2.5 h-2.5" />
+                        </Link>
+                      )}
+                    </div>
+                  )}
+                </BottomSheet>
+              );
+            })()}
           </div>
         )}
       </Card>

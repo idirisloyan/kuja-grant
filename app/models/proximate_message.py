@@ -87,8 +87,11 @@ class ProximateMessage(db.Model):
     )
 
     def to_dict(self, include_body: bool = True) -> dict:
+        from app.utils.test_records import message_is_test
         d = {
             'id': self.id,
+            # ONE test-data policy (PFX-04SEP-GLOBAL-001).
+            'is_test': message_is_test(self),
             'direction': self.direction,
             'channel': self.channel,
             'template_key': self.template_key,

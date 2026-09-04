@@ -13,11 +13,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
-  Loader2, ArrowLeft, Sparkles, Eye, EyeOff, Send, Undo2, FileDown, Flag,
+  Loader2, Sparkles, Eye, EyeOff, Send, Undo2, FileDown, Flag,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { PageBack } from '@/components/layout/page-shell';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
@@ -171,11 +171,13 @@ export function ProximateReportPackageClient() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 p-4 md:p-6">
+      {/* PFX-04SEP-NAV-001: a labelled shared back control ("‹ Back to
+          round") instead of an unlabelled arrow icon. */}
+      <PageBack
+        href={`/proximate/rounds/${data.round?.id}`}
+        label={t('proximate.round_report.back_to_round')}
+      />
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href={`/proximate/rounds/${data.round?.id}`}
-              className="hover:opacity-70" style={{ color: 'var(--prox-muted)' }}>
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg truncate" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
             {data.partner?.name} — {t('proximate.rpkg.impl_report')}

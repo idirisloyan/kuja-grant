@@ -27,7 +27,9 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { CheckCircle2, Circle, Lock, ArrowRight, X } from 'lucide-react';
 import { api } from '@/lib/api';
+import { tenantKind } from '@/lib/tenant';
 import { useAuthStore } from '@/stores/auth-store';
+import { useNetworkStore } from '@/stores/network-store';
 
 interface Stage {
   key: string;
@@ -77,8 +79,18 @@ export function JourneyRail() {
   // User.role='ngo' for platform-level compatibility, so the role
   // check alone leaks NGO chrome onto Proximate donor/OB pages.
   const onProximatePath = pathname?.startsWith('/proximate');
+  // 4 Sep 2026 QA: the path check above still let the rail through on
+  // /settings/* and /admin/audit-chain under the Proximate TENANT — the
+  // Oversight Body saw "Build your profile · Complete your organisation
+  // profile" (marketplace NGO copy) on a fund console. The journey is hub /
+  // network vocabulary, so gate on the resolved tenant kind, fail-closed:
+  // nothing renders until the tenant is known, and never on a fund or ops
+  // console (same class as kuja_tenant_vocabulary_leak_2026-08-26).
+  const network = useNetworkStore((s) => s.network);
+  const kind = tenantKind(network);
+  const journeyTenant = !!network && (kind === 'hub' || kind === 'network');
 
-  const shouldFetch = isNgo && !dismissed && !onDashboard && !onAuthPath && !onProximatePath;
+  const shouldFetch = isNgo && journeyTenant && !dismissed && !onDashboard && !onAuthPath && !onProximatePath;
 
   const { data } = useSWR<JourneyResp>(
     shouldFetch ? '/journey/me' : null,

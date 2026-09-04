@@ -2011,18 +2011,34 @@ def api_proximate_overview():
     if gate:
         return gate
 
-    # Partners by status
+    # Partners by status — under the ONE test-data policy
+    # (PFX-04SEP-GLOBAL-001). The dashboard showed 99 partners while the
+    # register showed 81 + 18 hidden fixtures: this rollup counted every row.
+    # It now excludes fixtures unless the caller passes ?include_test=1 (the
+    # frontend forwards the shared "Show test data" flag), so summary and
+    # register are the same dataset.
+    from app.utils.test_records import partner_is_test, include_test_requested
+    include_test = include_test_requested(request)
+    all_rows = ProximatePartner.query.filter_by(network_id=net.id).all()
+    rows = [r for r in all_rows if include_test or not partner_is_test(r)]
+    partner_ids = {r.id for r in rows}
+    partners_test_hidden = len(all_rows) - len(rows)
     by_status = {s: 0 for s in PARTNER_STATUSES}
-    rows = ProximatePartner.query.filter_by(network_id=net.id).all()
     for r in rows:
         if r.status in by_status:
             by_status[r.status] += 1
 
-    # Open interventions — split open vs expired (past response_due_at)
-    open_interventions = InterventionMeasure.query.filter(
-        InterventionMeasure.network_id == net.id,
-        InterventionMeasure.status.in_(['open', 'escalated']),
-    ).all()
+    # Open interventions — split open vs expired (past response_due_at).
+    # Same scope: an intervention on a fixture partner is not a real decision.
+    open_interventions = [
+        m for m in InterventionMeasure.query.filter(
+            InterventionMeasure.network_id == net.id,
+            InterventionMeasure.status.in_(['open', 'escalated']),
+        ).all()
+        if include_test
+        or getattr(m, 'partner_id', None) is None
+        or m.partner_id in partner_ids
+    ]
     expired_count = sum(1 for m in open_interventions if m.is_expired)
     open_count = len(open_interventions) - expired_count
     escalated_count = sum(
@@ -2069,6 +2085,8 @@ def api_proximate_overview():
         'success': True,
         'partners_by_status': by_status,
         'partners_total': len(rows),
+        'partners_test_hidden': partners_test_hidden,
+        'test_data_included': include_test,
         'interventions': {
             'open': open_count,
             'expired': expired_count,

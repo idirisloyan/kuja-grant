@@ -39,9 +39,10 @@
 import { ChevronLeft, AlertCircle, AlertTriangle, CheckCircle2, Info, ChevronDown } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { useNetworkStore } from '@/stores/network-store';
+import { useUIStore } from '@/stores/ui-store';
 
 // ---------------------------------------------------------------------------
 // Tones — shared status / attention vocabulary
@@ -96,9 +97,18 @@ export function PageBack({
   onClick?: () => void;
 }) {
   const cls = 'text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1';
+  // PFX-04SEP-NAV-001 / MOBILE-001: this is THE return-navigation component.
+  // Besides rendering the link it publishes the parent to the sticky mobile
+  // context bar, so "‹ Partners" stays reachable after the page scrolls.
+  // Below lg the bar IS the back control, so the in-page link steps aside —
+  // a phone must never show the same return twice (MOBILE-004 info budget).
+  const setParent = useUIStore((s) => s.setMobileContextParent);
+  useEffect(() => {
+    if (href) setParent({ label, href });
+  }, [href, label, setParent]);
   if (href) {
     return (
-      <Link href={href} className={cls}>
+      <Link href={href} className={cn(cls, 'hidden lg:inline-flex')}>
         <ChevronLeft className="w-3 h-3" /> {label}
       </Link>
     );
@@ -150,12 +160,33 @@ export function PageHeader({
   const flatHeader =
     network?.slug === 'proximate'
     || (typeof window !== 'undefined' && window.location.hostname.toLowerCase().includes('proximate'));
+  // PFX-04SEP-MOBILE-001 — publish this page's identity to the sticky mobile
+  // context bar: the title, and the last breadcrumb as the parent (a PageBack
+  // on the page overrides the parent). Cleared on unmount so the next page
+  // starts clean. Keyed on a string so a fresh breadcrumbs array each render
+  // does not re-fire the effect.
+  const setMobileContext = useUIStore((s) => s.setMobileContext);
+  const crumbKey = (breadcrumbs ?? []).map((c) => `${c.label}|${c.href ?? ''}`).join(';');
+  useEffect(() => {
+    const last = breadcrumbs && breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1] : undefined;
+    const crumbParent = last?.href ? { label: last.label, href: last.href } : null;
+    // A PageBack rendered above this header has already published the
+    // parent (its effect runs first — it is the earlier sibling). Without
+    // breadcrumbs of our own we must keep it, or every "new" page would
+    // lose its "‹ Back to …" in the context bar the moment the title landed.
+    const published = useUIStore.getState().mobileContext?.parent ?? null;
+    setMobileContext({ title, parent: crumbParent ?? published });
+    return () => setMobileContext(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, crumbKey, setMobileContext]);
   return (
     <header className={flatHeader ? 'pb-1' : 'border border-border rounded-lg bg-card p-5'}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav
           aria-label="Breadcrumb"
-          className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap"
+          // Desktop trail only: on phones the sticky context bar carries the
+          // parent, and a second trail above the title is clutter.
+          className="mb-2 hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap"
         >
           {breadcrumbs.map((c, i) => (
             <span key={i} className="inline-flex items-center gap-1.5">

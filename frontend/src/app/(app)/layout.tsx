@@ -23,6 +23,7 @@ import { JourneyRail } from '@/components/dashboards/journey-rail';
 import { WhatsNewBanner } from '@/components/layout/whats-new-banner';
 import { OfflineQueuePanel } from '@/components/layout/offline-queue-panel';
 import { ProximateBottomNav } from '@/components/proximate/bottom-nav';
+import { MobileContextBar } from '@/components/layout/mobile-context-bar';
 import { LicenseRequiredDialog } from '@/components/licensing/license-required-dialog';
 
 const SIDEBAR_WIDTH = 280;
@@ -115,6 +116,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           style={{ ['--sidebar-w' as string]: `${currentWidth}px` }}
         >
           <Header />
+          {/* PFX-04SEP-MOBILE-001 — level-2 mobile navigation: the sticky
+              context bar (module · filter, or ‹ parent / title). */}
+          <MobileContextBar />
           {/* Phase 99 — persistent NGO journey rail above main content.
               Self-gated to user.role==='ngo' and hidden on /dashboard
               where the full <JourneyTracker> renders. Dismissible per

@@ -43,11 +43,32 @@ export function isTestRecord(...names: MaybeName[]): boolean {
 }
 
 /**
+ * A record that may carry the SERVER's verdict. Since PFX-04SEP-GLOBAL-001
+ * every Proximate serializer emits `is_test` from one backend policy
+ * (app/utils/test_records.py — name, donor, reference AND creator identity,
+ * inherited through partner/donor). When it is present it wins; the name
+ * heuristic below is only the fallback for payloads that predate it.
+ */
+type MaybeFlagged = { is_test?: boolean | null };
+
+/** Server verdict first, name heuristic second. Takes any record object so
+ *  callers' row types need not declare `is_test` to be accepted. */
+export function recordIsTest(
+  row: object | null | undefined,
+  ...names: MaybeName[]
+): boolean {
+  const flag = row ? (row as MaybeFlagged).is_test : undefined;
+  if (typeof flag === 'boolean') return flag;
+  return isTestRecord(...names);
+}
+
+/**
  * Split a list into real records and fixtures in one pass, so callers can show
  * a count of what is hidden rather than hiding it silently. Something the user
  * cannot see must at least be something they are told about.
  *
  * `namesOf` may return one name or the record's own name plus its parents'.
+ * Rows carrying a server `is_test` are classified by it regardless of names.
  */
 export function splitTestRecords<T>(
   rows: T[],
@@ -57,7 +78,8 @@ export function splitTestRecords<T>(
   const test: T[] = [];
   for (const row of rows) {
     const n = namesOf(row);
-    (isTestRecord(...(Array.isArray(n) ? n : [n])) ? test : real).push(row);
+    const names = Array.isArray(n) ? n : [n];
+    (recordIsTest(row as MaybeFlagged, ...names) ? test : real).push(row);
   }
   return { real, test };
 }

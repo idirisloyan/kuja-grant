@@ -19,7 +19,7 @@ import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { Button } from '@/components/ui/button';
 import {
-  PageShell, PageHeader, PageMain,
+  PageShell, PageHeader, PageMain, PageBack,
 } from '@/components/layout/page-shell';
 import { WhyBlocked, type Blocker } from '@/components/proximate/next-step';
 
@@ -300,6 +300,7 @@ export default function ProximateDisbursementNewPage() {
       : '';
     return (
       <PageShell>
+        <PageBack href="/proximate/disbursements" label={t('proximate.nav.back_to_disbursements')} />
         <PageHeader
           title={t('proximate.disbursements.recorded_title')}
           subtitle={t('proximate.disbursements.recorded_subtitle')}
@@ -355,6 +356,8 @@ export default function ProximateDisbursementNewPage() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: shared back component, above the header. */}
+      <PageBack href="/proximate/disbursements" label={t('proximate.nav.back_to_disbursements')} />
       <PageHeader
         title={t('proximate.disbursements.new_title')}
         subtitle={t('proximate.disbursements.new_subtitle')}

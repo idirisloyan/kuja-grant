@@ -16,7 +16,13 @@ import { Loader2, Plus, ChevronRight, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { TestDataToggle } from '@/components/proximate/test-data-toggle';
-import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { recordIsTest, splitTestRecords } from '@/lib/test-records';
+
+// One status vocabulary for the desktop pill row and the phone select, so
+// the two controls can never offer different choices (PFX-04SEP-MOBILE-006).
+const ROUND_STATUS_FILTERS = [
+  'all', 'draft', 'in_review', 'active', 'closed', 'cancelled',
+] as const;
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
@@ -95,6 +101,15 @@ export default function ProximateRoundsPage() {
       null, '', window.location.pathname + (qs ? `?${qs}` : ''),
     );
   }, [statusFilter]);
+  // The sticky mobile context bar shows "Rounds · In review" while a
+  // status filter is applied (PFX-04SEP-MOBILE-001/006).
+  const setMobileContextFilter = useUIStore((s) => s.setMobileContextFilter);
+  useEffect(() => {
+    setMobileContextFilter(
+      statusFilter && statusFilter !== 'all' ? labelForProximateStatus(statusFilter, t) : null,
+    );
+    return () => setMobileContextFilter(null);
+  }, [statusFilter, t, setMobileContextFilter]);
   // System-wide test-data classification (PFX-SEP02-GLOBAL-004): fixture
   // rounds ("UAT Round…", "QA Fixture Round…", "verification round…") are
   // hidden unless the shared, persisted "Show test data" flag is on. Chips
@@ -215,15 +230,48 @@ export default function ProximateRoundsPage() {
             />
           </div>
         )}
+        {/* PFX-04SEP-MOBILE-006: on a phone the six status pills become one
+            compact Status control; the pill row stays from sm up. Both drive
+            the same statusFilter so the URL, the count and the context bar
+            agree whichever one was used. */}
         {!loadError && rounds !== null && counted.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {['all', 'draft', 'in_review', 'active', 'closed', 'cancelled']
+          <div className="sm:hidden flex items-center gap-2">
+            <label
+              htmlFor="rounds-status-filter"
+              className="text-xs shrink-0"
+              style={{ color: 'var(--prox-muted)' }}
+            >
+              {t('common.status')}
+            </label>
+            <select
+              id="rounds-status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="flex-1 min-w-0 text-sm rounded-md border bg-background px-2"
+              style={{ borderColor: 'var(--prox-line-2)', minHeight: 40 }}
+            >
+              {ROUND_STATUS_FILTERS
+                .filter((s) => s === 'all' || statusCounts[s])
+                .map((s) => (
+                  <option key={s} value={s}>
+                    {s === 'all'
+                      ? `${t('common.all')} (${counted.length})`
+                      : `${labelForProximateStatus(s, t)} (${statusCounts[s]})`}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+        {!loadError && rounds !== null && counted.length > 0 && (
+          <div className="hidden sm:flex items-center gap-1.5 flex-wrap">
+            {ROUND_STATUS_FILTERS
               .filter((s) => s === 'all' || statusCounts[s])
               .map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
+                  aria-pressed={statusFilter === s}
                   className="text-xs px-3 py-1 rounded-full border transition-colors"
                   style={statusFilter === s
                     ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
@@ -258,7 +306,7 @@ export default function ProximateRoundsPage() {
                     is what tells two rounds apart (PFX-SEP02-MOBILE-002). */}
                 <strong className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14.5 }}>
                   {r.title}
-                  {isTestRecord(r.title, r.donor_name) && (
+                  {recordIsTest(r, r.title, r.donor_name) && (
                     <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>
                       {t('common.test_record')}
                     </span>

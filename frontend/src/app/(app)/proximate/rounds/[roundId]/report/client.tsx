@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2, ArrowLeft, Printer } from 'lucide-react';
+import { PageBack } from '@/components/layout/page-shell';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -138,12 +139,12 @@ export function ProximateRoundReportClient() {
   return (
     <div className="max-w-4xl mx-auto p-6 print:p-0 print:max-w-none space-y-6">
       <div className="flex items-center justify-between print:hidden">
-        <Link href={id ? `/proximate/rounds/${id}` : '/proximate/rounds'}>
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="w-3.5 h-3.5 me-1" />
-            {t('proximate.round_report.back_to_round')}
-          </Button>
-        </Link>
+        {/* PFX-04SEP-NAV-001: the shared back component (it also feeds the
+            sticky mobile context bar), not a page-local button. */}
+        <PageBack
+          href={id ? `/proximate/rounds/${id}` : '/proximate/rounds'}
+          label={t('proximate.round_report.back_to_round')}
+        />
         <Button size="sm" onClick={() => window.print()}>
           <Printer className="w-3.5 h-3.5 me-1" />
           {t('proximate.round_report.print')}

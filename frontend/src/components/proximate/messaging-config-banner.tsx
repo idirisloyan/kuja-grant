@@ -15,6 +15,7 @@
 // a system that quietly does nothing must say so where the work happens.
 // ============================================================================
 
+import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, HelpCircle, SendHorizontal } from 'lucide-react';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import type { MessagingConfigState } from './messaging-shared';
@@ -37,6 +38,11 @@ export function MessagingConfigBanner({
   onShowOutbound?: () => void;
 }) {
   const { t, formatDate } = useTranslation();
+  // PFX-04SEP-MOBILE-008: when nothing is stuck the health block is ONE
+  // line; the three-cell breakdown opens on request. The moment delivery
+  // has a problem the breakdown is forced open — nobody should have to
+  // expand a card to learn that 16 messages never left.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   if (state === 'not_configured') {
     return (
@@ -108,14 +114,34 @@ export function MessagingConfigBanner({
   // line beside "16 outbound failed" used to read as "all fine". Green is
   // reserved for the provider; delivery goes red the moment anything is stuck.
   const stuck = unsentCount > 0;
+  const showDetail = stuck || detailsOpen;
+  const lastLabel = lastSuccessAt
+    ? formatDate(lastSuccessAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : t('proximate.messaging.health_none_yet');
   return (
-    <div className="prox-panel" style={{ padding: '12px 16px' }} role={stuck ? 'alert' : undefined}>
+    <div
+      className="prox-panel"
+      style={{ padding: showDetail ? '12px 16px' : '10px 16px' }}
+      role={stuck ? 'alert' : undefined}
+      data-testid="messaging-health"
+      data-state={stuck ? 'attention' : 'healthy'}
+    >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2
-          className="text-sm"
+          className="text-sm min-w-0"
           style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}
         >
-          {t('proximate.messaging.health_title')}
+          {showDetail ? t('proximate.messaging.health_title') : (
+            <span className="inline-flex items-center gap-1.5 min-w-0">
+              <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--prox-good)' }} aria-hidden="true" />
+              <span className="truncate">
+                {t('proximate.messaging.health_ok_line', {
+                  channels: channelsLabel || t('proximate.messaging.configured_title'),
+                  last: lastLabel,
+                })}
+              </span>
+            </span>
+          )}
         </h2>
         {stuck && onShowOutbound && (
           <button
@@ -127,7 +153,19 @@ export function MessagingConfigBanner({
             {t('proximate.messaging.review_delivery')}
           </button>
         )}
+        {!stuck && (
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((v) => !v)}
+            aria-expanded={detailsOpen}
+            className="text-xs underline hover:no-underline shrink-0"
+            style={{ color: 'var(--prox-muted)', minHeight: 32 }}
+          >
+            {detailsOpen ? t('common.hide_details') : t('common.details')}
+          </button>
+        )}
       </div>
+      {showDetail && (
       <dl className="mt-2 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <div className="flex items-center justify-between gap-3 sm:block">
           <dt className="text-xs" style={{ color: 'var(--prox-muted)' }}>
@@ -161,12 +199,11 @@ export function MessagingConfigBanner({
             {t('proximate.messaging.health_last_success')}
           </dt>
           <dd className="font-medium" style={{ color: 'var(--prox-ink)' }}>
-            {lastSuccessAt
-              ? formatDate(lastSuccessAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-              : t('proximate.messaging.health_none_yet')}
+            {lastLabel}
           </dd>
         </div>
       </dl>
+      )}
     </div>
   );
 }

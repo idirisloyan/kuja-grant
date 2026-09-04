@@ -11,13 +11,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, Link2, FileText } from 'lucide-react';
+import { ShieldCheck, Link2, FileText } from 'lucide-react';
 import { api } from '@/lib/api';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { EmptyState } from '@/components/proximate/empty-state';
 import { useTranslation } from '@/lib/hooks/use-translation';
-import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { PageShell, PageHeader, PageMain, PageBack } from '@/components/layout/page-shell';
 
 interface Disb {
   id: number; amount_usd: number; status: string; partner_name: string;
@@ -63,12 +63,11 @@ export default function TraceabilityPage() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: shared back component, above the header. */}
+      <PageBack href="/proximate/donor" label={t('proximate.nav.back_to_dashboard')} />
       <PageHeader title={t('proximate.traceability.title')}
         subtitle={t('proximate.traceability.subtitle')} />
       <PageMain>
-        <Link href="/proximate/donor" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
-          <ArrowLeft className="w-4 h-4" /> {t('common.back')}
-        </Link>
 
         {loading && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}

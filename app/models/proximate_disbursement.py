@@ -169,6 +169,11 @@ class ProximateDisbursement(db.Model):
     # they can attest without a Kuja login. Issued at assign time.
     verifier_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
 
+    # Historical-import provenance (4 Sep 2026 QA pack) — see
+    # import_historical_round.py. NULL for releases recorded in the product.
+    import_batch_id = db.Column(db.String(64), nullable=True, index=True)
+    import_source_ref = db.Column(db.String(120), nullable=True)
+
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -197,8 +202,13 @@ class ProximateDisbursement(db.Model):
         )
 
     def to_dict(self) -> dict:
+        from app.utils.test_records import disbursement_is_test
         return {
             'id': self.id,
+            # ONE test-data policy (PFX-04SEP-GLOBAL-001): inherited from the
+            # partner.
+            'is_test': disbursement_is_test(self),
+            'import_batch_id': self.import_batch_id,
             'network_id': self.network_id,
             'partner_id': self.partner_id,
             'partner_name': self.partner.name if self.partner else None,

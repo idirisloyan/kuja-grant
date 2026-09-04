@@ -1,0 +1,86 @@
+{
+  "batch_id": "hist-2025-kassala-sample",
+  "source": "Adeso Excel tracker 'Kassala cycle 2025' (sample package — replace with the real export)",
+  "round": {
+    "source_ref": "R-2025-01",
+    "title": "Kassala Flood Response 2025",
+    "title_ar": "استجابة فيضانات كسلا 2025",
+    "trigger_type": "disaster",
+    "trigger_summary": "August 2025 flash floods along the Gash river displaced households in Kassala town and Wad Alhelew.",
+    "donor_name": "Example Foundation",
+    "envelope_usd": 60000,
+    "target_country": "SD",
+    "target_region": "Kassala",
+    "target_locality": "Kassala town; Wad Alhelew",
+    "status": "closed",
+    "phase": "closeout",
+    "dates": {
+      "drafted_at": "2025-08-20",
+      "submitted_at": "2025-08-22",
+      "activated_at": "2025-08-25",
+      "closed_at": "2025-12-15"
+    },
+    "closing_summary": "Six partners funded; all reports received; cycle closed 15 Dec 2025."
+  },
+  "grant": {
+    "source_ref": "G-2025-EF-01",
+    "title": "Example Foundation — Sudan emergency window 2025",
+    "donor_name": "Example Foundation",
+    "donor_grant_ref": "EF-2025-0142",
+    "amount_committed_usd": 60000,
+    "amount_received_usd": 60000,
+    "currency": "USD",
+    "start_date": "2025-08-01",
+    "end_date": "2026-01-31",
+    "reporting_cadence": "final_only",
+    "status": "completed",
+    "signed_at": "2025-08-05",
+    "allocated_to_round_usd": 60000
+  },
+  "partners": [
+    {
+      "source_ref": "P-001",
+      "name": "Kassala Youth Volunteers",
+      "name_ar": "متطوعو شباب كسلا",
+      "locality": "Kassala town",
+      "state": "KA",
+      "status": "dd_clear",
+      "nominated_at": "2025-08-26",
+      "dd_cleared_at": "2025-09-02"
+    },
+    {
+      "source_ref": "P-002",
+      "name": "Wad Alhelew Women's Kitchen",
+      "name_ar": "مطبخ نساء ود الحليو",
+      "locality": "Wad Alhelew",
+      "state": "KA",
+      "nominated_at": "2025-08-26",
+      "dd_cleared_at": "2025-09-04"
+    }
+  ],
+  "awards": [
+    { "partner_ref": "P-001", "amount_usd": 8000, "stage": "verified" },
+    { "partner_ref": "P-002", "amount_usd": 5000 }
+  ],
+  "disbursements": [
+    {
+      "source_ref": "D-001",
+      "partner_ref": "P-001",
+      "amount_usd": 8000,
+      "sent_at": "2025-09-05",
+      "received_at": "2025-09-07",
+      "report_due_at": "2025-10-05",
+      "report_submitted_at": "2025-10-01",
+      "status": "verified",
+      "purpose": "Emergency shelter kits for 120 households"
+    },
+    {
+      "source_ref": "D-002",
+      "partner_ref": "P-002",
+      "amount_usd": 5000,
+      "sent_at": "2025-09-06",
+      "report_submitted_at": "2025-10-03",
+      "purpose": "Communal kitchen — 3 weeks of hot meals"
+    }
+  ]
+}

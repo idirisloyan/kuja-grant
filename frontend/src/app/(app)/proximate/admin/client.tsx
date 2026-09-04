@@ -19,11 +19,16 @@ import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { labelForProximateAction } from '@/lib/proximate-audit-labels';
+import { useUIStore } from '@/stores/ui-store';
+import { TestDataToggle } from '@/components/proximate/test-data-toggle';
 
 interface Overview {
   success: boolean;
   partners_by_status: Record<string, number>;
   partners_total: number;
+  /** Fixture partners the server left out of every figure above (GLOBAL-001). */
+  partners_test_hidden?: number;
+  test_data_included?: boolean;
   interventions: { open: number; expired: number; escalated: number; total: number };
   endorsers_pending: number;
   monitoring_due_this_month: number;
@@ -58,10 +63,14 @@ export function ProximateAdminClient() {
     }
   }, [persona, personaLoading]);
 
+  // PFX-04SEP-GLOBAL-001 — the rollup follows the same shared "Show test
+  // data" flag as every register, so the pipeline count here and the
+  // Partners register can never disagree (99 vs 81 was exactly that).
+  const showTest = useUIStore((s) => s.showTestData);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get<Overview>('/api/proximate/overview')
+    api.get<Overview>(`/api/proximate/overview?include_test=${showTest ? 1 : 0}`)
       .then((r) => { if (!cancelled) setData(r); })
       .catch(() => { if (!cancelled) setError(t('proximate.admin.overview_failed')); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -188,6 +197,11 @@ export function ProximateAdminClient() {
   return (
     <div className="space-y-6">
       {head}
+
+      {/* PFX-04SEP-GLOBAL-001: the same "Show test data" control as the
+          registers, so an OB can see — and flip — the scope every figure on
+          this page is computed under. */}
+      <TestDataToggle count={data.partners_test_hidden ?? 0} />
 
       {/* DECISION STRIP — three cards from md up. Below md each card took a
           full viewport row before the pipeline was even visible

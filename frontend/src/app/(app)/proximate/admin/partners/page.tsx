@@ -9,7 +9,14 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { recordIsTest, splitTestRecords } from '@/lib/test-records';
+import { BottomSheet, SheetOption } from '@/components/proximate/bottom-sheet';
+
+// The one status vocabulary the register filters by — shared by the desktop
+// pill row and the phone bottom sheet so the two can never drift apart.
+const PARTNER_STATUS_FILTERS = [
+  'all', 'nominated', 'endorsements_open', 'dd_pending', 'dd_clear', 'suspended',
+] as const;
 import { TestDataToggle } from '@/components/proximate/test-data-toggle';
 import { useUIStore } from '@/stores/ui-store';
 import Link from 'next/link';
@@ -82,6 +89,17 @@ export default function ProximatePartnersPage() {
   const [sort, setSort] = useState<'name' | 'newest'>('name');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Phone-only "More" sheet (Import PIFs, Nominate) — PFX-04SEP-MOBILE-007.
+  const [moreOpen, setMoreOpen] = useState(false);
+  // The sticky mobile context bar shows "Partners · In review" while a
+  // status filter is applied (PFX-04SEP-MOBILE-001).
+  const setMobileContextFilter = useUIStore((s) => s.setMobileContextFilter);
+  useEffect(() => {
+    setMobileContextFilter(
+      statusFilter !== 'all' ? labelForProximateStatus(statusFilter, t) : null,
+    );
+    return () => setMobileContextFilter(null);
+  }, [statusFilter, t, setMobileContextFilter]);
   // Fixtures hidden by default — see lib/test-records.ts. ONE persisted flag
   // shared by every register (PFX-SEP02-GLOBAL-004); the count stays visible
   // so nothing disappears without the user being told.
@@ -333,8 +351,12 @@ export default function ProximatePartnersPage() {
                 >
                   {t('proximate.partners.nominate')}
                 </Link>
+                {/* PFX-04SEP-MOBILE-007: on a phone "Import PIFs" lives under
+                    the "More" sheet; the primary row keeps search, sort and
+                    status only. From sm up it stays inline. */}
                 <Button
                   size="sm" variant="outline" disabled={importing}
+                  className="hidden sm:inline-flex"
                   onClick={() => importRef.current?.click()}
                 >
                   {importing
@@ -368,20 +390,32 @@ export default function ProximatePartnersPage() {
                   <option value="name">{t('proximate.partners.sort_name')}</option>
                   <option value="newest">{t('proximate.partners.sort_newest')}</option>
                 </select>
+                {/* Phone: one "Status" control (opens a sheet) and one "More"
+                    control instead of six pills plus two buttons wrapping onto
+                    a second row. Desktop keeps the pill row. */}
                 <Button
                   size="sm" variant="outline" className="sm:hidden"
-                  onClick={() => setFiltersOpen((v) => !v)}
+                  onClick={() => setFiltersOpen(true)}
+                  aria-haspopup="dialog"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 me-1" />
-                  {t('proximate.partners.filters')}
+                  {t('common.status')}
                   {statusFilter !== 'all' ? ' (1)' : ''}
                 </Button>
-                <div className={`${filtersOpen ? 'flex' : 'hidden'} sm:flex items-center gap-1 flex-wrap w-full sm:w-auto`}>
-                  {['all', 'nominated', 'endorsements_open', 'dd_pending', 'dd_clear', 'suspended'].map((s) => (
+                <Button
+                  size="sm" variant="outline" className="sm:hidden"
+                  onClick={() => setMoreOpen(true)}
+                  aria-haspopup="dialog"
+                >
+                  {t('common.more')}
+                </Button>
+                <div className="hidden sm:flex items-center gap-1 flex-wrap">
+                  {PARTNER_STATUS_FILTERS.map((s) => (
                     <button
                       key={s}
                       type="button"
                       onClick={() => setStatusFilter(s)}
+                      aria-pressed={statusFilter === s}
                       className="text-[11px] px-2.5 py-1 rounded-md border transition-colors"
                       style={statusFilter === s
                         ? { background: 'var(--prox-accent)', color: '#fff', borderColor: 'transparent' }
@@ -391,6 +425,36 @@ export default function ProximatePartnersPage() {
                     </button>
                   ))}
                 </div>
+                <BottomSheet
+                  open={filtersOpen}
+                  onClose={() => setFiltersOpen(false)}
+                  title={t('common.status')}
+                >
+                  {PARTNER_STATUS_FILTERS.map((s) => (
+                    <SheetOption
+                      key={s}
+                      selected={statusFilter === s}
+                      trailing={counts[s] || 0}
+                      onClick={() => { setStatusFilter(s); setFiltersOpen(false); }}
+                    >
+                      {s === 'all' ? t('common.all') : labelForProximateStatus(s, t)}
+                    </SheetOption>
+                  ))}
+                </BottomSheet>
+                <BottomSheet
+                  open={moreOpen}
+                  onClose={() => setMoreOpen(false)}
+                  title={t('common.more')}
+                >
+                  <SheetOption
+                    onClick={() => { setMoreOpen(false); importRef.current?.click(); }}
+                  >
+                    {t('proximate.partners.import_pifs')}
+                  </SheetOption>
+                  <SheetOption href="/proximate/admin/partners/new">
+                    {t('proximate.partners.nominate')}
+                  </SheetOption>
+                </BottomSheet>
                 {/* Saved filters row: replay a named search+status combo. */}
                 {(savedFilters.length > 0 || statusFilter !== 'all' || filter.trim()) && (
                   <div className="flex items-center gap-1.5 flex-wrap pt-1">
@@ -455,7 +519,7 @@ export default function ProximatePartnersPage() {
                           distinguishes two partners (PFX-SEP02-PARTNERS-002). */}
                       <strong className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14 }}>
                         {p.name}
-                        {isTestRecord(p.name) && (
+                        {recordIsTest(p, p.name) && (
                           <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>
                             {t('common.test_record')}
                           </span>

@@ -10,9 +10,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Banknote } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { api } from '@/lib/api';
-import { PageShell, PageHeader, PageMain } from '@/components/layout/page-shell';
+import { PageShell, PageHeader, PageMain, PageBack } from '@/components/layout/page-shell';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
 const input = 'w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
@@ -51,12 +51,11 @@ export default function RegisterFspPage() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: shared back component, above the header. */}
+      <PageBack href="/proximate/admin/fsps" label={t('proximate.nav.back_to_fsps')} />
       <PageHeader title={t('proximate.fsp.title')}
         subtitle={t('proximate.fsp.subtitle')} />
       <PageMain>
-        <Link href="/proximate/admin" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
-          <ArrowLeft className="w-4 h-4" /> {t('proximate.nom.back')}
-        </Link>
         <div className="prox-panel max-w-xl" style={{ padding: '20px' }}>
           <form onSubmit={submit} className="space-y-4">
             <div>

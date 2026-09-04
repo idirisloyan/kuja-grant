@@ -142,6 +142,11 @@ class ProximateGrant(db.Model):
         db.DateTime, nullable=False, default=_now, onupdate=_now,
     )
 
+    # Historical-import provenance (4 Sep 2026 QA pack) — see
+    # import_historical_round.py. NULL for grants entered in the product.
+    import_batch_id = db.Column(db.String(64), nullable=True, index=True)
+    import_source_ref = db.Column(db.String(120), nullable=True)
+
     # ---- computed properties ---------------------------------------------
 
     @property
@@ -180,8 +185,13 @@ class ProximateGrant(db.Model):
             return {}
 
     def to_dict(self, *, include_extracted: bool = False) -> dict:
+        from app.utils.test_records import grant_is_test
         data = {
             'id': self.id,
+            # ONE test-data policy (PFX-04SEP-GLOBAL-001): inherited from the
+            # donor / reference / creator, not just the title.
+            'is_test': grant_is_test(self),
+            'import_batch_id': self.import_batch_id,
             'network_id': self.network_id,
             'donor_id': self.donor_id,
             'donor_name': self.donor_name_cache,

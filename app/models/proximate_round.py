@@ -198,6 +198,13 @@ class ProximateRound(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=_now)
     updated_at = db.Column(db.DateTime, nullable=False, default=_now, onupdate=_now)
 
+    # Historical-import provenance (4 Sep 2026 QA pack). Set ONLY by
+    # import_historical_round.py; NULL for every round created through the
+    # product. `import_batch_id` groups one import run (idempotency +
+    # rollback); `import_source_ref` is the row's id in the source file.
+    import_batch_id = db.Column(db.String(64), nullable=True, index=True)
+    import_source_ref = db.Column(db.String(120), nullable=True)
+
     # ---- money ----------------------------------------------------------
 
     @property
@@ -394,8 +401,12 @@ class ProximateRound(db.Model):
         }
 
     def to_dict(self, *, include_signatures: bool = False) -> dict:
+        from app.utils.test_records import round_is_test
         data = {
             "id": self.id,
+            # ONE test-data policy (PFX-04SEP-GLOBAL-001).
+            "is_test": round_is_test(self),
+            "import_batch_id": self.import_batch_id,
             "network_id": self.network_id,
             "title": self.title,
             "title_ar": self.title_ar,

@@ -524,6 +524,60 @@ def run_proximate_writes(base):
              override=OV, allow={200, 400, 403, 422, 503})
     check("OB POST /proximate/grants/extract-agreement", grant_extract)
 
+    # --- PFX-04SEP-GLOBAL-001: ONE test-data policy, applied server-side ---
+    # The 4 Sep QA round saw the dashboard count 99 partners while the
+    # register showed 81 + 18 hidden: the rollup ignored the flag the
+    # register honoured. The overview must now sum exactly the rows the
+    # register calls real, and flip to the full set only when the caller
+    # asks for test data — the same `showTestData` flag the UI persists.
+    def test_scope_reconciles():
+        parts = get(ob, base, "/api/proximate/partners", override=OV).json()
+        rows = parts.get("partners") or []
+        assert rows, "partners register returned no rows to reconcile against"
+        assert all("is_test" in p for p in rows), \
+            "every partner row must carry the server verdict `is_test`"
+        real = [p for p in rows if not p["is_test"]]
+        ov = get(ob, base, "/api/proximate/overview", override=OV).json()
+        assert ov["partners_total"] == len(real), (
+            f"overview partners_total={ov['partners_total']} but the register "
+            f"has {len(real)} real partners ({len(rows) - len(real)} test)")
+        assert ov.get("partners_test_hidden") == len(rows) - len(real), \
+            "overview must say how many fixture partners it left out"
+        ov_all = get(ob, base, "/api/proximate/overview?include_test=1",
+                     override=OV).json()
+        assert ov_all["partners_total"] == len(rows), (
+            f"include_test=1 overview partners_total={ov_all['partners_total']} "
+            f"!= register total {len(rows)}")
+    check("GLOBAL-001 overview partner count == register (hidden / shown)",
+          test_scope_reconciles)
+
+    def test_status_is_inherited():
+        # A real-looking title under a UAT donor reference is test data —
+        # classified by what it belongs to, not by its own name.
+        r = post(ob, base, "/api/proximate/grants", {
+            "title": "Sudan Rapid Shelter Support 2026",
+            "donor_grant_ref": "UAT-REG-001",
+            "amount_committed_usd": 1000, "currency": "USD",
+            "reporting_cadence": "quarterly",
+        }, override=OV, allow={200, 201})
+        g = r.json().get("grant") or r.json()
+        assert g.get("is_test") is True, \
+            f"grant under a UAT reference must be is_test=True, got {g.get('is_test')!r}"
+        r2 = post(ob, base, "/api/proximate/grants", {
+            "title": "Regression Donor Grant (real)",
+            "amount_committed_usd": 1000, "currency": "USD",
+            "reporting_cadence": "quarterly",
+        }, override=OV, allow={200, 201})
+        g2 = r2.json().get("grant") or r2.json()
+        assert g2.get("is_test") is False, \
+            f"plain grant must be is_test=False, got {g2.get('is_test')!r}"
+        listed = get(ob, base, "/api/proximate/grants", override=OV).json()
+        by_id = {x["id"]: x for x in listed.get("grants") or []}
+        assert by_id.get(g["id"], {}).get("is_test") is True, \
+            "the register must carry the same verdict as the create response"
+    check("GLOBAL-001 test status is inherited (UAT reference -> is_test)",
+          test_status_is_inherited)
+
     # --- rounds module ---
     def round_create():
         post(ob, base, "/api/proximate/rounds", {

@@ -192,6 +192,10 @@ class ProximatePartner(db.Model):
     # see all their disbursements + outcome obligations + acks
     # without needing a Kuja login.
     mini_portal_token = db.Column(db.String(64), nullable=True, unique=True, index=True)
+    # Historical-import provenance (4 Sep 2026 QA pack) — see
+    # import_historical_round.py. NULL for partners nominated in the product.
+    import_batch_id = db.Column(db.String(64), nullable=True, index=True)
+    import_source_ref = db.Column(db.String(120), nullable=True)
     created_at = db.Column(
         db.DateTime, nullable=False,
         default=lambda: datetime.now(timezone.utc),
@@ -256,9 +260,14 @@ class ProximatePartner(db.Model):
         }
 
     def to_dict(self) -> dict:
+        from app.utils.test_records import partner_is_test
         signals = self.trust_floor_signals()
         return {
             "id": self.id,
+            # ONE test-data policy (PFX-04SEP-GLOBAL-001) — the server says
+            # whether this is a fixture; registers and KPIs both read it.
+            "is_test": partner_is_test(self),
+            "import_batch_id": self.import_batch_id,
             "network_id": self.network_id,
             "name": self.name,
             "name_ar": self.name_ar,

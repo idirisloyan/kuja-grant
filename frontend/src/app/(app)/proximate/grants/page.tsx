@@ -18,7 +18,7 @@ import { LoadError } from '@/components/proximate/load-error';
 import { labelForProximateStatus } from '@/lib/proximate-status-labels';
 import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { TestDataToggle } from '@/components/proximate/test-data-toggle';
-import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { recordIsTest, splitTestRecords } from '@/lib/test-records';
 import { useUIStore } from '@/stores/ui-store';
 import {
   PageShell, PageHeader, PageMain,
@@ -213,7 +213,7 @@ export default function ProximateGrantsListPage() {
                       <div className="flex-1 min-w-0">
                         <p className="line-clamp-2" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontSize: 14, fontWeight: 700 }}>
                           {g.title}
-                          {isTestRecord(g.title, g.donor_name) && (
+                          {recordIsTest(g, g.title, g.donor_name) && (
                             <span className="prox-pill slate" style={{ marginInlineStart: 6, verticalAlign: 'middle' }}>
                               {t('common.test_record')}
                             </span>
@@ -230,7 +230,28 @@ export default function ProximateGrantsListPage() {
                         {labelForProximateStatus(g.status, t)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* PFX-04SEP-MOBILE-005: on a phone each grant is one
+                        compact row — the two numbers that drive a decision
+                        on one line; the four-cell grid returns from sm up
+                        and the detail page holds the rest. */}
+                    <div className="sm:hidden text-xs flex items-center gap-2 flex-wrap" style={{ color: 'var(--prox-muted)' }}>
+                      <span>
+                        {t('proximate.grants.committed')}{' '}
+                        <span className="prox-mono font-semibold" style={{ color: 'var(--prox-ink)' }}>{fmtUsd(g.amount_committed_usd)}</span>
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {t('proximate.grants.remaining')}{' '}
+                        <span className="prox-mono font-semibold" style={{ color: 'var(--prox-ink)' }}>{fmtUsd(g.amount_remaining_usd)}</span>
+                      </span>
+                      {g.amount_committed_usd ? (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span>{t('proximate.grants.pct_of_committed', { pct: pctAllocated.toFixed(0) })}</span>
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="hidden sm:grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
                         <div className="prox-eyebrow">{t('proximate.grants.committed')}</div>
                         <div className="prox-mono" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{fmtUsd(g.amount_committed_usd)}</div>
@@ -256,11 +277,11 @@ export default function ProximateGrantsListPage() {
                         </div>
                       </div>
                     </div>
-                    {g.amount_committed_usd && (
-                      <div className="prox-bar" style={{ marginTop: 11 }}>
+                    {g.amount_committed_usd ? (
+                      <div className="prox-bar hidden sm:block" style={{ marginTop: 11 }}>
                         <i style={{ width: `${pctAllocated}%` }} />
                       </div>
-                    )}
+                    ) : null}
                   </Link>
                 );
               })}

@@ -203,8 +203,14 @@ export default function NotificationSettingsPage() {
         </p>
       </div>
 
+      {/* PFX-04SEP-DESKTOP-001: "Delivery channels" is its own section — the
+          numbers a message can reach, separate from which categories use
+          them. */}
       <Card className="p-4 sm:p-5">
-        <div className="kuja-label">{t('notif_prefs.contact_details')}</div>
+        <div className="kuja-label">{t('notif_prefs.delivery_channels')}</div>
+        <p className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-1">
+          {t('notif_prefs.delivery_channels_hint')}
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
           <div>
             <label htmlFor="phone" className="text-xs font-semibold flex items-center gap-1.5">
@@ -237,7 +243,104 @@ export default function NotificationSettingsPage() {
         </p>
       </Card>
 
-      <Card className="p-4 sm:p-5">
+      {/* PFX-04SEP-DESKTOP-001: from sm up the same preferences read as a
+          MATRIX — one row per category, one column per channel — so the whole
+          mix is visible at once instead of one disclosure at a time. Phones
+          keep the per-category disclosure below. Both write the same state
+          through toggleChannel, so nothing about what is saved changes. */}
+      <Card className="p-4 sm:p-5 hidden sm:block">
+        <div className="kuja-label">{t('notif_prefs.channels_per_category')}</div>
+        <div className="overflow-x-auto mt-3">
+          <table className="w-full text-sm" aria-label={t('notif_prefs.channels_per_category')}>
+            <thead>
+              <tr className="text-xs text-[hsl(var(--kuja-ink-soft))]">
+                <th scope="col" className="text-start font-semibold py-2 pe-3">
+                  {t('notif_prefs.matrix_category')}
+                </th>
+                {prefs.catalog.channels.map((ch) => {
+                  const cm = CHANNEL_LABELS[ch];
+                  const Icon = cm?.icon ?? Bell;
+                  return (
+                    <th key={ch} scope="col" className="text-center font-semibold py-2 px-2 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        <Icon className="w-3 h-3" /> {cm ? t(cm.labelKey) : ch}
+                      </span>
+                      {cm?.muted && (
+                        <Badge variant="outline" className="ms-1 text-[9px]">
+                          {ch === 'web_push' ? t('notif_prefs.badge_soon') : t('notif_prefs.badge_stub')}
+                        </Badge>
+                      )}
+                    </th>
+                  );
+                })}
+                <th scope="col" className="py-2 ps-2">
+                  <span className="sr-only">{t('notif_prefs.test')}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[hsl(var(--border))]">
+              {prefs.categories.map((c) => {
+                const meta = CATEGORY_LABELS[c.category];
+                const catLabel = meta ? t(meta.labelKey) : c.category;
+                return (
+                  <tr key={c.category}>
+                    <th scope="row" className="text-start py-2.5 pe-3 align-top font-normal">
+                      <div className="text-sm font-semibold">{catLabel}</div>
+                      <div className="text-xs text-[hsl(var(--kuja-ink-soft))] mt-0.5">
+                        {meta ? t(meta.hintKey) : ''}
+                      </div>
+                    </th>
+                    {prefs.catalog.channels.map((ch) => {
+                      const cm = CHANNEL_LABELS[ch];
+                      const enabled = c.channels.includes(ch);
+                      const locked = cm?.locked;
+                      const channelLabel = cm ? t(cm.labelKey) : ch;
+                      return (
+                        <td key={ch} className="text-center py-2.5 px-2 align-top">
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={enabled}
+                            aria-label={`${catLabel} · ${channelLabel}`}
+                            disabled={locked}
+                            onClick={() => toggleChannel(c.category, ch)}
+                            title={locked
+                              ? t('notif_prefs.tooltip_always_on')
+                              : (enabled ? t('notif_prefs.tooltip_click_disable') : t('notif_prefs.tooltip_click_enable'))}
+                            className={cn(
+                              'inline-flex items-center justify-center w-8 h-8 rounded-md border transition-colors',
+                              enabled
+                                ? 'border-[hsl(var(--kuja-clay))] bg-[hsl(var(--kuja-clay)/0.10)] text-[hsl(var(--kuja-clay))]'
+                                : 'border-[hsl(var(--border))] text-[hsl(var(--kuja-ink-soft))] hover:border-[hsl(var(--kuja-clay))]',
+                              locked && 'opacity-60 cursor-not-allowed',
+                              cm?.muted && !enabled && 'opacity-60',
+                            )}
+                          >
+                            {enabled
+                              ? <Check className="w-4 h-4" />
+                              : <span className="w-4 h-4" aria-hidden="true" />}
+                          </button>
+                        </td>
+                      );
+                    })}
+                    <td className="py-2.5 ps-2 text-end align-top">
+                      <button
+                        type="button"
+                        onClick={() => sendTest(c.category)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[hsl(var(--border))] px-2 py-1 text-[11px] font-semibold hover:bg-[hsl(var(--kuja-sand-50))] whitespace-nowrap"
+                      >
+                        <Send className="w-3 h-3" /> {t('notif_prefs.test')}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card className="p-4 sm:p-5 sm:hidden">
         <div className="kuja-label">{t('notif_prefs.channels_per_category')}</div>
         <div className="mt-3 divide-y divide-[hsl(var(--border))]">
           {prefs.categories.map((c) => {

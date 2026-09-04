@@ -13,12 +13,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Loader2, UploadCloud, FileText, Sparkles, Plus, X, ArrowLeft,
+  Loader2, UploadCloud, FileText, Sparkles, Plus, X,
   CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import {
-  PageShell, PageHeader, PageMain,
+  PageShell, PageHeader, PageMain, PageBack,
 } from '@/components/layout/page-shell';
 import { useTranslation } from '@/lib/hooks/use-translation';
 
@@ -200,19 +200,14 @@ export default function ProximateGrantWizardPage() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: shared back component, above the header. */}
+      <PageBack href="/proximate/grants" label={t('proximate.gw.back')} />
       <PageHeader
         title={t('proximate.gw.title')}
         subtitle={t('proximate.gw.subtitle')}
       />
       <PageMain>
         <div className="max-w-3xl space-y-4">
-          <Link
-            href="/proximate/grants"
-            className="text-xs inline-flex items-center gap-1 hover:underline"
-            style={{ color: 'var(--prox-muted)' }}
-          >
-            <ArrowLeft className="w-3 h-3" /> {t('proximate.gw.back')}
-          </Link>
 
           {error && (
             <div className="prox-panel" style={{ padding: '12px', border: '1px solid color-mix(in srgb, var(--prox-danger) 40%, transparent)', background: 'var(--prox-danger-tint)' }}>

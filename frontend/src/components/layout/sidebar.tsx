@@ -44,6 +44,7 @@ import { tenantKind } from '@/lib/tenant';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import { useProximatePersona, type ProximatePersona } from '@/lib/hooks/use-proximate-persona';
 import { cn } from '@/lib/utils';
+import { AppearanceSegment } from '@/components/shared/theme-toggle';
 
 import {
   LayoutDashboard, ClipboardCheck, Search, FileText, BarChart3, Building2,
@@ -185,6 +186,27 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
         )}
       </div>
 
+      {/* PFX-04SEP-MOBILE-001 — in the drawer, say where the user is and who
+          they are here: Workspace · Role. Multi-role testers on one phone
+          otherwise had no way to tell which seat they were in. */}
+      <div className="lg:hidden border-b border-white/5 px-4 py-3 text-[11px] space-y-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="uppercase tracking-[0.14em] text-[#8C6450]">{t('sidebar.workspace')}</span>
+          <span className="font-medium text-[#F4E8DC] truncate">{network?.name || 'Kuja'}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="uppercase tracking-[0.14em] text-[#8C6450]">{t('sidebar.role')}</span>
+          <span className="font-medium text-[#F4E8DC] truncate capitalize">
+            {isProximateFlavor
+              ? (persona === 'ob' ? t('sidebar.role_ob')
+                : persona === 'admin' ? t('sidebar.role_operator')
+                  : persona === 'donor' ? t('sidebar.role_donor')
+                    : (role ?? ''))
+              : (role ?? '')}
+          </span>
+        </div>
+      </div>
+
       {/* Nav: labeled groups when the profile defines them, else the
           classic primary + secondary split */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
@@ -241,12 +263,23 @@ export function Sidebar({ width, collapsedWidth }: SidebarProps) {
         )}
       </nav>
 
+      {/* PFX-04SEP-MOBILE-003 — Appearance in the drawer footer (and in the
+          account sheet), never another header icon. */}
+      <div className="lg:hidden border-t border-white/5 px-4 py-3">
+        <div className="text-[9px] uppercase tracking-[0.14em] text-[#8C6450] mb-1.5">
+          {t('header.appearance')}
+        </div>
+        <AppearanceSegment onDark className="w-full justify-between" />
+      </div>
+
       {/* Collapse toggle */}
       <button
         type="button"
         onClick={toggleSidebar}
         className={cn(
-          'hidden lg:flex items-center gap-2 border-t border-white/5 px-3 py-3 text-xs text-[#B5816C] hover:bg-white/5 hover:text-white transition-colors',
+          // #C9967F measures 5.7:1 on the sidebar ground; the previous #B5816C
+          // sat at 4.46:1, just under the 4.5:1 text gate (PFX-04SEP-MOBILE-002).
+          'hidden lg:flex items-center gap-2 border-t border-white/5 px-3 py-3 text-xs text-[#C9967F] hover:bg-white/5 hover:text-white transition-colors',
           sidebarCollapsed && 'justify-center px-0',
         )}
         aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
@@ -365,6 +398,7 @@ function NavGroup({
             <Link
               href={item.href}
               title={collapsed ? item.label : undefined}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'kuja-nav-link group flex items-center rounded-md text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2',

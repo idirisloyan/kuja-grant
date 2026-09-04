@@ -210,10 +210,13 @@ export default function CrisisSelectorPage() {
             Not clear what it is or how it works." Answer the three
             questions before showing any data. */}
         <div className="prox-panel" style={{ padding: '16px 18px', background: 'var(--prox-surface-2)' }}>
-          <p className="text-sm mb-1" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
+          {/* PFX-04SEP-MOBILE-010: on a phone the page subtitle already states
+              the purpose, so the explainer collapses to the 3-step indicator;
+              the title + sentence return from sm up. */}
+          <p className="text-sm mb-1 hidden sm:block" style={{ fontFamily: 'var(--font-prox-display), "Bricolage Grotesque", sans-serif', fontWeight: 700 }}>
             {t('proximate.crisis_selector.explainer_title')}
           </p>
-          <p className="text-xs mb-3" style={{ color: 'var(--prox-muted)' }}>
+          <p className="text-xs mb-3 hidden sm:block" style={{ color: 'var(--prox-muted)' }}>
             {t('proximate.crisis_selector.explainer_body')}
           </p>
           <div className="flex items-center gap-2 flex-wrap text-xs">

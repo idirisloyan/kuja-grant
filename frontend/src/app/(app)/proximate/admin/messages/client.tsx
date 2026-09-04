@@ -227,8 +227,12 @@ export function ProximateMessagesClient() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
+          {/* PFX-04SEP-MOBILE-008: the tab row stays put under the global
+              header (4rem) + the mobile context bar (44px) while the list
+              scrolls, so Inbox / Outbound / Delivery are always one tap
+              away. Static again from lg up where the sidebar is docked. */}
           <div
-            className="flex items-center gap-1 overflow-x-auto"
+            className="flex items-center gap-1 overflow-x-auto sticky top-[calc(4rem+44px)] lg:static z-10 bg-background"
             role="tablist"
             style={{ borderBottom: '1px solid var(--prox-line)' }}
           >

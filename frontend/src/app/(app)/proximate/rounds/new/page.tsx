@@ -14,7 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
 import {
-  PageShell, PageHeader, PageMain,
+  PageShell, PageHeader, PageMain, PageBack,
 } from '@/components/layout/page-shell';
 
 interface DonorOption {
@@ -117,6 +117,8 @@ export default function NewProximateRoundPage() {
 
   return (
     <PageShell>
+      {/* PFX-04SEP-NAV-001: shared back component, above the header. */}
+      <PageBack href="/proximate/rounds" label={t('proximate.nav.back_to_rounds')} />
       <PageHeader
         title={t('proximate.rounds.new_title')}
         subtitle={t('proximate.rounds.new_subtitle')}

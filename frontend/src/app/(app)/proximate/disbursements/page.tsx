@@ -23,7 +23,7 @@ import { useTranslation } from '@/lib/hooks/use-translation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadError } from '@/components/proximate/load-error';
-import { isTestRecord, splitTestRecords } from '@/lib/test-records';
+import { recordIsTest, splitTestRecords } from '@/lib/test-records';
 import { TestDataToggle } from '@/components/proximate/test-data-toggle';
 import { useUIStore } from '@/stores/ui-store';
 import {
@@ -204,7 +204,7 @@ export default function ProximateDisbursementsPage() {
             <span className={`prox-pill ${proxPillForStatus(d.status)}`}>
               {labelForProximateStatus(d.status, t)}
             </span>
-            {showTest && isTestRecord(d.partner_name) && (
+            {showTest && recordIsTest(d, d.partner_name) && (
               <span className="prox-pill slate">{t('common.test_record')}</span>
             )}
           </div>
@@ -285,17 +285,33 @@ export default function ProximateDisbursementsPage() {
                   {g.rows.length} × {labelForProximateStatus(g.rows[0].status, t)}
                 </span>
               </div>
-              <small className="block" style={{ marginTop: 3 }}>
-                <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>${total.toLocaleString()}</span>
-                {g.rows.map((d) => {
-                  const age = d.status === 'pending_report' ? dueAge(d.report_due_at) : null;
-                  return age ? (
-                    <span key={d.id} style={age.late ? { color: 'var(--prox-danger)' } : undefined}>
-                      {' · '}<span className="prox-mono">${(d.amount_usd ?? 0).toLocaleString()}</span> {age.text}
+              {(() => {
+                // PFX-04SEP-MOBILE-009: a collapsed group is a DECISION
+                // summary, not a preview of every row. One line: the money
+                // at stake, how many reports are late, and the oldest —
+                // the individual rows are one tap away.
+                const lateDays = g.rows
+                  .filter((d) => d.status === 'pending_report' && d.report_due_at)
+                  .map((d) => Math.round(
+                    (Date.now() - new Date(d.report_due_at as string).getTime()) / 86_400_000,
+                  ))
+                  .filter((n) => Number.isFinite(n) && n >= 0);
+                const oldest = lateDays.length ? Math.max(...lateDays) : 0;
+                return (
+                  <small className="block" style={{ marginTop: 3 }}>
+                    <span className="prox-mono" style={{ fontWeight: 600, color: 'var(--prox-ink)' }}>
+                      ${total.toLocaleString()}
                     </span>
-                  ) : null;
-                })}
-              </small>
+                    {' '}{t('proximate.disbursements.group_total')}
+                    {lateDays.length > 0 && (
+                      <span style={{ color: 'var(--prox-danger)' }}>
+                        {' · '}{t('proximate.disbursements.group_overdue', { n: lateDays.length })}
+                        {' · '}{t('proximate.disbursements.group_oldest', { n: oldest })}
+                      </span>
+                    )}
+                  </small>
+                );
+              })()}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap justify-end">
               <Link

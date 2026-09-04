@@ -60,6 +60,9 @@
     --kuja-flag: 0 74% 42%;             /* danger #B91C1C */
     --kuja-spark: 262 83% 58%;          /* AI purple #7C3AED */
     --kuja-spark-soft: 262 90% 96%;
+    /* Text-safe spark: ≥ 4.5:1 on --kuja-spark-soft (the brand hue is a
+       button/icon colour, not a text colour). PFX-04SEP-MOBILE-002. */
+    --kuja-spark-ink: 262 60% 42%;
 
     --radius: 0.625rem;
   }
@@ -342,6 +345,7 @@
   /* One accent: the loud AI purple becomes a calm slate. */
   --kuja-spark: 220 16% 48%;
   --kuja-spark-soft: 220 16% 95%;
+  --kuja-spark-ink: 220 18% 38%;
 }
 
 /* Flat, tone-coded decision cards — the busy gradient fill becomes a faint
@@ -626,4 +630,50 @@ button { word-break: keep-all; overflow-wrap: anywhere; }
   [data-tenant="proximate"]:has(nav[aria-label="Primary"]) .prox-above-nav{
     bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
+}
+
+/* ================================================================
+   PFX-04SEP-MOBILE-002 — dark mode is TOKEN-driven.
+   Root cause of the near-black headings on the dark canvas: `.kuja-display`
+   paints hsl(var(--kuja-ink)) and the Kuja tokens (--kuja-ink, --kuja-ink-soft,
+   --kuja-sand-50, …) were defined only on :root — `.dark` never redefined
+   them, so every display heading, every ink-tinted label and every sand-
+   tinted surface stayed light-theme in dark mode, on every tenant.
+   1) Generic dark values for the Kuja tokens (all tenants).
+   2) Proximate: map the shadcn surface/text variables onto the warm
+      Proximate dark palette so inputs, cards and menus stop rendering in the
+      cool navy of the generic dark theme next to warm brown panels.
+   Contrast (WCAG AA): ink #F6EFE8 on ground #15110D ≈ 16:1; muted #968B7F on
+   surface #1F1913 ≈ 5.5:1; ink-2 #C7BDB2 ≈ 10:1.
+   ================================================================ */
+.dark{
+  --kuja-ink:0 0% 96%;
+  --kuja-ink-soft:215 20% 72%;
+  --kuja-sand:222 28% 18%;
+  --kuja-sand-50:222 30% 12%;
+  --kuja-quartz:222 47% 5%;
+  --kuja-savanna-soft:100 20% 18%;
+  --kuja-spark-soft:262 40% 16%;
+  --kuja-spark-ink:262 40% 82%;
+}
+[data-tenant="proximate"].dark{
+  --background:28 24% 7%;          /* --prox-ground  #15110D */
+  --foreground:30 44% 94%;         /* --prox-ink     #F6EFE8 */
+  --card:30 24% 10%;               /* --prox-surface #1F1913 */
+  --card-foreground:30 44% 94%;
+  --popover:30 24% 10%;
+  --popover-foreground:30 44% 94%;
+  --muted:32 27% 13%;              /* --prox-inset   #2A2219 */
+  --muted-foreground:31 10% 58%;   /* --prox-muted   #968B7F, lifted a step */
+  --secondary:32 27% 13%;
+  --secondary-foreground:30 44% 94%;
+  --accent:31 24% 15%;
+  --accent-foreground:30 44% 94%;
+  --border:30 20% 16%;             /* --prox-line    #302820 */
+  --input:33 22% 20%;              /* --prox-line-2  #3D3327 */
+  --kuja-ink:30 44% 94%;
+  --kuja-ink-soft:31 16% 74%;      /* --prox-ink-2   #C7BDB2 */
+  --kuja-sand-50:30 24% 12%;
+  --kuja-sand:30 22% 16%;
+  --kuja-quartz:28 16% 7%;
 }

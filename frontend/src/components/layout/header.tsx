@@ -20,7 +20,7 @@ import {
   Menu, LogOut, Sparkles, ChevronDown, User as UserIcon, Check, Globe, Search, Signal, SignalLow, Bell, Palette,
 } from 'lucide-react';
 import { ChangelogButton } from './ChangelogButton';
-import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { ThemeToggle, AppearanceSegment } from '@/components/shared/theme-toggle';
 
 export function Header() {
   const router = useRouter();
@@ -182,7 +182,9 @@ export function Header() {
         <button
           type="button"
           onClick={openCopilot}
-          className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--kuja-spark))]/20 bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--kuja-spark))] hover:bg-[hsl(var(--kuja-spark))]/15 transition-colors"
+          // Label uses the spark INK token (4.5:1+ on the soft ground in both
+          // themes); the brand spark hue itself only reached 4.2:1 (MOBILE-002).
+          className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--kuja-spark))]/20 bg-[hsl(var(--kuja-spark-soft))] px-3 py-1.5 text-sm font-medium text-[hsl(var(--kuja-spark-ink))] hover:bg-[hsl(var(--kuja-spark))]/15 transition-colors"
         >
           <Sparkles className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{t('header.ai_assistant') || 'Ask AI'}</span>
@@ -308,10 +310,15 @@ export function Header() {
                     ))}
                   </select>
                 </label>
-                <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-foreground">
-                  <Palette className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="flex-1">{t('header.theme')}</span>
-                  <ThemeToggle />
+                {/* PFX-04SEP-MOBILE-003 — Appearance [System | Light | Dark]
+                    in the account sheet; the same control sits in the drawer
+                    footer. Both read one shared mode. */}
+                <div className="px-3 py-1.5 text-sm text-foreground">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Palette className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span>{t('header.appearance')}</span>
+                  </div>
+                  <AppearanceSegment className="w-full" />
                 </div>
                 <button
                   type="button"

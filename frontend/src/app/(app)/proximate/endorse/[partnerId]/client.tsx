@@ -22,7 +22,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Loader2, Check, X, AlertTriangle, CheckCircle2,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { apiOffline, api, isQueuedResponse } from '@/lib/api';
 import { useTranslation } from '@/lib/hooks/use-translation';
@@ -43,7 +42,7 @@ import { proxPillForStatus } from '@/components/proximate/status-badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
-  PageShell, PageHeader, PageMain,
+  PageShell, PageHeader, PageMain, PageBack,
 } from '@/components/layout/page-shell';
 
 // Redesign Stage 3 — OB partner-detail tabs. Endorsers keep the
@@ -177,6 +176,11 @@ export default function ProximateEndorseWizardClient() {
   // Resolve the actual Proximate persona instead.
   const { persona } = useProximatePersona();
   const isOb = persona === 'ob';
+  // PFX-04SEP-NAV-001: one shared back control on every state of this page.
+  // An OB came from the partner register; a panel member came from their
+  // endorsement inbox — the parent differs, the component does not.
+  const backHref = isOb ? '/proximate/admin/partners' : '/proximate/endorse';
+  const backLabel = isOb ? t('proximate.nav.back_to_partners') : t('proximate.result.back_to_inbox');
 
   const [data, setData] = useState<PartnerResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -402,13 +406,13 @@ export default function ProximateEndorseWizardClient() {
 
   const { partner, questions } = data;
   const displayName = isRtl && partner.name_ar ? partner.name_ar : partner.name;
-  const BackChevron = isRtl ? ChevronRight : ChevronLeft;
 
   // Queued offline — the PWA outbox will retry when the connection
   // returns. Critical for Sudan field workers; show clean confirmation.
   if (queued) {
     return (
       <PageShell>
+        <PageBack href={backHref} label={backLabel} />
         <PageHeader title={displayName} />
         <PageMain>
           <div className="space-y-4">
@@ -423,13 +427,9 @@ export default function ProximateEndorseWizardClient() {
                 </div>
               </div>
             </div>
-            <Button
-              onClick={() => router.push('/proximate/endorse')}
-              variant="outline"
-              className="w-full"
-            >
-              {t('proximate.result.back_to_inbox')}
-            </Button>
+            {/* PFX-04SEP-NAV-001: the way back is the shared PageBack above
+                the title (and the sticky context bar on phones) — no second
+                page-local return button. */}
           </div>
         </PageMain>
       </PageShell>
@@ -442,6 +442,7 @@ export default function ProximateEndorseWizardClient() {
     const signalCount = Object.keys(result.endorsement.coi_signals).length;
     return (
       <PageShell>
+        <PageBack href={backHref} label={backLabel} />
         <PageHeader title={displayName} icon={CheckCircle2} />
         <PageMain>
           <div className="space-y-4">
@@ -519,13 +520,9 @@ export default function ProximateEndorseWizardClient() {
               </ul>
             </div>
 
-            <Button
-              onClick={() => router.push('/proximate/endorse')}
-              variant="outline"
-              className="w-full"
-            >
-              {t('proximate.result.back_to_inbox')}
-            </Button>
+            {/* PFX-04SEP-NAV-001: the way back is the shared PageBack above
+                the title (and the sticky context bar on phones) — no second
+                page-local return button. */}
           </div>
         </PageMain>
       </PageShell>
@@ -535,6 +532,7 @@ export default function ProximateEndorseWizardClient() {
   // Wizard screen 2: 3 questions.
   return (
     <PageShell>
+      <PageBack href={backHref} label={backLabel} />
       <PageHeader
         title={displayName}
         subtitle={partner.locality ?? undefined}
@@ -545,15 +543,9 @@ export default function ProximateEndorseWizardClient() {
       />
       <PageMain>
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => router.push('/proximate/endorse')}
-            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-          >
-            <BackChevron className="w-3 h-3" />
-            {t('proximate.wizard.back')}
-          </button>
-
+          {/* PFX-04SEP-NAV-001: the page-local "Back to inbox" is gone — the
+              shared PageBack above the title (persona-aware) and the sticky
+              context bar on phones are the ONE return path. */}
           {isOb && (prevPartnerId || nextPartnerId) && (
             <div className="flex items-center justify-end gap-1.5 text-xs">
               {prevPartnerId ? (

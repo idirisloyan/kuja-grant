@@ -62,6 +62,20 @@ interface UIState {
 
   /** Toggle test-data visibility + persist to localStorage. */
   toggleShowTestData: () => void;
+
+  /** PFX-04SEP-MOBILE-001 — what the sticky mobile context bar shows.
+   *  Published by PageHeader (title + last breadcrumb as parent) and
+   *  PageBack (parent), refined by pages that carry a filter. Ephemeral. */
+  mobileContext: MobileContext | null;
+  setMobileContext: (ctx: MobileContext | null) => void;
+  setMobileContextParent: (parent: MobileContext['parent']) => void;
+  setMobileContextFilter: (filter: string | null) => void;
+}
+
+export interface MobileContext {
+  title: string;
+  parent?: { label: string; href: string } | null;
+  filter?: string | null;
 }
 
 const TEST_DATA_KEY = 'kuja.showTestData';
@@ -118,6 +132,13 @@ export const useUIStore = create<UIState>((set) => ({
       writeShowTestData(next);
       return { showTestData: next };
     }),
+
+  mobileContext: null,
+  setMobileContext: (ctx) => set({ mobileContext: ctx }),
+  setMobileContextParent: (parent) =>
+    set((s) => ({ mobileContext: s.mobileContext ? { ...s.mobileContext, parent } : { title: '', parent } })),
+  setMobileContextFilter: (filter) =>
+    set((s) => (s.mobileContext ? { mobileContext: { ...s.mobileContext, filter } } : {})),
 
   setLangOverride: (lang) => {
     writeLangOverride(lang);
